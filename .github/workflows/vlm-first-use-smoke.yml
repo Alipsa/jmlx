@@ -1,0 +1,200 @@
+name: WP4 one-pair native VLM smoke
+
+on:
+  # Available from the Actions UI after this workflow reaches the default branch.
+  workflow_dispatch:
+    inputs:
+      workloads:
+        description: Tier-B VLM cases to smoke (one old/new pair per case)
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - qwen3vl
+          - phi3v
+  # Opt-in label trigger: add (or remove and re-add) the
+  # `run-vlm-first-use-smoke` label to a same-repository PR to run this smoke
+  # on that PR's head. Fork PRs cannot use this self-hosted runner, so the
+  # job's `if` also requires the PR head to be in this repository.
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.label.name == 'run-vlm-first-use-smoke' &&
+       github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: self-macos-xl
+    timeout-minutes: 120
+    # The model cache dirs under $HOME/tier-b-models are shared with the
+    # Tier-B workflow's self-hosted arms, which clean and download into the
+    # same paths. The group is per model directory (tier-b-model-dir-<name>)
+    # to match the Tier-B arms' groups: a single-workload smoke contends only
+    # with the arm that touches its directory. A `both` smoke joins the
+    # distinct tier-b-model-dir-both group, which gates it against other
+    # `both` smokes but not against the individual arms; that residual case
+    # is safe on the single self-macos-xl runner (jobs queue on the runner
+    # itself) and the failure mode is a detectable, retryable arm failure.
+    # One shared group for all the cache-touching jobs is not an option: a
+    # GitHub concurrency group holds at most one in-progress and one pending
+    # request, and a newer request cancels the pending one (findings
+    # section 17.9 records the two runs that lost five arms to this).
+    concurrency:
+      group: ${{ format('tier-b-model-dir-{0}', inputs.workloads || 'both') }}
+      cancel-in-progress: false
+    env:
+      WP4_WORKLOADS: ${{ inputs.workloads || 'both' }}
+
+    steps:
+      - name: Isolate job paths and Gradle state
+        shell: bash
+        run: |
+          set -euo pipefail
+          job_tag="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          echo "GRADLE_USER_HOME=${RUNNER_TEMP}/wp4-gradle-${job_tag}" >> "$GITHUB_ENV"
+          echo "WP4_OLD_TREE=${RUNNER_TEMP}/wp4-old-${job_tag}" >> "$GITHUB_ENV"
+          echo "WP4_RUN_ROOT=${RUNNER_TEMP}/wp4-vlm-smoke-${job_tag}" >> "$GITHUB_ENV"
+          echo "WP4_MODEL_ROOT=${HOME}/tier-b-models" >> "$GITHUB_ENV"
+          mkdir -p "${RUNNER_TEMP}/wp4-gradle-${job_tag}"
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+          architecture: aarch64
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Create old-pin worktree with identical worker source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add --detach "$WP4_OLD_TREE" 46cb325bec9b4878534cc5c6bda1a569dfe4aa4c
+          worker_path=jmlx-benchmarks/src/main/java/se/alipsa/jmlx/benchmarks/VlmFirstUseWorker.java
+          mkdir -p "$WP4_OLD_TREE/$(dirname "$worker_path")"
+          cp "$worker_path" "$WP4_OLD_TREE/$worker_path"
+          cmp "$worker_path" "$WP4_OLD_TREE/$worker_path"
+
+      - name: Prepare pinned spec and clean persistent model caches
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/vlm-first-use/prepare-smoke.py \
+            --workloads "$WP4_WORKLOADS" \
+            --repo "$GITHUB_WORKSPACE" \
+            --old-tree "$WP4_OLD_TREE" \
+            --run-root "$WP4_RUN_ROOT" \
+            --model-root "$WP4_MODEL_ROOT"
+
+      - name: Download selected digest-pinned Tier-B artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$WP4_WORKLOADS" == both || "$WP4_WORKLOADS" == qwen3vl ]]; then
+            ./gradlew downloadTierBArtifact \
+              -PtierBManifest=tools/tier-b/qwen3vl-2b-instruct.json \
+              -PtierBTarget="$WP4_MODEL_ROOT/qwen3vl"
+          fi
+          if [[ "$WP4_WORKLOADS" == both || "$WP4_WORKLOADS" == phi3v ]]; then
+            ./gradlew downloadTierBArtifact \
+              -PtierBManifest=tools/tier-b/phi3v-4b-instruct.json \
+              -PtierBTarget="$WP4_MODEL_ROOT/phi3v"
+          fi
+
+      - name: Bootstrap each tree's pinned native runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd "$WP4_OLD_TREE" && ./scripts/bootstrap-native.sh)
+          ./scripts/bootstrap-native.sh
+
+      - name: Rebuild both installDist trees from their source
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd "$WP4_OLD_TREE" && ./gradlew --no-build-cache --rerun-tasks :jmlx-benchmarks:installDist)
+          ./gradlew --no-build-cache --rerun-tasks :jmlx-benchmarks:installDist
+
+      - name: Run one alternating old/new pair per selected VLM
+        shell: bash
+        run: ./gradlew :jmlx-benchmarks:benchmarkVlmFirstUse --args="$WP4_RUN_ROOT/spec.json"
+
+      - name: Verify the real worker protocol in the session report
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["WP4_RUN_ROOT"])
+          spec = json.loads((root / "spec.json").read_text())
+          session = json.loads((root / "session/session-report.json").read_text())
+          assert session["schema"] == "jmlx-vlm-first-use-session-3"
+          expected = {(w["name"], tree, 0) for w in spec["workloads"] for tree in ("old", "new")}
+          workers = session["workers"]
+          assert len(workers) == len(expected)
+          assert {(w["workload"], w["tree"], w["pair_index"]) for w in workers} == expected
+          # Pinned here, not taken from the launcher's own records, which
+          # already compare the worker reports the same way. The old tuple
+          # stays literal: the old tree is the fixed 46cb325 worktree, whose
+          # staged pin is the historical pair. The new tuple is derived from
+          # the new tree's own scripts/bootstrap-native.sh - the pin source,
+          # independent of the staged native output the launcher verifies -
+          # so a PR that repins the runtime does not break this assertion.
+          import re
+          bootstrap = (
+              Path(spec["trees"]["new"]["path"]) / "scripts" / "bootstrap-native.sh"
+          ).read_text()
+          metal = re.search(r'^MLX_METAL_VERSION="([^"]+)"', bootstrap, re.M)
+          commit = re.search(r'^MLX_C_COMMIT="([^"]+)"', bootstrap, re.M)
+          assert metal and commit, "pin variables not found in bootstrap-native.sh"
+          EXPECTED = {
+              "old": ("0.31.2", "fba4470b89073180056c9ea46c443051375f7399"),
+              "new": (metal.group(1), commit.group(1)),
+          }
+          worker_path = "jmlx-benchmarks/src/main/java/se/alipsa/jmlx/benchmarks/VlmFirstUseWorker.java"
+          pins = {}
+          for tree in session["trees"]:
+              assert (tree["native_pin"]["mlxMetalVersion"], tree["native_pin"]["mlxcCommit"]) == EXPECTED[tree["name"]]
+              assert tree["untracked"] == ([worker_path] if tree["name"] == "old" else [])
+              pins[tree["name"]] = tree["native_pin"]
+          for worker in workers:
+              report = worker["report"]
+              assert worker["classification"] == "ok"
+              assert report["schema"] == "jmlx-vlm-first-use-3"
+              assert report["exit_code"] == 0
+              for key in ("mlxMetalVersion", "mlxcCommit", "library_path"):
+                  assert report["native_pin"][key] == pins[worker["tree"]][key]
+              assert len(report["measured_ttft_s"]) == spec["measured"]
+              assert len(report["measured_full_generation_s"]) == spec["measured"]
+          print(f"Verified {len(workers)} real ok workers across {len(spec['workloads'])} workload(s)")
+          PY
+
+      - name: Upload spec and per-worker evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wp4-vlm-first-use-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ env.WP4_RUN_ROOT }}/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Remove old-pin worktree
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${WP4_OLD_TREE:-}" ]]; then
+            git worktree remove --force "$WP4_OLD_TREE" || git worktree prune --expire now
+          fi

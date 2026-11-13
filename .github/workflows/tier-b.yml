@@ -50,6 +50,28 @@ jobs:
     # still OOM-kill the job before the assertion runs.
     runs-on: ${{ matrix.runner || 'macos-26' }}
     timeout-minutes: 90
+    # The self-hosted arms clean and download into the persistent per-host
+    # model cache ($HOME/tier-b-models/<arm>); the WP4 smoke workflow
+    # (vlm-first-use-smoke.yml) cleans and downloads into the qwen3vl and phi3v
+    # directories of that same cache. The group is per model directory, so a
+    # job only contends with other jobs that touch the same directory.
+    # Per-directory grouping is required, not just preferable: a GitHub
+    # concurrency group holds at most one in-progress and one pending request,
+    # and a newer request cancels the pending one ("Canceling since a higher
+    # priority waiting request for <group> exists") — cancel-in-progress:
+    # false only protects the in-progress slot. One group for all four
+    # self-hosted arms therefore cancels two of them on every run (observed:
+    # runs 43395837213 and 43419328748, findings section 17.9). Hosted arms
+    # use per-run workspace caches, so they get a unique per-run group and
+    # keep running in parallel. The same one-in-progress-plus-one-pending
+    # limit still applies within a single group: with a job running for a
+    # directory and a second request for it pending, a third request for
+    # the same directory cancels the pending one - a visible cancelled
+    # job, never a silent pass (e.g. a scheduled arm queued behind a
+    # dispatch, then a labeled smoke of the same workload).
+    concurrency:
+      group: ${{ matrix.runner && format('tier-b-model-dir-{0}', matrix.name) || format('tier-b-arm-{0}-{1}', matrix.name, github.run_id) }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
@@ -201,21 +223,7 @@ jobs:
           : "${HOME:?the job environment must set HOME}"
           MODEL_DIR="$HOME/tier-b-models/${{ matrix.name }}"
           echo "Model dir: $MODEL_DIR"
-          mkdir -p "$MODEL_DIR"
-          python3 - "$MODEL_DIR" "$JMLX_TIER_B_MANIFEST" <<'PY'
-          import json, os, sys
-          from pathlib import Path
-
-          root = Path(sys.argv[1])
-          listed = {os.path.normpath(k) for k in json.load(open(sys.argv[2]))["files"]}
-          # Deepest first, so a directory is visited after its contents.
-          for path in sorted(root.rglob("*"), key=lambda p: len(p.parts), reverse=True):
-              rel = os.path.normpath(str(path.relative_to(root)))
-              if path.is_symlink() or (path.is_file() and rel not in listed):
-                  path.unlink()
-              elif path.is_dir() and not any(path.iterdir()):
-                  path.rmdir()
-          PY
+          python3 tools/tier-b/model_cache.py "$MODEL_DIR" "$JMLX_TIER_B_MANIFEST"
           echo "JMLX_TIER_B_MODEL_DIR=$MODEL_DIR" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v6
         with:
@@ -227,9 +235,9 @@ jobs:
       # process.platform === 'darwin'), which is the GitHub-hosted runner's
       # tool cache, so on the self-hosted arm it dies with "mkdir: /Users/runner:
       # Permission denied" before Python is even resolved. The self-hosted arm
-      # uses the machine's python3 instead (brew's, first on PATH); the only
-      # Python this job runs is a stdlib-only report heredoc, so no pinned
-      # toolchain is needed there.
+      # uses the machine's python3 instead (brew's, first on PATH); the Python
+      # this job runs there is stdlib-only (tools/tier-b/model_cache.py and the
+      # report heredoc), so no pinned toolchain is needed.
       - uses: actions/setup-python@v6
         if: '!matrix.runner'
         with:

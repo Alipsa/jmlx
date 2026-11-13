@@ -3600,3 +3600,818 @@ raw report.json placements and the 60 s hostrec samples:
   sentence covers separately.
 - No code, measurement or raw-data change; the digest manifest
   remains at 458 entries.
+
+## 17. WP4 — Both-pin, both-VLM first inference (2026-11-11, this host)
+
+Cross-references: "plan section N" is `req/plans/phase8-2-plan.md`; a bare
+"section N" is this findings file.
+
+### 17.1 Code and host state
+
+- Measured code: clean tree at e4cb1f0 (branch phase8-2-wp4; tracked-clean
+  — the only untracked file is the operator scratch script `resume.sh`,
+  recorded as untracked in every session report and never committed). The
+  WP4 harness (worker, launcher, launcher tests, `benchmarkVlmFirstUse`
+  task) landed in this one commit. The commit was amended once, from
+  a9b5abc, after the rejected first smoke (the TTFT stamping fix, section
+  17.2); the post-fix smoke and the full session both ran from the
+  amended SHA, so no measured code changed between them.
+- Label (plan section 5.2): this is a **code-and-pin comparison, not an
+  isolated native-pin effect**. The old tree runs the framework code
+  committed at 46cb325 (156 commits before the new tree) against the
+  0.31.2/fba4470 dylib; the new tree runs e4cb1f0 against
+  0.32.4/a26f2d5. What is shared and verified between the trees is the
+  measurement logic — `VlmFirstUseWorker.java`, byte-identical in both
+  trees (SHA-256
+  `405a839c2f0399391b67e399bfbbb83218a4ee44bab9c2c56d9631665ed02130`,
+  re-verified from disk by the launcher before the first fork and recorded
+  in both session reports; in the old tree it is an untracked file) — and
+  the workload bytes (digest-pinned manifests and images, re-verified per
+  fork by both launcher and worker). The launcher itself is new-tree only
+  (it forks and does not measure).
+- Trees (compat worktrees outside the checkout, resolved absolute paths
+  recorded in both session reports): new = `/Users/per/project/jmlx` at
+  e4cb1f0f43ddd90242237f7e155a399ca5c84cfd; old =
+  `/Users/per/jmlx-wp4-oldpin` at 46cb325bec9b4878534cc5c6bda1a569dfe4aa4c
+  (detached head; an ancestor of the new tree's HEAD). The old worktree
+  sits outside the checkout (a sibling of the project directory), so the
+  root inventory scans (`verifyMlxApiCallSites` and the others) see only
+  the current checkout's generated bindings, never the old tree's. The
+  main checkout was not repinned and its staged runtime was not touched;
+  the current generated bindings were never pointed at the old dylib —
+  each fork runs one tree's installDist against that tree's own staged
+  `native/install/lib` (each tree's `class_dir` and `native_dir` are
+  recorded in the session report's tree blocks, and the worker report
+  records the pin loaded from its own `-Djmlx.library.path`).
+- Pin identities, staged (read from disk by the launcher) and re-verified
+  at the worker's own `-Djmlx.library.path` (the property the loader
+  resolves first; this is the staged pin file at that path, not a runtime
+  verification of which dylib the process actually loaded): old 0.31.2 /
+  mlx-c fba4470b89073180056c9ea46c443051375f7399; new 0.32.4 /
+  mlx-c a26f2d584a14ec619ae8db9a09be03becd47598a. Launcher-side and
+  worker-side staged identities agree for all 24 workers.
+- Dist dependency sets (recorded, not a controlled variable): the old
+  tree's installDist resolves jackson 3.1.2, jmlx-jinja 0.6.0,
+  jmlx-tokenizer/jmlx-vision 0.1.0; the new tree's resolves jackson 3.2.4,
+  jmlx-jinja 0.6.2, jmlx-tokenizer/jmlx-vision 0.1.2. The worker compiles
+  against both (it uses only API stable across the two).
+- Case and settings (frozen, plan section 5.2; WP0 section 2.2): per
+  workload, the digest-pinned Tier-B manifest's case 0 (qwen3vl-2b:
+  manifest `5ebfaf7a…`, phi3v-4b: manifest `faeae7ad…`), the manifest's
+  own images (digests re-verified per fork), max_new_tokens and
+  expanded/unexpanded IDs from the manifest, `MLX_ENABLE_TF32=0` (the
+  worker report records the precision env per worker). Stop sets, recorded
+  explicitly per workload: qwen3vl-2b `{151643, 151645}`, phi3v-4b
+  `{32000}`. They are inert for the frozen cases (both finish
+  MAX_TOKENS with no generated ID in either set) but are carried in every
+  job and worker report as the declared setting.
+- Per-process request sequence (one fixed case per process, plan section
+  5.2): model load, first image+text generation captured immediately after
+  load in the fresh JVM (before any correctness forward, warmup, probe or
+  other case; lazy loader work stays inside the first request — the load
+  wall records the lazy portion, the report notes it), correctness
+  verification of the first request (IDs vs the manifest's recorded
+  target IDs, finish reason, prompt positions vs expanded-ID size,
+  rendered prompt vs the manifest), then 3 warmups and 5 measured
+  repetitions of the same request. Worker timeout 900 s, session time
+  budget 5400 s.
+- Host: M5 Max (128 GiB), macOS 27.2 (build 26B123), Temurin 25.0.4.1
+  worker JVMs. The host was rebooted 09:03 local (08:03 UTC) the morning
+  of the run, per the operator's `last reboot` (recorded here; not part
+  of the raw tree); both the smoke and the full session ran on the
+  post-reboot host. The primary thermal records (full `pmset -g therm`
+  at session start and end, no warning or performance level) are the
+  `thermal-start.txt` / `thermal-end.txt` of the session directory in the
+  raw tree. Timestamps: hostrec and session-report times are UTC; local
+  time is UTC+1.
+- Fork order (recorded in the session report): workload-major,
+  pair-major, tree-minor, with the leading tree alternating per pair (even
+  pairs lead old, odd pairs lead new) — every fork is on a different tree
+  from its predecessor and each pin leads 12 of the 24 forks.
+- hostrec convention (plan section 4): pre/post appends per fork by the
+  launcher, plus the session wrapper's 60 s poll loop; full
+  `pmset -g therm` start/end records in the session directory; the
+  wrapper's `host.log` is copied into the session directory as
+  `hostrec.log`. hostrec records memfree as a percentage, not a pressure
+  level (same convention and limitation as section 16.1).
+
+### 17.2 Smoke (1 pair per VLM, rejected first run and the TTFT fix)
+
+- First smoke (1 pair, 4 workers, from pre-amend tree a9b5abc): all four
+  workers `ok`, all IDs matched, but the report's warm `measured_ttft_s`
+  arrays were `-1e-09` — the worker stamped the first-token time only when
+  recording the full token-event list (first request only), so warm
+  iterations reported the "no event" sentinel. The run was rejected, its
+  session directory removed, and the worker fixed so every generation
+  stamps the first-token time (the TTFT) while only the first request
+  records the token-event list. The fix is in the amended commit e4cb1f0;
+  the worker source digest quoted in section 17.1 is the post-fix one.
+- Post-fix smoke (1 pair, 4 workers, from e4cb1f0; kept in the raw tree
+  under `sessions/wp4-smoke`): 4/4 `ok`, all IDs matched, measured TTFTs
+  now realistic (qwen3vl warm TTFT ~0.31-0.35 s, phi3v ~1.6-2.4 s),
+  per-pair warm-median ratios present for both workloads; tree/pin
+  verification, hostrec bracketing and the session-report schema all
+  verified end-to-end against real model loads on both pins.
+
+### 17.3 Full session `wp4-observed-cache-1` (6 alternating pairs per VLM)
+
+- Session 15:38:49-15:46:07 UTC (7 m 18 s wall for 24 workers), out root
+  `~/wp4-scratch/sessions/wp4-observed-cache-1`. All 24 workers `ok`; no
+  dead, crashed, timeout, job-verification-failed or not-started
+  classification. Correctness-after-capture held for every worker: first
+  request IDs equal the manifest's recorded target IDs, finish reason
+  MAX_TOKENS, prompt positions equal the expanded-ID size, rendered prompt
+  equal to the manifest's, and all 5 measured repetitions of each worker
+  reproduced the first request's IDs (greedy determinism under TF32=0).
+- Host records, restated from both record sets (the wrapper-only
+  statement that originally stood here is withdrawn by section 17.5,
+  P2): the launcher's 48 per-fork records (one per pre/post fork,
+  `hostrec/host.log`, digest-pinned) show therm-warnings count 2 in
+  every record (no new warnings), 1-min load 1.24-4.20, memfree 38-64%,
+  and omlx (hostrec.sh's "leading contention candidate" — the resident
+  serving-model server) at or below 0.6% only from 15:43:29 on (the
+  phi3v phase): 16 of the 48 records read above 15%, and four bursts
+  above 50% (97.9 / 95.2 / 83.2 / 75.6%) all fall in
+  15:38:49-15:40:14, bracketing the qwen3vl pairs 2-5 and the anomalous
+  qwen3vl-2b new-pair-2 dip. The wrapper's coarser 9 records (pre, 7
+  polls, post; `hostrec.log`) agree in trend but sample only every 60 s
+  (omlx at most 76.6%, in the pre record; 0.4-14.5% at every poll and
+  the post; load 1.40-3.32; memfree 35-59%) and miss the bursts between
+  samples. Two caveats: `ps` %CPU on macOS is a decaying average, so a
+  high reading covers earlier activity and no causal link between the
+  omlx bursts and the p2 dip is claimed; and the session did not run on
+  a quiet host — the serving agent (this session's own model,
+  omlx-server) was actively working during the qwen3vl phase, against
+  the section 16.4b convention of parking the agent's work on a
+  different agent so omlx-server stays quiet. The session therefore does
+  not qualify as the plan section 4 quiet-host baseline, and the section
+  4 trigger rule (a >10% adjacent-fork-median shift, or a surprising
+  host state) calls for another alternating session before runtime
+  attribution: session 2, section 17.6. No gpu-burn contention was
+  applied (plan section 5.2: controlled contention is optional follow-up
+  only). Thermal start and end: no warning or performance level
+  recorded.
+- First-in-process (first request; raw per-worker values in the session
+  report, MB below are 10^6):
+  - qwen3vl-2b: load wall old 0.793-1.306 s, new 1.070-1.409 s (medians
+    1.090 / 1.360); first TTFT old 0.249-0.691 s (median 0.449), new
+    0.475-0.673 s (median 0.509); first full generation old 0.613-1.139 s
+    (median 0.776), new 0.777-1.047 s (median 0.827).
+  - phi3v-4b: load wall old 0.836-1.924 s, new 0.822-1.937 s (medians
+    1.082 / 0.846); first TTFT old 1.340-2.470 s (median 1.573), new
+    1.270-2.184 s (median 1.354); first full generation old
+    2.422-5.776 s (median 3.124), new 2.371-3.856 s (median 2.448).
+- Warm measurements (post-warmup, 5 measured per worker, pooled n=30 per
+  tree per workload; type-7 linear-interpolation quantiles, as in section
+  16):
+  - qwen3vl-2b TTFT: old p10/median/p90 0.252/0.329/0.353 s, new
+    0.145/0.324/0.352 s; full generation old 0.495/0.605/0.627 s, new
+    0.266/0.598/0.630 s.
+  - phi3v-4b TTFT: old 1.381/1.572/2.416 s, new 1.396/1.508/2.103 s; full
+    generation old 2.268/2.448/4.023 s, new 2.255/2.397/3.670 s.
+- Paired per-pair warm-median ratios (new/old, the paired statistic; pairs
+  are process pairs, not independent samples):
+  - qwen3vl-2b: TTFT 0.525/1.117 range, median 0.951; full generation
+    0.478/1.066 range, median 0.939.
+  - phi3v-4b: TTFT 0.850/1.082 range, median 0.958; full generation
+    0.909/1.050 range, median 0.975.
+- Per-pair trajectory (warm full-generation median, old/new by pair):
+  qwen3vl-2b old 0.616/0.549/0.596/0.590/0.618/0.614, new
+  0.612/0.586/0.285/0.534/0.601/0.484; phi3v-4b old
+  3.998/4.015/2.268/2.454/2.442/2.301, new 3.635/3.666/2.383/2.390/2.384/
+  2.255. Two observations, recorded without attribution (plan section 5.2:
+  repeat before attributing; OS/Metal cache state is observed/uncontrolled
+  in this regime):
+  - phi3v-4b pairs 0-1 (forks 13-16, directly after the 12 qwen3vl
+    forks) are slow in **both trees at the same session position**
+    (warm full ~3.6-4.0 s) and step down to ~2.3-2.4 s from pair 2
+    (forks 17-18) in both trees. A synchronized
+    two-tree step at one session position is consistent with a host
+    cache-regime transition (OS page cache / system shader cache
+    warming across the fresh processes) rather than a pin effect; the
+    controlled shader-cache
+    experiment that would attribute it was not run (plan section 5.2
+    marks it additional work), so shader-cache attribution is left
+    unresolved, as the plan allows. It does not invalidate the paired
+    comparison, and the pooled statistics deliberately include the early
+    pairs (the p90 values carry the transition).
+  - qwen3vl-2b new pair 2 is a single low pair (0.285 s vs ~0.5-0.6 s
+    around it; the paired TTFT ratio 0.525 is the session minimum). The
+    10% adjacent-fork delta is an investigation trigger, not a gate; it
+    is recorded here and the pooled statistics include it. No further
+    session was triggered (one session per cell, under the plan section 4
+    cap of three).
+- Memory (process-wide MLX counters sampled after each phase's eval; the
+  report's note on lagging Metal frees applies; the v1 worker never
+  reset the peak counter, so every peak below is lifetime-cumulative —
+  the after_first peak includes the load and after_load phases — and is
+  not directly comparable to the phase-local peaks of session 2,
+  section 17.6):
+  - qwen3vl-2b: after load, peak 8,514.86 MB and active 8,510.14 MB in
+    both trees (span across the 12 workers: peak 8,514,863,104-
+    8,514,865,152 B, active 8,510,144,512-8,510,146,560 B). After the
+    first forward, peak 9,828.89 MB in all 12 workers (9,828,890,684-
+    9,828,892,836 B; both trees inside a 2.1 KB span), consistent with
+    the 7.3b WP8 measurement of 9,828,890,788 B for the same checkpoint
+    and case.
+  - phi3v-4b: after load, peak 16,643.12 MB and active 16,536.11 MB in
+    both trees (peak 16,643,123,200-16,643,127,296 B, active
+    16,536,107,008-16,536,111,104 B). After the first forward, the
+    trees diverge: old 31,100.38 MB (31,100,376,165-31,100,380,261 B),
+    new 30,202.75 MB (30,202,745,961-30,202,748,009 B) — the new tree
+    peaks ~897.6 MB lower on the identical checkpoint and case. The
+    after-load peaks agree between trees (the same lazy loader), so the
+    divergence appears with the first forward. Per the section 17.1
+    label this is a code-and-pin effect, not attributable to the native
+    pin alone; the old tree's number matches the 7.3c WP8 measurement
+    (31,100,376,165 B) within one page, the new tree's reflects the
+    framework memory changes in the 156 commits between the trees.
+  - First-request TTFT and full generation include the lazy loader work
+    inside the first request, as declared (the report's load block notes
+    "load is lazy (no eval during load); weight materialization lands
+    inside the first forward"); the load wall itself records only the
+    (mostly lazy) loader.
+- Session-report and per-worker artifacts: `session-report.json` (schema
+  `jmlx-vlm-first-use-session-1`), 24 cells each with `job.json`,
+  `report.json` (schema `jmlx-vlm-first-use-1`) and
+  `worker-stderr.log` (empty for every worker), the per-fork hostrec
+  directory, `hostrec.log` (wrapper host log) and the two thermal
+  records.
+
+### 17.4 Raw-data digests and open items
+
+- Raw-data digests: `req/plans/phase8-2-wp4-raw-digests.json` (schema v2,
+  181 files, paths relative to `~/wp4-scratch`) records the SHA-256 of
+  both full sessions (`wp4-observed-cache-1`: 24 worker cells with
+  job/report/stderr each, session report, per-fork hostrec records,
+  `hostrec.log`, thermal records; `wp4-observed-cache-2`: same layout),
+  the post-fix smoke session (same layout, 4 cells), the wrapper's
+  `hostrec/<session>/{host.log,launcher.log}` for both sessions and all
+  three session specs — tying this section, including its host-side
+  claims, to the exact raw tree. All 100 v1 files are byte-identical in
+  v2 (session 1's raw tree is unchanged). Session 1's report carries
+  tree new e4cb1f0 / tree old 46cb325 and the v1 worker digest quoted in
+  section 17.1; session 2's carries tree new ecc69a5 / tree old 46cb325
+  and the review commit's worker digest quoted in section 17.5, plus the
+  executed-jar digests per tree. The rejected first-smoke session was
+  removed before the post-fix smoke ran and is not in the raw tree (its
+  only evidentiary role was exposing the TTFT stamping bug, section
+  17.2).
+- Open items: the phi3v-4b early-pair transition (section 17.3) remains
+  unattributed — attributing it needs either back-to-back repeats or the
+  controlled shader-cache experiment, both follow-up work per plan section
+  5.2; session 2 (section 17.6) is the back-to-back repeat: the
+  early-pair slowness did not recur on the quiet host, so the state is
+  consistent with a first-use-after-reboot host effect, still not
+  attributed. The qwen3vl-2b new-pair-2 dip (section 17.3) was the other
+  section 4 trigger that ordered session 2; it did not recur (section
+  17.6) and its bracketing by session 1's omlx burst is recorded without
+  causal attribution. The phi3v-4b after-first-forward allocator peak
+  difference (~897.6 MB, new tree lower) is a code-and-pin observation
+  under the section 17.1 label, unchanged in session 2; attributing it to
+  specific framework changes would need a commit-range memory bisect,
+  which is not part of this work package. The old-pin worktree
+  (`/Users/per/jmlx-wp4-oldpin`) and its staged runtime stay in place for
+  any repeat session the owner orders; nothing in this section repins or
+  modifies the main checkout.
+
+### 17.5 Review round 1 (2026-11-11, PR #92)
+
+Sixteen findings (1 high, 5 medium, 10 low), all addressed in the review
+commit; the worker report schema is bumped `jmlx-vlm-first-use-1` -> `-2`
+and the session report schema `jmlx-vlm-first-use-session-1` -> `-2`
+(the job schema is unchanged — its `manifest_path` now always carries
+the launcher-verified resolved path). The review commit's worker source
+digest is `fede0c00ac0528f044cb322ad24ed0d93c03068582cd47ec8e20ad04eabbccac`
+(byte-identical in both trees, as before). Session 1's results stand as
+recorded (all 24 workers ok, all IDs matched; the high-severity finding
+did not affect it — every `first_request.correct.*` field in the raw
+reports is true), but the harness it ran on changed, and the section 4
+triggers fired, so session 2 (section 17.6) ran the fixed harness from
+the review commit's SHA. Its first qwen3vl forks showed residual omlx
+activity, so only its later qwen3vl pairs and phi3v phase were quiet.
+
+- P1 (high): a first-request correctness failure wrote
+  `correctness_failed` and then fell through to an `ok` report with
+  exit 0 (missing `return`), and the launcher's classify trusted
+  `status` alone. Fixed: the post-capture decision is now the static,
+  side-effect-free `postCaptureVerdict(idsMatch, finishMatch,
+  positionsMatch, divergences)` returning `Verdict(status, exitCode,
+  failureReason)`, and the verdict's exit code is the process exit code;
+  classify accepts `ok` only when the exit code is 0 and every
+  `first_request.correct.*` field is boolean true
+  (`firstRequestCorrect`), else `invalid-report` with a detail.
+- P2: the section 17.3 host bullet restated from both record sets (the
+  48 per-fork records, not only the wrapper's 9); "quiet" withdrawn;
+  the serving agent's own omlx activity during the qwen3vl phase
+  recorded. See the restated bullet.
+- P3: the worker's second `put("workload")` (the inputs object)
+  overwrote the workload name (Jackson 3 `putObject` replaces an
+  existing property). The object is now `workload_inputs`.
+- P4: a warm/measured ID divergence threw, was misclassified as a
+  runtime exit-2 failure with the captured first request lost, and
+  `measuredIdsMatch.add(true)` was tautological. Fixed: a divergence
+  records `WarmDivergence(label, generatedIds)` in the report's
+  `divergences` array, stops the remaining iterations, and the post-
+  capture verdict finishes the worker as `correctness_failed` (exit 3)
+  with the first-request data retained; `measured_ids_match` records
+  real per-iteration results.
+- P5: `token_event_times_s` held only the first token (the early return
+  skipped every later event). Every first-request token event is now
+  recorded; the TTFT stamping (first event only) is unchanged.
+- P6: the worker had no tests. `VlmFirstUseWorkerTest` (pure Java, no
+  native) covers the verdict matrix (all-ok, each single first-request
+  mismatch, labeled warm/measured divergences, combined problems) and
+  the job schema gate; the launcher test gained the two inconsistent-
+  ok classify cells (ok report with exit 3; ok report with a false
+  `correct` field) and the new out_root refusal scenarios.
+- P7: "actually loaded" pin identity reworded to "staged pin file re-
+  read from the worker's own `-Djmlx.library.path`" (the property the
+  loader resolves first; no runtime dylib-load verification); the
+  report now carries the same note in `native_pin.note` (section 17.1
+  bullet restated).
+- P8: the phi3v step-down wording softened to "consistent with a host
+  cache-regime transition rather than a pin effect" (section 17.3).
+- P9: the executed jars are now digested per tree (`jar_sha256` in each
+  session-report tree block).
+- P10: hostrec failures and timeouts are no longer invisible: 30 s
+  timeout per call (killed and recorded), all failures listed in the
+  session report's `hostrec_failures` array (a missing host record is a
+  plan section 4 trigger).
+- P11: the session report's hostrec string corrected (per-fork records
+  in `hostrec/host.log`; the wrapper's 60 s poll log is `hostrec.log`).
+- P12: the backstop race fixed with a write-once `reportWritten`
+  guard: only the first caller of `finish` writes the report, and the
+  backstop exits 4 only if it itself wrote.
+- P13: the job now carries the launcher-verified resolved manifest path
+  (`workload.manifestAt(spec.repoRoot)`), not the spec's raw string.
+- P14: `out_root` (and every spec path) is normalized before the
+  containment check, which now also covers both trees.
+- P15: the worker now calls `MLXMemory.resetPeak()` after the
+  after_load and after_first samples (phase-local peaks, plan section 7
+  "peaks reset at stated phases"); session 1's peaks were
+  lifetime-cumulative and are labeled as such (section 17.3 memory
+  bullet).
+- P16 (minors): `Job.parse` rejects a missing or wrong schema;
+  `generate` is void (the unused `long[]` return is gone); the worker
+  class Javadoc order matches the code (verification before the
+  handshake claim); non-string, non-integer manifest content-part
+  fields are rejected instead of passed into the chat template as raw
+  JsonNode.
+
+Session 2 (the section 4 trigger): the plan's trigger rule is "a >10%
+shift between adjacent fork medians, a thermal/memory warning, a
+missing host record, or a surprising VLM prefill triggers another
+alternating session before runtime attribution" (cap three sessions per
+cell; one used). Two triggers fire in session 1: the qwen3vl-2b
+new-pair-2 dip (0.285 s vs ~0.5-0.6 s neighbors) and the phi3v-4b
+early-pair step-down; and session 1 does not qualify as a quiet-host
+baseline (the serving agent worked on omlx during the run, section
+17.3). Session 2 reuses the frozen case, config and fork-order
+convention (spec `wp4-observed-cache-2`: same pairs 6, warmups 3,
+measured 5, timeout 900 s, budget 5400 s, TF32=0, stop sets qwen3vl
+{151643, 151645} / phi3v {32000}) from the review commit's SHA, with
+the serving agent fully idle during the run (the section 16.4b
+convention restored).
+
+### 17.6 Session 2 `wp4-observed-cache-2` (host activity during qwen3vl, fixed harness)
+
+- Session 21:00:17-21:07:00 UTC (6 m 43 s wall, 24 workers) from the
+  review commit ecc69a5 (worker digest
+  `fede0c00ac0528f044cb322ad24ed0d93c03068582cd47ec8e20ad04eabbccac`
+  byte-identical in both trees, re-verified by the launcher; executed-jar
+  digests in each session-report tree block; `hostrec_failures` empty).
+  All 24 workers `ok` under the `-2` schemas; every first request
+  matches the manifest reference (all `correct.*` true), no warm or
+  measured divergence (all `divergences` arrays empty; all 5 measured
+  repetitions of every worker reproduce the first request's IDs), and
+  every report carries `workload_inputs` and the full
+  `token_event_times_s` array.
+- Host: the 48 per-fork records show omlx at 89.4% in the pre record,
+  decaying monotonically (34.6 / 20.3 / 29.9 / 17.9 / 15.1 / 13.1 /
+  12.5 / 12.6 / 7.4%) across the first four qwen3vl forks and at or
+  below 0.7% from qwen3vl old:p4 (21:01:24) to the end of the session —
+  the entire phi3v phase ran on the quiet host of the section 16.4b
+  convention, with no bursts between the readings (unlike session 1).
+  The decaying readings of the first ~70 s carry the owner's pre-launch
+  activity (the agent was idle from the moment the background run was
+  launched); per the decaying-average caveat they are recorded without
+  causal attribution. therm-warnings 2 in all 48 records; thermal start
+  and end: no warning or performance level; 1-min load 3.37-7.08 (the
+  phi3v forks themselves push the load); memfree 28-69%.
+- First-in-process (first request; separate from the warm statistics,
+  plan section 4; ranges over the 6 workers per tree):
+  - qwen3vl-2b: load wall old 0.786-1.459 s, new 0.819-2.845 s (new p2's
+    load is an outlier); first TTFT old 0.204-0.765 s, new 0.233-0.922
+    s; first full old 0.335-1.327 s, new 0.366-1.350 s.
+  - phi3v-4b: load wall old 0.896-1.351 s, new 0.937-1.315 s; first
+    TTFT old 1.355-1.655 s, new 1.316-1.817 s; first full old
+    2.472-6.568 s (p0 4.959, p1 6.568, p3 5.384), new 2.447-9.755 s
+    (p0 9.755, p4 8.685). Slow first requests occur in both trees (the
+    lazy loader work inside the first request; recorded without
+    attribution) and the first-request distribution stays separate from
+    the warm statistics.
+- Warm measurements (5 measured per worker, pooled n=30 per tree per
+  workload; type-7 quantiles as in section 16):
+  - qwen3vl-2b TTFT: old p10/median/p90 0.110/0.239/0.378 s, new
+    0.111/0.338/0.389 s; full generation old 0.224/0.392/0.654 s, new
+    0.226/0.616/0.674 s.
+  - phi3v-4b TTFT: old 1.416/1.617/1.869 s, new 1.348/1.733/1.855 s;
+    full generation old 2.332/2.491/2.794 s, new 2.234/2.672/2.864 s.
+- Paired per-pair warm-median ratios (new/old, the paired statistic):
+  - qwen3vl-2b full generation
+    1.190/1.063/0.994/2.379/1.079/1.005 (TTFT 1.303/1.068/0.986/2.328/
+    1.036/1.001): pairs 1, 2, 4 and 5 sit in 0.994-1.079. The p3 ratio
+    is an intra-pair ordering artifact: the host's fast-regime boundary
+    fell between new:p3 and old:p3, so the pair's new member measured in
+    the slow regime and its old member in the fast one.
+  - phi3v-4b full generation 0.902/1.026/0.992/1.120/1.058/1.018 (TTFT
+    0.830/1.013/0.964/1.167/1.027/1.034), median 1.022, on the fully
+    quiet host.
+- Regime structure and session-to-session comparison:
+  - qwen3vl-2b runs two warm-full regimes in session 2, ~0.563-0.669 s
+    (pairs 0-2 and new p3) vs ~0.224-0.272 s (old p3, pairs 4-5); the
+    boundary coincides with the omlx readings crossing below 1%
+    (21:01:24-21:01:28). Session 1's qwen3vl phase ran entirely inside
+    the omlx-burst window and its warm full was 0.549-0.618 s (old) and
+    0.484-0.612 s (new, apart from the new-p2 dip of 0.285 s) — the same
+    slow regime; session 1's new-p2 dip did not recur (session 2 new p2
+    is 0.629 s), consistent with its bracketing by session 1's 95.2%
+    omlx burst (recorded without causal attribution, decaying-average
+    caveat).
+  - The phi3v-4b early-pair slowness (session 1: ~3.6-4.0 s for pairs
+    0-1 in both trees, stepping down from pair 2) did not recur:
+    session 2's warm full is flat at 2.136-2.815 s across all pairs on
+    the quiet host, and the pooled medians (old 2.491 / new 2.672 s)
+    match session 1's quiet-phase values (2.448 / 2.397 s). This
+    is consistent with a host-side state tied to the first use of the
+    checkpoint after the 09:03 reboot; this does not establish a
+    code-and-pin runtime attribution;
+    the controlled experiment that would attribute it was not run (plan
+    section 5.2 marks it additional work), so attribution stays
+    "consistent with".
+  - The fully quiet phi3v phase has paired ratios near 1.0 (median
+    1.022 in session 2). For qwen3vl, only pairs 4-5 ran after the
+    observed omlx activity decayed; their full-generation ratios are
+    1.079 and 1.005. These two quiet pairs do not support a workload-wide
+    code-and-pin attribution. The earlier qwen3vl forks and the p3
+    ratio of 2.379 remain part of the reported data.
+- Memory (phase-local peaks, schema -2; session 1's cumulative peaks,
+  section 17.3, agree within the quoted spans, confirming the peak is
+  reached in the first forward, not during load):
+  - qwen3vl-2b: after load, peak 8,514,863,104-8,514,865,152 B in both
+    trees (session 1's span). After the first forward, peak
+    9,828,890,684-9,828,892,836 B — byte-identical to session 1's
+    after-first span and to the 7.3b WP8 measurement
+    (9,828,890,788 B). After the warm/measured phases, peak
+    9,828,890,685-9,828,892,733 B: the warm phase never exceeds the
+    first forward's peak, it re-touches the same maximum buffer.
+  - phi3v-4b: after load, peak 16,643,123,200-16,643,125,248 B in both
+    trees. After the first forward: old 31,100,376,165-31,100,378,213
+    B, new 30,202,744,781-30,202,748,009 B (session 1 spans: old
+    31,100,376,165-31,100,380,261, new 30,202,745,961-30,202,748,009 —
+    the ~897.6 MB tree-to-tree gap is unchanged, a code-and-pin
+    observation under the section 17.1 label, not attributable to the
+    pin alone); after the warm/measured phases, the peaks equal the
+    after-first peaks (same maximum buffer re-touched).
+- Cell closure: **qwen3vl-2b = `unstable`; phi3v-4b = `unstable`** under
+  plan section 4.1. Both sessions have all required worker samples and
+  are retained with their ranges and host records, but neither cell has
+  a settled performance ratio or runtime attribution. Session 2 has
+  >10% adjacent-fork shifts in qwen3vl, and phi3v pair 0 (TTFT ratio
+  0.830) and pair 3 (full/TTFT ratios 1.120/1.167) also meet that
+  trigger. The qwen3vl regime boundary coincides with decaying omlx
+  activity; the phi3v host phase is quiet but still variable. Session 3
+  was not run. Section 4 requires another alternating session **before
+  runtime attribution**; no such attribution is made here. Ending
+  collection after two sessions, before budget exhaustion or the
+  three-session limit, is a recorded deviation from section 4.1's
+  stopping rule. Any later runtime attribution needs another complete
+  alternating session or a recorded plan revision.
+- Artifacts: `session-report.json` (schema `jmlx-vlm-first-use-session-2`),
+  24 cells each with `job.json`, `report.json` (schema
+  `jmlx-vlm-first-use-2`) and `worker-stderr.log` (empty for every
+  worker), the per-fork hostrec directory (48 records), `hostrec.log`
+  (wrapper host log) and the two thermal records; digested in the v2
+  raw-digest manifest (section 17.4).
+
+### 17.7 Review rounds 2–3 (2026-11-12, PR #92)
+
+The round-2 harness checks each installed JMLX jar against the newest
+tracked main-source or build-file modification in its own module and
+the root Gradle inputs (including `gradle.properties` and the Gradle
+wrapper version); it also checks the benchmarks jar against the
+worker source, which can be untracked in the old worktree. A Git checkout
+can refresh input mtimes while Gradle keeps content-identical jars; a
+freshness refusal now directs the operator to rerun `installDist` with
+`--rerun-tasks`. The launcher compares worker reports with the expected
+cell and verified pin, accepts only known statuses and matching exit codes,
+retains a timeout classification when the launcher kills a worker after its
+backstop wrote a timeout report, and records three native-binary digests.
+Worker input-verification failures exit 1. Report and session schemas are
+now `jmlx-vlm-first-use-3` and `jmlx-vlm-first-use-session-3`;
+`job_verification_failed` has one spelling with or without a report.
+
+At the end of review round 3, this committed harness had **not had a
+native smoke or full session**. The macOS CI native job runs module checks
+and release smoke, not this two-tree VLM launcher. Section 17.8 records
+the subsequent one-pair native smoke of this harness, including real
+`exit_code`, `native_pin.library_path` and jar freshness acceptance.
+Its worker-source SHA-256 is
+`76c053b8f1a52dbfaa8b27983e81d223c794f1585e380a0286f25b5411efa439`,
+different from both measured worker versions. The session 1 and 2
+reports retain their historical worker digests and
+schemas; their raw artifacts have not been rewritten. Before any next
+session, copy the current `VlmFirstUseWorker.java` into the old worktree's
+untracked worker path and rebuild that tree's `installDist`. Otherwise the
+launcher rejects the byte-different worker source (or a stale benchmarks
+jar). The new checkout also needs its `installDist` rebuilt from this
+commit. The section 4 trigger applies to both workloads: session 2's
+phi3v pair 0 and pair 3 gaps exceed 10% as well as the qwen3vl shifts,
+so both cells close as `unstable`, without a settled ratio or runtime
+attribution from session 2.
+
+### 17.8 CI one-pair native VLM smoke (2026-11-12, PR #92)
+
+The labeled [GitHub Actions run](https://github.com/Alipsa/jmlx/actions/runs/43307319179)
+`43307319179` (attempt 1) executed head
+`76dac46c323c54d99e8bcd6596218c0207703a32` against old tree
+`46cb325bec9b4878534cc5c6bda1a569dfe4aa4c`. Both trees used the
+byte-identical worker source SHA-256
+`76c053b8f1a52dbfaa8b27983e81d223c794f1585e380a0286f25b5411efa439`
+and rebuilt `installDist` from their source. The worker reports record
+Java 25.0.5; the two full sessions used 25.0.4.1.
+
+| Tree | `mlxMetalVersion` | `mlxcCommit` | `mlx.metallib` SHA-256 | `libmlxc.dylib` SHA-256 | `libmlx.dylib` SHA-256 |
+| --- | --- | --- | --- | --- | --- |
+| old | 0.31.2 | `fba4470b89073180056c9ea46c443051375f7399` | `8c8bfcece8c0610745b68879771e5aa1b92b29fa5e17172e5508e4f5153d8d15` | `f63fe68131e23876859497369069ef2ad3c869569563fd70bab8ab65ec0b8847` | `2ee6fbd32ff22e22e1301ebe3c3bece95584104ff9cbc900513d41a095211bbd` |
+| new | 0.32.4 | `a26f2d584a14ec619ae8db9a09be03becd47598a` | `c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893` | `3b17e14ba9fffc430983c9f216935542e72abc6872a6d0ec103b4a838bbf63ce` | `d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6` |
+
+The protocol gate passed **4/4 real `ok` workers**: one old/new pair for
+each workload, with matching exit codes, tree/cell identities, pin values,
+and two measured iterations per worker. The after-first-forward MLX peaks
+reproduce the prior shape: qwen3vl-2b old/new both 9,828,890,788 B;
+phi3v-4b old 31,100,376,165 B and new 30,202,745,961 B. These are
+phase-local peaks. The first pre-fork host record has `omlx=40.0%`, so
+the host was **not quiet**. The smoke's per-pair warm ratios, based on
+only two measured iterations per worker, are protocol observations, **not
+performance evidence**; they do not change either cell's `unstable`
+closure in section 17.6 or support runtime attribution.
+
+The 18-file Actions artifact of run 43307319179 is archived as
+`req/plans/evidence/wp4-native-smoke-43307319179-1.zip` - the
+original artifact zip (SHA-256
+`a1829718db51f547e4281d623117299c6ee5b1ada487f29d90b762e1a34ba45d`,
+which equals GitHub's recorded artifact digest; review round 6,
+section 17.11). Review round 4 briefly re-archived it redacted
+(section 17.9); review round 5 reverted that (section 17.10), so
+the unredacted artifact is the current record.
+`req/plans/phase8-2-wp4-raw-digests.json` schema v3 records the
+archive and every contained file's digest, independently of the
+Actions artifact's 14-day retention. Its 181 historical
+scratch-tree digests remain unchanged.
+
+### 17.9 Review round 4 (2026-11-13, PR #92)
+
+Round 4 addressed the eight findings on the smoke workflow, the
+Tier-B call site and the committed evidence. No Java source
+changed: the worker and launcher are untouched, so the old
+worktree's untracked worker copy and both trees' `installDist`
+outputs remain in sync, and no old-tree re-sync or digest
+re-recording was needed.
+
+The shared model-cache cleaner moved from `tools/vlm-first-use/`
+(WP4-specific) to `tools/tier-b/model_cache.py`, next to the
+manifests it cleans against: the four self-hosted Tier-B arms
+must not depend on a directory that WP4 cleanup could later
+remove. The Tier-B call site passes the new path;
+`prepare-smoke.py` adds `tools/tier-b` to `sys.path` and imports
+`clean_model_dir` from there; the stale "stdlib-only report
+heredoc" comment in `tier-b.yml` now names the script. The
+script was re-tested from the repository root after the move:
+it keeps the listed files and removes unlisted files, symlinks
+and the empty directories they leave. `tier-b.yml` runs once on
+this branch before merge, with the result recorded below.
+
+The smoke's verify step no longer compares the worker reports
+against the launcher's own `session["trees"]` records (written
+by the same code that classified them). It pins the expected
+native pins directly (old 0.31.2 / `fba4470b89073180056c9ea46c443051375f7399`,
+new 0.32.4 / `a26f2d584a14ec619ae8db9a09be03becd47598a`) and
+asserts each tree against that tuple, plus the untracked-file
+invariant the workflow's design relies on: the old tree's
+untracked list is exactly the byte-copied worker source file and
+the new tree's is empty.
+
+Both workflows that clean and download into the persistent
+`$HOME/tier-b-models` cache declare per-directory concurrency
+groups (`tier-b-model-dir-<name>`, `cancel-in-progress: false`):
+a job contends only with jobs that touch the same directory.
+The "unverified" part of the finding is now checked: the
+repository's runner listing shows exactly one instance carrying
+the `self-macos-xl` label, online and not busy, so with a single
+runner the race was not possible today (jobs queue on the runner
+itself); the groups are future-proofing against a second
+instance. The group is per directory rather than one shared
+group, because a GitHub concurrency group holds at most one
+in-progress and one pending request, and a newer request
+cancels the pending one — `cancel-in-progress: false` protects
+only the in-progress slot. One shared group for the four
+self-hosted tier-b arms therefore cancels two of the arms on
+every run: the first branch dispatch (run 43395837213) cancelled
+qwen3vl, phi3v and qwen35, and the re-dispatch (run
+43419328748) cancelled phi3v and qwen35, each with the
+annotation "Canceling since a higher priority waiting request
+for tier-b-model-cache exists" (jobs 131786392540,
+131786392996, 131786393122, 131865083424 and 131865085194).
+Hosted arms use per-run workspace caches, so they get a unique
+per-run group and keep running in parallel as before. The
+`both` smoke joins the distinct `tier-b-model-dir-both` group:
+it gates against other `both` smokes but not against the
+individual arms, a residual case that is safe on the single
+runner and fails detectably (a retryable arm failure) if it
+ever matters.
+
+The label-trigger comment no longer names PR #92; it documents
+the label as a general opt-in for same-repository PRs.
+`prepare-smoke.py` names the session `run_root.name`
+(`wp4-vlm-smoke-<run>-<attempt>`) instead of double-prefixing it
+with `wp4-native-smoke-`, and the smoke's artifact upload uses
+`${{ env.WP4_RUN_ROOT }}` instead of re-deriving the
+`$RUNNER_TEMP` path (a drift between the two would have ended
+the upload at `if-no-files-found: warn`).
+
+Owner decision on the committed evidence: redact and record.
+The re-archived zip at the same path replaces the v3 archive
+(SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`,
+preserved in git history and in
+`ci_smoke.redaction.preimage_archive_sha256`). Exactly 11 of the
+18 files changed: the two runner-host path prefixes
+(`/Users/ghrunner/actions-runner/_work` → `[host-workspace]`,
+`/Users/ghrunner/tier-b-models` → `[host-models]`) in
+`spec.json`, `session-report.json` and the eight job/report
+files, and the eight per-fork `omlx=<pct>%` values in
+`host.log` → `omlx=redacted`. The other seven files
+(`host.log.cmds`, the four worker-stderr logs, both thermal
+files) are byte-identical to the v3 archive.
+`phase8-2-wp4-raw-digests.json` is schema v4 with the new
+archive and per-file digests plus the `ci_smoke.redaction`
+record, and the smoke's verify logic was re-run against the
+redacted tree (4/4 `ok` workers). The section 17.8 observation
+that quoted a redacted value (`omlx=40.0%` in the first pre
+record, "host was not quiet") remains recorded here in text.
+Review round 5 reverted this redaction (section 17.10): after the
+reviewer checked main and found the same runner path prefix
+already committed there, the owner dropped the redaction, and the
+v3 archive and v3 manifest were restored from commit 2d36fbb.
+
+CI re-verification on this branch (recorded 2026-11-13, all at
+head `f76d435ca42f171864dff68e0023a113724b55da`): re-applying
+the `run-vlm-first-use-smoke` label to PR #92 triggered run
+[43395836816](https://github.com/Alipsa/jmlx/actions/runs/43395836816)
+(08:46:19Z–08:50:01Z), which passed the protocol gate with
+4/4 `ok` workers under the new direct pin asserts and the
+untracked-file invariant. The full build (ci.yml run
+43395786770, including `:jmlx-benchmarks:check`, Spotless and
+Checkstyle) is green at this head. `tier-b.yml` was dispatched
+on the branch as runs 43395837213 and 43419328748 (the latter
+after the owner asked for the full matrix to be re-run). Both
+runs finished with all seven hosted arms green; the self-hosted
+arms that ran exercised the moved
+`python3 tools/tier-b/model_cache.py` call site end-to-end
+against a persistent directory (smolvlm in both runs, qwen3vl
+in the second) and passed, while the remaining arms were the
+shared-group cancellations recorded above. The dispatch under
+the per-directory groups (run
+[43425816840](https://github.com/Alipsa/jmlx/actions/runs/43425816840),
+12:30:59Z–12:35:54Z) completed **11/11 success** at head
+`f09129e4009d71a61c30b7d27e771a8b417c088e`: all seven hosted
+arms and all four self-hosted arms (smolvlm, phi3v, qwen35,
+qwen3vl, chained on the single runner), with no cancellations.
+The phi3v and qwen35 arms that the shared group had cancelled
+in both earlier dispatches now ran and passed, and every
+self-hosted arm exercised the moved `model_cache.py` call
+site. The label was re-applied once more, and the smoke run
+[43428911217](https://github.com/Alipsa/jmlx/actions/runs/43428911217)
+(12:53:06Z–12:55:43Z) passed 4/4 `ok` workers at that same
+final head; ci.yml run 43425810144 is green there as well.
+All three workflows that touch the model cache were therefore
+executed at the head that merges, under the per-directory
+groups.
+
+### 17.10 Review round 5 (2026-11-13, PR #92)
+
+Round 5 addressed three findings on the committed evidence and
+the smoke's verify step. No Java source changed.
+
+Item 1 (medium): the redaction quoted what it removed, and the
+preimage stayed in the branch history. The round-4 redaction
+record (this file's section 17.9 and the manifest's
+`ci_smoke.redaction`) named the two removed path prefixes
+verbatim, and the unredacted v3 zip remained reachable at commit
+2d36fbb, where a `--merge` of the PR would have carried it onto
+main. The reviewer then checked main and found the same runner
+path prefix already committed there: origin/main's
+tools/qwen35-reference/evidence/delta-benchmark-48-layers.json
+and two *-java-acceptance.json files contain
+/Users/ghrunner/actions-runner/bin/Runner.Listener. The
+redaction therefore protected nothing that was not already
+public while leaking the substitution in its own record. Owner
+decision (reversing the round-4 "redact and record" choice):
+drop the redaction, per the reviewer's recommendation. The v3
+archive was restored from commit 2d36fbb (SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`)
+and `phase8-2-wp4-raw-digests.json` was restored to schema v3
+(the `ci_smoke.redaction` block and the v4 note sentence are
+gone). Review round 6 found that this restored file was a
+re-zip of the artifact (contents identical, zip container not)
+and replaced the committed archive with the original artifact
+download (section 17.11). The trade-off the reviewer noted for the redacted
+archive - that only git history could check the preimage digest
+and the Actions artifact expires around 2026-11-26 - no longer
+applies: the committed archive IS the artifact. The existing
+tools/qwen35-reference/evidence files on main are out of scope
+for this PR. The smoke's verify logic was re-run, in its round-5
+form, against the restored unredacted tree (4/4 `ok` workers).
+
+Item 2 (low): the smoke's hard-coded new-pin assertion would
+fail on any future native repin now that the label trigger is a
+general opt-in for same-repository PRs. The verify step's
+`EXPECTED["new"]` tuple is now derived from the new tree's own
+`scripts/bootstrap-native.sh` (the pin source, independent of
+the staged native output the launcher reads): a PR that bumps
+`MLX_METAL_VERSION`/`MLX_C_COMMIT` carries the new expectation
+with it. The `EXPECTED["old"]` tuple stays literal, since the
+old tree is the fixed 46cb325 worktree whose staged pin is the
+historical pair.
+
+Item 3 (nit): the per-directory groups narrow the pending-cancel
+problem, they do not remove it - within one group (one model
+directory), a second queued request is still cancelled when a
+third arrives for the same directory. A sentence to that effect,
+including the concrete scenario (a scheduled arm queued behind a
+dispatch, then a labeled smoke of the same workload), was added
+to the tier-b.yml concurrency comment.
+
+CI re-verification on the round-5 head
+`6ea18290a46c0d7558147690320a2df883831f74` (recorded
+2026-11-13): re-applying the `run-vlm-first-use-smoke` label
+to PR #92 triggered run
+[43443308327](https://github.com/Alipsa/jmlx/actions/runs/43443308327)
+(14:30:14Z–14:33:43Z), which passed the protocol gate with
+4/4 `ok` workers; the round-5 derived new-pin expectation ran
+against the new tree's own `scripts/bootstrap-native.sh`, and
+the old-tree untracked-file invariant held. The full build
+(ci.yml run 43443268157, including `:jmlx-benchmarks:check`,
+Spotless and Checkstyle) is green at this head: the `java` job
+succeeded 14:30:02Z–14:32:20Z, and the `native` job's first
+attempt was cancelled at 14:45:01Z by hosted macOS arm64 runner
+capacity ("The job was not acquired by Runner of type hosted
+even after multiple attempts") - an infrastructure failure, not
+a code one, since rounds 4-6 change no Java source or native
+pin and the native suites were green at `f76d435` and
+`f09129e`; the failed-job re-run (14:47:48Z–14:56:51Z)
+succeeded. The round-5 tier-b.yml change was comment-only, so
+the round-4 11/11 dispatch (43425816840) stands as the tier-b
+behavioral evidence.
+
+### 17.11 Review round 6 (2026-11-13, PR #92)
+
+Round 6 addressed two findings on the committed archive's
+provenance and the section 17.10 close. No Java source or
+workflow change.
+
+Item 1 (low): the committed zip was not byte-identical to the
+Actions artifact, though its contents were. The reviewer
+compared the committed file (SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`)
+against the artifact as served by GitHub (recorded digest
+`sha256:a1829718db51f547e4281d623117299c6ee5b1ada487f29d90b762e1a34ba45d`):
+the extracted trees are identical (18 files, 41,867 bytes each,
+no differences), so the committed file was a re-zip of the
+downloaded artifact - all 18 per-file digests match, the zip
+container does not. The section 17.8/17.10 "byte-identical"
+wording overstated it, and once the artifact expires on
+2026-11-26 nobody can check the claim. Fix (the reviewer's
+alternative, chosen while the artifact was still downloadable):
+the committed zip was replaced with the original artifact zip
+downloaded from the run on 2026-11-13 - SHA-256
+`a1829718db51f547e4281d623117299c6ee5b1ada487f29d90b762e1a34ba45d`,
+verified equal to both the download and GitHub's recorded
+artifact digest (artifact 13983663948). All 18 per-file digests
+are unchanged and were re-verified against the manifest, the
+round-5 verify logic was re-run on the new zip (4/4 `ok`
+workers), and `ci_smoke.archive_sha256` now equals the
+`ci_smoke.artifact` digest recorded next to it. The wording in
+sections 17.8 and 17.10 is amended in place to name the
+original-artifact provenance; with this swap, "the committed
+archive IS the artifact" is literally true.
+
+Item 2 (low): section 17.10 promised its CI results at the
+close of the section, but the round-5 commit landed while the
+runs were still in flight. The close is filled in above once
+both runs are green. Because recording it means another commit,
+the PR body names `6ea18290a46c0d7558147690320a2df883831f74`
+as the code head the way it named `f09129e` for round 4; this
+round-6 commit is doc- and evidence-only.

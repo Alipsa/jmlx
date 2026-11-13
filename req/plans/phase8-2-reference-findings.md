@@ -4159,14 +4159,15 @@ performance evidence**; they do not change either cell's `unstable`
 closure in section 17.6 or support runtime attribution.
 
 The downloaded 18-file Actions artifact is archived as
-`req/plans/evidence/wp4-native-smoke-43307319179-1.zip`; its v3
-digests (archive SHA-256
-`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`)
-were superseded in review round 4 by the redacted re-archive
-(section 17.9). `req/plans/phase8-2-wp4-raw-digests.json` schema
-v4 records the archive and every contained file's digest,
-independently of the Actions artifact's 14-day retention. Its 181
-historical scratch-tree digests remain unchanged.
+`req/plans/evidence/wp4-native-smoke-43307319179-1.zip` (SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`),
+byte-identical to the Actions artifact it came from. Review round
+4 briefly re-archived it redacted (section 17.9); review round 5
+reverted that (section 17.10), so this v3 archive is the current
+record. `req/plans/phase8-2-wp4-raw-digests.json` schema v3 records
+the archive and every contained file's digest, independently of
+the Actions artifact's 14-day retention. Its 181 historical
+scratch-tree digests remain unchanged.
 
 ### 17.9 Review round 4 (2026-11-13, PR #92)
 
@@ -4258,6 +4259,10 @@ record, and the smoke's verify logic was re-run against the
 redacted tree (4/4 `ok` workers). The section 17.8 observation
 that quoted a redacted value (`omlx=40.0%` in the first pre
 record, "host was not quiet") remains recorded here in text.
+Review round 5 reverted this redaction (section 17.10): after the
+reviewer checked main and found the same runner path prefix
+already committed there, the owner dropped the redaction, and the
+v3 archive and v3 manifest were restored from commit 2d36fbb.
 
 CI re-verification on this branch (recorded 2026-11-13, all at
 head `f76d435ca42f171864dff68e0023a113724b55da`): re-applying
@@ -4292,3 +4297,58 @@ final head; ci.yml run 43425810144 is green there as well.
 All three workflows that touch the model cache were therefore
 executed at the head that merges, under the per-directory
 groups.
+
+### 17.10 Review round 5 (2026-11-13, PR #92)
+
+Round 5 addressed three findings on the committed evidence and
+the smoke's verify step. No Java source changed.
+
+Item 1 (medium): the redaction quoted what it removed, and the
+preimage stayed in the branch history. The round-4 redaction
+record (this file's section 17.9 and the manifest's
+`ci_smoke.redaction`) named the two removed path prefixes
+verbatim, and the unredacted v3 zip remained reachable at commit
+2d36fbb, where a `--merge` of the PR would have carried it onto
+main. The reviewer then checked main and found the same runner
+path prefix already committed there: origin/main's
+tools/qwen35-reference/evidence/delta-benchmark-48-layers.json
+and two *-java-acceptance.json files contain
+/Users/ghrunner/actions-runner/bin/Runner.Listener. The
+redaction therefore protected nothing that was not already
+public while leaking the substitution in its own record. Owner
+decision (reversing the round-4 "redact and record" choice):
+drop the redaction, per the reviewer's recommendation. The v3
+archive was restored from commit 2d36fbb - SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`,
+verified byte-identical to the CI artifact of run 43307319179 -
+and `phase8-2-wp4-raw-digests.json` was restored to schema v3
+(the `ci_smoke.redaction` block and the v4 note sentence are
+gone). The trade-off the reviewer noted for the redacted
+archive - that only git history could check the preimage digest
+and the Actions artifact expires around 2026-11-26 - no longer
+applies: the committed archive IS the artifact. The existing
+tools/qwen35-reference/evidence files on main are out of scope
+for this PR. The smoke's verify logic was re-run, in its round-5
+form, against the restored unredacted tree (4/4 `ok` workers).
+
+Item 2 (low): the smoke's hard-coded new-pin assertion would
+fail on any future native repin now that the label trigger is a
+general opt-in for same-repository PRs. The verify step's
+`EXPECTED["new"]` tuple is now derived from the new tree's own
+`scripts/bootstrap-native.sh` (the pin source, independent of
+the staged native output the launcher reads): a PR that bumps
+`MLX_METAL_VERSION`/`MLX_C_COMMIT` carries the new expectation
+with it. The `EXPECTED["old"]` tuple stays literal, since the
+old tree is the fixed 46cb325 worktree whose staged pin is the
+historical pair.
+
+Item 3 (nit): the per-directory groups narrow the pending-cancel
+problem, they do not remove it - within one group (one model
+directory), a second queued request is still cancelled when a
+third arrives for the same directory. A sentence to that effect,
+including the concrete scenario (a scheduled arm queued behind a
+dispatch, then a labeled smoke of the same workload), was added
+to the tier-b.yml concurrency comment.
+
+CI re-verification on the round-5 head is recorded at the close
+of this section.

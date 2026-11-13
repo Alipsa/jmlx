@@ -63,7 +63,12 @@ jobs:
     # self-hosted arms therefore cancels two of them on every run (observed:
     # runs 43395837213 and 43419328748, findings section 17.9). Hosted arms
     # use per-run workspace caches, so they get a unique per-run group and
-    # keep running in parallel.
+    # keep running in parallel. The same one-in-progress-plus-one-pending
+    # limit still applies within a single group: with a job running for a
+    # directory and a second request for it pending, a third request for
+    # the same directory cancels the pending one - a visible cancelled
+    # job, never a silent pass (e.g. a scheduled arm queued behind a
+    # dispatch, then a labeled smoke of the same workload).
     concurrency:
       group: ${{ matrix.runner && format('tier-b-model-dir-{0}', matrix.name) || format('tier-b-arm-{0}-{1}', matrix.name, github.run_id) }}
       cancel-in-progress: false

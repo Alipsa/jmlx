@@ -147,10 +147,22 @@ jobs:
           assert len(workers) == len(expected)
           assert {(w["workload"], w["tree"], w["pair_index"]) for w in workers} == expected
           # Pinned here, not taken from the launcher's own records, which
-          # already compare the worker reports the same way.
+          # already compare the worker reports the same way. The old tuple
+          # stays literal: the old tree is the fixed 46cb325 worktree, whose
+          # staged pin is the historical pair. The new tuple is derived from
+          # the new tree's own scripts/bootstrap-native.sh - the pin source,
+          # independent of the staged native output the launcher verifies -
+          # so a PR that repins the runtime does not break this assertion.
+          import re
+          bootstrap = (
+              Path(spec["trees"]["new"]["path"]) / "scripts" / "bootstrap-native.sh"
+          ).read_text()
+          metal = re.search(r'^MLX_METAL_VERSION="([^"]+)"', bootstrap, re.M)
+          commit = re.search(r'^MLX_C_COMMIT="([^"]+)"', bootstrap, re.M)
+          assert metal and commit, "pin variables not found in bootstrap-native.sh"
           EXPECTED = {
               "old": ("0.31.2", "fba4470b89073180056c9ea46c443051375f7399"),
-              "new": ("0.32.4", "a26f2d584a14ec619ae8db9a09be03becd47598a"),
+              "new": (metal.group(1), commit.group(1)),
           }
           worker_path = "jmlx-benchmarks/src/main/java/se/alipsa/jmlx/benchmarks/VlmFirstUseWorker.java"
           pins = {}

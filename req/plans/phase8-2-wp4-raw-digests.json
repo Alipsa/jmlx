@@ -1,7 +1,7 @@
 {
-  "schema": "jmlx-phase8-2-wp4-raw-digests-4",
+  "schema": "jmlx-phase8-2-wp4-raw-digests-3",
   "source": "~/wp4-scratch, paths relative to that directory",
-  "note": "SHA-256 of the WP4 raw tree recorded for section 17 of req/plans/phase8-2-reference-findings.md: the full observed-cache session wp4-observed-cache-1 (24 worker cells under sessions/wp4-observed-cache-1/{qwen3vl-2b,phi3v-4b}/{old,new}-p{0..5} with job.json, report.json and worker-stderr.log each, plus session-report.json, the per-fork hostrec records under sessions/wp4-observed-cache-1/hostrec/ and the wrapper's hostrec.log, thermal-start.txt and thermal-end.txt), the second alternating session wp4-observed-cache-2 (same layout, 24 cells; the review-round quiet-host repeat, section 17.6), the 1-pair smoke session wp4-smoke (same layout, 4 cells), the wrapper's hostrec/{wp4-observed-cache-1,wp4-observed-cache-2}/{host.log,launcher.log}, and the three session specs. Session 1's session-report.json carries tree new sha e4cb1f0f43ddd90242237f7e155a399ca5c84cfd / tree old sha 46cb325bec9b4878534cc5c6bda1a569dfe4aa4c and the v1 worker source digest 405a839c2f0399391b67e399bfbbb83218a4ee44bab9c2c56d9631665ed02130; session 2's carries tree new sha ecc69a50e7a7263e955ac20c716b71344ce86c34 / tree old sha 46cb325bec9b4878534cc5c6bda1a569dfe4aa4c and the review commit's worker source digest fede0c00ac0528f044cb322ad24ed0d93c03068582cd47ec8e20ad04eabbccac, byte-identical in both trees. v1 (100 files) covered session 1, the smoke and their wrapper logs; v2 adds session 2. v3 adds the committed CI native smoke archive for run 43307319179; the 181 historical scratch-tree file digests are unchanged. v4 re-archives the CI smoke archive with the runner host's identifying details redacted (runner workspace and model-home path prefixes, the per-fork omlx percentages); see ci_smoke.redaction and section 17.9. All other digests are unchanged.",
+  "note": "SHA-256 of the WP4 raw tree recorded for section 17 of req/plans/phase8-2-reference-findings.md: the full observed-cache session wp4-observed-cache-1 (24 worker cells under sessions/wp4-observed-cache-1/{qwen3vl-2b,phi3v-4b}/{old,new}-p{0..5} with job.json, report.json and worker-stderr.log each, plus session-report.json, the per-fork hostrec records under sessions/wp4-observed-cache-1/hostrec/ and the wrapper's hostrec.log, thermal-start.txt and thermal-end.txt), the second alternating session wp4-observed-cache-2 (same layout, 24 cells; the review-round quiet-host repeat, section 17.6), the 1-pair smoke session wp4-smoke (same layout, 4 cells), the wrapper's hostrec/{wp4-observed-cache-1,wp4-observed-cache-2}/{host.log,launcher.log}, and the three session specs. Session 1's session-report.json carries tree new sha e4cb1f0f43ddd90242237f7e155a399ca5c84cfd / tree old sha 46cb325bec9b4878534cc5c6bda1a569dfe4aa4c and the v1 worker source digest 405a839c2f0399391b67e399bfbbb83218a4ee44bab9c2c56d9631665ed02130; session 2's carries tree new sha ecc69a50e7a7263e955ac20c716b71344ce86c34 / tree old sha 46cb325bec9b4878534cc5c6bda1a569dfe4aa4c and the review commit's worker source digest fede0c00ac0528f044cb322ad24ed0d93c03068582cd47ec8e20ad04eabbccac, byte-identical in both trees. v1 (100 files) covered session 1, the smoke and their wrapper logs; v2 adds session 2. v3 adds the committed CI native smoke archive for run 43307319179; the 181 historical scratch-tree file digests are unchanged.",
   "files": {
     "hostrec/wp4-observed-cache-1/host.log": "fe0cb0993974c73a6a70b997b9afbb5f12b289129551cb51e0d102126e64f03e",
     "hostrec/wp4-observed-cache-1/launcher.log": "d4ce9016db5dc1ab96c253ff36455eb777dc655b0378faaa0211df0102a88999",
@@ -190,37 +190,26 @@
     "attempt": 1,
     "head_sha": "76dac46c323c54d99e8bcd6596218c0207703a32",
     "archive": "req/plans/evidence/wp4-native-smoke-43307319179-1.zip",
-    "archive_sha256": "e32e73707c7488c78a1a8e092bdf247447d720118fa0307c956592b05b890b32",
+    "archive_sha256": "a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6",
     "files": {
-      "session/hostrec/host.log": "2b4742252c19da822e262220b0612e8a06839b840fb2366cb43688cae75ac89b",
+      "session/hostrec/host.log": "a986417acefd00ec99130dc8b34d830b36de9b8fe03f73ac647f5c95bca79799",
       "session/hostrec/host.log.cmds": "b3147da54678860ad4c120fd504dff7e56d9de15910964180d9cb9db3014c787",
-      "session/phi3v-4b/new-p0/job.json": "9e018961325f36a69be6e7a078dc821b79e0110d20e3df310fce8d76fac8a7bb",
-      "session/phi3v-4b/new-p0/report.json": "3e06fddb4e8f43eef5326d5c562f25ca64826b6a34f0d43e706c86b6ac6013fa",
+      "session/phi3v-4b/new-p0/job.json": "19a4aed7417491815a7d38dfcbd53cb1a0b984d9b577d24b83761c17f175258a",
+      "session/phi3v-4b/new-p0/report.json": "1b257c6cb939b1b48b4882875def14be6dc4be4fac3692a8748f7ccd25d16e83",
       "session/phi3v-4b/new-p0/worker-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "session/phi3v-4b/old-p0/job.json": "2995b3a9d16cd89434f3b08d8e586b00e7eff28db598d4bad7831876a65fe52b",
-      "session/phi3v-4b/old-p0/report.json": "543d71ca08c668defe520b1d3dd87c6e91f8c0f64b1157317a35ba3f4a584ec5",
+      "session/phi3v-4b/old-p0/job.json": "f678e1a8e6027eb9b637f91c91b43be402df08f979fcf2d4ee3dbe99b853c76f",
+      "session/phi3v-4b/old-p0/report.json": "1bca7de7ccd8477fc5a82bfd5f518c02e8106595351e12ac74802f9b2db8758d",
       "session/phi3v-4b/old-p0/worker-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "session/qwen3vl-2b/new-p0/job.json": "9e758a181e9c116e9503a87057bdd55f548cff804146ad56f9742d7b8a9433d9",
-      "session/qwen3vl-2b/new-p0/report.json": "d8edbd3e832575b64d5b324c5ad58037cb86d63ccc4363b5790f447a34796541",
+      "session/qwen3vl-2b/new-p0/job.json": "8c2b41fa569718f038ea52a142c3bcd0804557b136d7b0939d8773e6d7229c69",
+      "session/qwen3vl-2b/new-p0/report.json": "d14eac2ecb071b07d55653c845485aecca428cbe2e5999b7332f579e7d18f915",
       "session/qwen3vl-2b/new-p0/worker-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "session/qwen3vl-2b/old-p0/job.json": "d64592d032361b93a7ec8edc2340b830f33f8e6c3616340f1d7c81825809b04c",
-      "session/qwen3vl-2b/old-p0/report.json": "6a4dfbfe0d7662102698f8c18acc209865095d03f0f71a4d56409acec17aeec5",
+      "session/qwen3vl-2b/old-p0/job.json": "23cd95bd2b002cefe43443d193a8552873b77d47d77d37ede50087fcf56b97ee",
+      "session/qwen3vl-2b/old-p0/report.json": "055a73ff3999b06f84a7a41ece30d906f77edcae4e9a54868e12c9bc4ce0b49b",
       "session/qwen3vl-2b/old-p0/worker-stderr.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "session/session-report.json": "66aaabbd94131185f8316b06487d7caba162fc5815f8ffb775571d7c89de5fe8",
+      "session/session-report.json": "8dd4f69e33a5f6129b9dcd10b28cdc65e8c0853577809c47e99fce504c6cb93e",
       "session/thermal-end.txt": "6735f04bb165f84b3cc6782e9b66f43b84459bbf0da5ff652792c7dc27bd0cf4",
       "session/thermal-start.txt": "6735f04bb165f84b3cc6782e9b66f43b84459bbf0da5ff652792c7dc27bd0cf4",
-      "spec.json": "b86c0c70c5cea7102b88c0b987c168be1d5f535b52db3d2f03a5ddf77b02d5d9"
-    },
-    "redaction": {
-      "date": "2026-11-13",
-      "reason": "PR #92 review round 4 (findings section 17.9): the committed archive must not keep the self-hosted runner host's paths or host activity in the public repository.",
-      "preimage_archive_sha256": "a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6",
-      "preimage_note": "preimage per-file digests are the v3 ci_smoke.files values, preserved in git history",
-      "substitutions": [
-        "/Users/ghrunner/actions-runner/_work -> [host-workspace] (spec.json, session-report.json and the eight job/report files)",
-        "/Users/ghrunner/tier-b-models -> [host-models] (same 10 files)",
-        "omlx=<percent>% -> omlx=redacted (session/hostrec/host.log, 8 lines)"
-      ]
+      "spec.json": "91591e888c0fb9e78624450a8430217129482c85c13f62a88b857e9b79c0d344"
     }
   }
 }

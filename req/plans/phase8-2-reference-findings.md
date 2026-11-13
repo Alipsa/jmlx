@@ -4158,15 +4158,17 @@ only two measured iterations per worker, are protocol observations, **not
 performance evidence**; they do not change either cell's `unstable`
 closure in section 17.6 or support runtime attribution.
 
-The downloaded 18-file Actions artifact is archived as
-`req/plans/evidence/wp4-native-smoke-43307319179-1.zip` (SHA-256
-`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`),
-byte-identical to the Actions artifact it came from. Review round
-4 briefly re-archived it redacted (section 17.9); review round 5
-reverted that (section 17.10), so this v3 archive is the current
-record. `req/plans/phase8-2-wp4-raw-digests.json` schema v3 records
-the archive and every contained file's digest, independently of
-the Actions artifact's 14-day retention. Its 181 historical
+The 18-file Actions artifact of run 43307319179 is archived as
+`req/plans/evidence/wp4-native-smoke-43307319179-1.zip` - the
+original artifact zip (SHA-256
+`a1829718db51f547e4281d623117299c6ee5b1ada487f29d90b762e1a34ba45d`,
+which equals GitHub's recorded artifact digest; review round 6,
+section 17.11). Review round 4 briefly re-archived it redacted
+(section 17.9); review round 5 reverted that (section 17.10), so
+the unredacted artifact is the current record.
+`req/plans/phase8-2-wp4-raw-digests.json` schema v3 records the
+archive and every contained file's digest, independently of the
+Actions artifact's 14-day retention. Its 181 historical
 scratch-tree digests remain unchanged.
 
 ### 17.9 Review round 4 (2026-11-13, PR #92)
@@ -4318,12 +4320,14 @@ redaction therefore protected nothing that was not already
 public while leaking the substitution in its own record. Owner
 decision (reversing the round-4 "redact and record" choice):
 drop the redaction, per the reviewer's recommendation. The v3
-archive was restored from commit 2d36fbb - SHA-256
-`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`,
-verified byte-identical to the CI artifact of run 43307319179 -
+archive was restored from commit 2d36fbb (SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`)
 and `phase8-2-wp4-raw-digests.json` was restored to schema v3
 (the `ci_smoke.redaction` block and the v4 note sentence are
-gone). The trade-off the reviewer noted for the redacted
+gone). Review round 6 found that this restored file was a
+re-zip of the artifact (contents identical, zip container not)
+and replaced the committed archive with the original artifact
+download (section 17.11). The trade-off the reviewer noted for the redacted
 archive - that only git history could check the preimage digest
 and the Actions artifact expires around 2026-11-26 - no longer
 applies: the committed archive IS the artifact. The existing
@@ -4350,5 +4354,64 @@ including the concrete scenario (a scheduled arm queued behind a
 dispatch, then a labeled smoke of the same workload), was added
 to the tier-b.yml concurrency comment.
 
-CI re-verification on the round-5 head is recorded at the close
-of this section.
+CI re-verification on the round-5 head
+`6ea18290a46c0d7558147690320a2df883831f74` (recorded
+2026-11-13): re-applying the `run-vlm-first-use-smoke` label
+to PR #92 triggered run
+[43443308327](https://github.com/Alipsa/jmlx/actions/runs/43443308327)
+(14:30:14Z–14:33:43Z), which passed the protocol gate with
+4/4 `ok` workers; the round-5 derived new-pin expectation ran
+against the new tree's own `scripts/bootstrap-native.sh`, and
+the old-tree untracked-file invariant held. The full build
+(ci.yml run 43443268157, including `:jmlx-benchmarks:check`,
+Spotless and Checkstyle) is green at this head: the `java` job
+succeeded 14:30:02Z–14:32:20Z, and the `native` job's first
+attempt was cancelled at 14:45:01Z by hosted macOS arm64 runner
+capacity ("The job was not acquired by Runner of type hosted
+even after multiple attempts") - an infrastructure failure, not
+a code one, since rounds 4-6 change no Java source or native
+pin and the native suites were green at `f76d435` and
+`f09129e`; the failed-job re-run (14:47:48Z–14:56:51Z)
+succeeded. The round-5 tier-b.yml change was comment-only, so
+the round-4 11/11 dispatch (43425816840) stands as the tier-b
+behavioral evidence.
+
+### 17.11 Review round 6 (2026-11-13, PR #92)
+
+Round 6 addressed two findings on the committed archive's
+provenance and the section 17.10 close. No Java source or
+workflow change.
+
+Item 1 (low): the committed zip was not byte-identical to the
+Actions artifact, though its contents were. The reviewer
+compared the committed file (SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`)
+against the artifact as served by GitHub (recorded digest
+`sha256:a1829718db51f547e4281d623117299c6ee5b1ada487f29d90b762e1a34ba45d`):
+the extracted trees are identical (18 files, 41,867 bytes each,
+no differences), so the committed file was a re-zip of the
+downloaded artifact - all 18 per-file digests match, the zip
+container does not. The section 17.8/17.10 "byte-identical"
+wording overstated it, and once the artifact expires on
+2026-11-26 nobody can check the claim. Fix (the reviewer's
+alternative, chosen while the artifact was still downloadable):
+the committed zip was replaced with the original artifact zip
+downloaded from the run on 2026-11-13 - SHA-256
+`a1829718db51f547e4281d623117299c6ee5b1ada487f29d90b762e1a34ba45d`,
+verified equal to both the download and GitHub's recorded
+artifact digest (artifact 13983663948). All 18 per-file digests
+are unchanged and were re-verified against the manifest, the
+round-5 verify logic was re-run on the new zip (4/4 `ok`
+workers), and `ci_smoke.archive_sha256` now equals the
+`ci_smoke.artifact` digest recorded next to it. The wording in
+sections 17.8 and 17.10 is amended in place to name the
+original-artifact provenance; with this swap, "the committed
+archive IS the artifact" is literally true.
+
+Item 2 (low): section 17.10 promised its CI results at the
+close of the section, but the round-5 commit landed while the
+runs were still in flight. The close is filled in above once
+both runs are green. Because recording it means another commit,
+the PR body names `6ea18290a46c0d7558147690320a2df883831f74`
+as the code head the way it named `f09129e` for round 4; this
+round-6 commit is doc- and evidence-only.

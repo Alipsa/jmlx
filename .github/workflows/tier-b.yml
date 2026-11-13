@@ -50,16 +50,22 @@ jobs:
     # still OOM-kill the job before the assertion runs.
     runs-on: ${{ matrix.runner || 'macos-26' }}
     timeout-minutes: 90
-    # The self-hosted arms clean and download into the persistent per-host model
-    # cache ($HOME/tier-b-models/<arm>); the WP4 smoke workflow
+    # The self-hosted arms clean and download into the persistent per-host
+    # model cache ($HOME/tier-b-models/<arm>); the WP4 smoke workflow
     # (vlm-first-use-smoke.yml) cleans and downloads into the qwen3vl and phi3v
-    # directories of that same cache. The shared group (cancel-in-progress:
-    # false, so a queued run waits for the live one) keeps the two workflows
-    # from racing, should more than one runner instance carry the
-    # self-macos-xl label. Hosted arms use per-run workspace caches, so they
-    # get a unique per-run group and keep running in parallel.
+    # directories of that same cache. The group is per model directory, so a
+    # job only contends with other jobs that touch the same directory.
+    # Per-directory grouping is required, not just preferable: a GitHub
+    # concurrency group holds at most one in-progress and one pending request,
+    # and a newer request cancels the pending one ("Canceling since a higher
+    # priority waiting request for <group> exists") — cancel-in-progress:
+    # false only protects the in-progress slot. One group for all four
+    # self-hosted arms therefore cancels two of them on every run (observed:
+    # runs 43395837213 and 43419328748, findings section 17.9). Hosted arms
+    # use per-run workspace caches, so they get a unique per-run group and
+    # keep running in parallel.
     concurrency:
-      group: ${{ matrix.runner && 'tier-b-model-cache' || format('tier-b-arm-{0}-{1}', matrix.name, github.run_id) }}
+      group: ${{ matrix.runner && format('tier-b-model-dir-{0}', matrix.name) || format('tier-b-arm-{0}-{1}', matrix.name, github.run_id) }}
       cancel-in-progress: false
     strategy:
       fail-fast: false

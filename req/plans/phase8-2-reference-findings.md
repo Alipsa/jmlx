@@ -4201,18 +4201,33 @@ untracked list is exactly the byte-copied worker source file and
 the new tree's is empty.
 
 Both workflows that clean and download into the persistent
-`$HOME/tier-b-models` cache now declare the shared
-`concurrency.group: tier-b-model-cache` with
-`cancel-in-progress: false`, so a queued run waits for a live
-cleanup/download instead of racing it. The "unverified" part of
-the finding is now checked: the repository's runner listing
-shows exactly one instance carrying the `self-macos-xl` label,
-online and not busy, so with a single runner at its default
-concurrency the race was not possible today; the guard is
-future-proofing against a second instance. In `tier-b.yml` only
-the self-hosted arms take the shared group: the hosted arms use
-per-run workspace caches (no `$HOME/tier-b-models`), so they get
-a unique per-run group and keep running in parallel as before.
+`$HOME/tier-b-models` cache declare per-directory concurrency
+groups (`tier-b-model-dir-<name>`, `cancel-in-progress: false`):
+a job contends only with jobs that touch the same directory.
+The "unverified" part of the finding is now checked: the
+repository's runner listing shows exactly one instance carrying
+the `self-macos-xl` label, online and not busy, so with a single
+runner the race was not possible today (jobs queue on the runner
+itself); the groups are future-proofing against a second
+instance. The group is per directory rather than one shared
+group, because a GitHub concurrency group holds at most one
+in-progress and one pending request, and a newer request
+cancels the pending one — `cancel-in-progress: false` protects
+only the in-progress slot. One shared group for the four
+self-hosted tier-b arms therefore cancels two of the arms on
+every run: the first branch dispatch (run 43395837213) cancelled
+qwen3vl, phi3v and qwen35, and the re-dispatch (run
+43419328748) cancelled phi3v and qwen35, each with the
+annotation "Canceling since a higher priority waiting request
+for tier-b-model-cache exists" (jobs 131786392540,
+131786392996, 131786393122, 131865083424 and 131865085194).
+Hosted arms use per-run workspace caches, so they get a unique
+per-run group and keep running in parallel as before. The
+`both` smoke joins the distinct `tier-b-model-dir-both` group:
+it gates against other `both` smokes but not against the
+individual arms, a residual case that is safe on the single
+runner and fails detectably (a retryable arm failure) if it
+ever matters.
 
 The label-trigger comment no longer names PR #92; it documents
 the label as a general opt-in for same-repository PRs.
@@ -4243,3 +4258,23 @@ record, and the smoke's verify logic was re-run against the
 redacted tree (4/4 `ok` workers). The section 17.8 observation
 that quoted a redacted value (`omlx=40.0%` in the first pre
 record, "host was not quiet") remains recorded here in text.
+
+CI re-verification on this branch (recorded 2026-11-13, all at
+head `f76d435ca42f171864dff68e0023a113724b55da`): re-applying
+the `run-vlm-first-use-smoke` label to PR #92 triggered run
+[43395836816](https://github.com/Alipsa/jmlx/actions/runs/43395836816)
+(08:46:19Z–08:50:01Z), which passed the protocol gate with
+4/4 `ok` workers under the new direct pin asserts and the
+untracked-file invariant. The full build (ci.yml run
+43395786770, including `:jmlx-benchmarks:check`, Spotless and
+Checkstyle) is green at this head. `tier-b.yml` was dispatched
+on the branch as runs 43395837213 and 43419328748 (the latter
+after the owner asked for the full matrix to be re-run). Both
+runs finished with all seven hosted arms green; the self-hosted
+arms that ran exercised the moved
+`python3 tools/tier-b/model_cache.py` call site end-to-end
+against a persistent directory (smolvlm in both runs, qwen3vl
+in the second) and passed, while the remaining arms were the
+shared-group cancellations recorded above. The dispatch under
+the per-directory groups (the state of the follow-up commit)
+and its result are recorded in the close of this section.

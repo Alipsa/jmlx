@@ -33,11 +33,19 @@ jobs:
     timeout-minutes: 120
     # The model cache dirs under $HOME/tier-b-models are shared with the
     # Tier-B workflow's self-hosted arms, which clean and download into the
-    # same paths; the shared group (cancel-in-progress: false, so a queued
-    # run waits for the live one) keeps the two workflows from racing on
-    # cleanup, should more than one runner instance carry the label.
+    # same paths. The group is per model directory (tier-b-model-dir-<name>)
+    # to match the Tier-B arms' groups: a single-workload smoke contends only
+    # with the arm that touches its directory. A `both` smoke joins the
+    # distinct tier-b-model-dir-both group, which gates it against other
+    # `both` smokes but not against the individual arms; that residual case
+    # is safe on the single self-macos-xl runner (jobs queue on the runner
+    # itself) and the failure mode is a detectable, retryable arm failure.
+    # One shared group for all the cache-touching jobs is not an option: a
+    # GitHub concurrency group holds at most one in-progress and one pending
+    # request, and a newer request cancels the pending one (findings
+    # section 17.9 records the two runs that lost five arms to this).
     concurrency:
-      group: tier-b-model-cache
+      group: ${{ format('tier-b-model-dir-{0}', inputs.workloads || 'both') }}
       cancel-in-progress: false
     env:
       WP4_WORKLOADS: ${{ inputs.workloads || 'both' }}

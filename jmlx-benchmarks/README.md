@@ -227,3 +227,83 @@ the step's time: the output carries the explicit assumptions, the
 coverage of classified calls and the uncovered signatures. The contract
 and the local measurement baseline are in
 `req/plans/phase8-2-reference-findings.md` section 15.4.
+
+## VLM first use (phase 8.2 WP4)
+
+```sh
+./gradlew :jmlx-benchmarks:benchmarkVlmFirstUse --args='path/to/spec.json'
+```
+
+The both-pin, both-VLM first-inference launcher (plan section 5.2; frozen
+contract in `req/plans/phase8-2-reference-findings.md` section 17). It forks
+one `VlmFirstUseWorker` per workload × pair × tree — the two trees being the
+current checkout (new native pin) and an isolated old-pin compatibility
+worktree — each worker running from its own tree's `installDist` against its
+own staged native runtime. The session is a **code-and-pin comparison, not an
+isolated native-pin effect**: the two trees differ in 156 commits, not only
+the pin, and the launcher re-verifies the measurement worker source is
+byte-identical in both trees before the first fork.
+
+Spec fields (schema `jmlx-vlm-first-use-spec-1`):
+
+```text
+session                session name
+out_root               new directory, outside the repository and both trees
+repo_root              the new-tree checkout
+hostrec_script         per-fork host-state recorder (the tools/gpu-burn/hostrec.sh conventions)
+trees.old / trees.new  {path, expected_tree_sha, class_dir, native_dir}; the launcher
+                       verifies each tree's git tree SHA, its installDist classes and its
+                       staged native lib/pin before forking; the two trees must differ
+workloads[]            {name, manifest, manifest_sha256, model_dir, stop_token_ids} —
+                       one digest-pinned Tier-B manifest per workload (the prompt, image
+                       and generation policy are owned by the manifest; the spec re-pins
+                       the manifest file digest); stop_token_ids must be explicit and
+                       nonempty per workload
+pairs                  pairs per tree per workload (positive)
+warmups                post-first-request warmups (nonnegative)
+measured               measured repetitions (positive)
+worker_timeout_s       finite per-worker limit (positive)
+session_time_budget_s  finite session limit (positive)
+precision_env / precision_value  e.g. MLX_ENABLE_TF32 / "0"
+```
+
+Per worker: model load, then the **first** image+text generation captured
+immediately after load in the fresh JVM (lazy loader work stays inside the
+first request by construction), correctness verification of the first request
+against the Tier-B manifest reference, then the warmups and measured
+repetitions. Requests are greedy under the spec's precision value; every
+measured repetition must reproduce the first request's IDs (divergence is
+recorded, never hidden). The observed-cache regime primes nothing and never
+resets the OS/Metal caches: the cache state is recorded as observed, not as
+cold. Exit codes follow the baseline launcher (0 all ok, 1 spec failure
+before any fork, 2 any worker non-ok).
+
+The executed sessions are `wp4-observed-cache-1/-2` (24 workers each); the raw
+evidence, host records and per-pair ratios are under
+`req/benchmarks/phase8-2/raw/wp4/`, and both VLM cells closed `unstable` with
+no settled cross-pin ratio — the published record is
+`req/phase8-2-benchmark.md` section 6.
+
+## Published phase 8.2 evidence
+
+The WP3 text baseline and the WP4 first-inference sessions are published in
+`req/phase8-2-benchmark.md` (rounded display values; full precision in
+`req/benchmarks/phase8-2/summary.json`), with the digest-pinned raw trees
+(458 WP3 + 181 WP4 files) under `req/benchmarks/phase8-2/raw/` and the
+evidence index at `req/benchmarks/phase8-2/evidence-index.json`. Two checks
+re-derive the evidence without running any benchmark or downloading anything:
+
+```sh
+# Root check guard (pure Java, cross-platform): re-hashes the frozen workload manifest.
+./gradlew verifyDecodeBaselineManifest
+
+# Raw-to-summary verifier (pure Java, part of :jmlx-benchmarks:test, so it also
+# runs on the Linux CI job):
+./gradlew :jmlx-benchmarks:test --tests "se.alipsa.jmlx.benchmarks.Phase82SummaryVerifierTest"
+```
+
+The verifier re-derives every summary value from the committed raw bytes
+(type-7 quantiles, pair sets, greedy-identity blocks, the FFM budget medians
+within the per-call recording bound, the WP4 pooling and paired ratios) and
+asserts the raw tree is exactly the committed digest-pinned set with no
+username or absolute local path.

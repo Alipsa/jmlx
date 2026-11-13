@@ -35,7 +35,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
 | 6 | Complete local text-LLM inference | none | none | delivered |
 | 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | delivered (all milestones delivered; every gate in the Phase 7 done list below passed, hosted Tier-B arm execution being out of scope of that gate per the 2026-11-04 owner amendment in `phase8-1-plan.md` WP0 — the last passing gate, the 7.6 qwen35 self-hosted Tier-B run, in run 41841745005 on 2026-11-04) |
-| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | in progress (8.1 delivered 2026-11-05: `jmlx-jinja` 0.6.1, `jmlx-tokenizer` 0.1.1 and `jmlx-vision` 0.1.1 on Central after the `.module` recovery; 8.3 and 8.4 not started) |
+| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | in progress (8.1 delivered 2026-11-05: `jmlx-jinja` 0.6.1, `jmlx-tokenizer` 0.1.1 and `jmlx-vision` 0.1.1 on Central after the `.module` recovery; 8.2 measurements delivered 2026-11-13 — `req/phase8-2-benchmark.md`; 8.3 and 8.4 not started) |
 | 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record), Z-Image Base and FLUX.2 Klein Base 4B image generation (9.8, decided in its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
 | 11 | Numerical, random and specialized compute parity; audio inference (11.5, scheduled by the 7.4 decision) | 11.0 | 0.x release | not started |
@@ -339,8 +339,32 @@ published before `jmlx-models` itself.
    separately on both pins and workloads, with per-run host observations. The
    baseline measures in a quiet host state, records the host state with the
    numbers, and re-runs any surprising VLM prefill figure as a back-to-back
-   alternating session before attributing it to the runtime. The detailed implementation and
-   evidence gates are in [phase8-2-plan.md](plans/phase8-2-plan.md).
+   alternating session before attributing it to the runtime.
+
+   **Status (2026-11-13): measurement complete and published** —
+   `req/phase8-2-benchmark.md`, with the raw evidence, the digest-pinned
+   evidence index, the full-precision summary and the pure-Java raw-to-summary
+   verifier under `req/benchmarks/phase8-2/`, and the tooling documentation in
+   `tools/decode-baseline/README.md`. The WP3 text baseline ran the methodology
+   above (alternating pairs per cell, per-fork host observations, quiet host):
+   jmlx's controlled single-prefill/127-step generation is 1.08–1.59× the wall
+   time of the Python `mlx_lm` reference's matched generation on the settled
+   cells (1.1318–1.5863 dense/MoE, 1.0841 the settled 4-bit cell); the
+   stock-loop comparison (1.1375–1.8516×) is a timing observation only, because
+   the two runtimes' greedy outputs diverge in five of nine cells. The
+   4-bit/2048 cells are `io_affected` (page-cache-limited), the 4-bit/512
+   controlled cell is `unstable`, and the stock 4-bit/2048 cell is `blocked`
+   pending the owner's decision — report section 7 lists the open items that
+   need a dated owner scope amendment. Per-token host overhead is recorded as
+   calibrated FFM transition estimates (76.65–111.12 µs per decode step;
+   report section 5). WP4 (both pins, both VLMs) ran two alternating
+   first-inference sessions; both VLM cells closed `unstable` with no settled
+   cross-pin ratio or runtime attribution, and the ~897.6 MB phi3v
+   after-first-forward peak gap is a code-and-pin observation, not a pin claim
+   (report section 6). What the first native release (8.4) may state about
+   performance is report section 8; the observed bottlenecks and testable
+   hypotheses for Phase 9.1 are report section 9. The detailed implementation
+   and evidence gates are in [phase8-2-plan.md](plans/phase8-2-plan.md).
 3. **8.3 Spring AI and LangChain4j adapters.** `ChatModel`, `StreamingChatModel` and
    `EmbeddingModel` implementations for each library (the LangChain4j ones also give Quarkus users
    the quarkus-langchain4j path). Callers may run on virtual threads: the

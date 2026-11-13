@@ -13,8 +13,10 @@ on:
           - both
           - qwen3vl
           - phi3v
-  # Allows PR #92 to exercise this workflow before it reaches the default branch.
-  # Remove and re-add the label to run it again. Fork PRs cannot use this runner.
+  # Opt-in label trigger: add (or remove and re-add) the
+  # `run-vlm-first-use-smoke` label to a same-repository PR to run this smoke
+  # on that PR's head. Fork PRs cannot use this self-hosted runner, so the
+  # job's `if` also requires the PR head to be in this repository.
   pull_request:
     types: [labeled]
 
@@ -29,6 +31,14 @@ jobs:
        github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: self-macos-xl
     timeout-minutes: 120
+    # The model cache dirs under $HOME/tier-b-models are shared with the
+    # Tier-B workflow's self-hosted arms, which clean and download into the
+    # same paths; the shared group (cancel-in-progress: false, so a queued
+    # run waits for the live one) keeps the two workflows from racing on
+    # cleanup, should more than one runner instance carry the label.
+    concurrency:
+      group: tier-b-model-cache
+      cancel-in-progress: false
     env:
       WP4_WORKLOADS: ${{ inputs.workloads || 'both' }}
 
@@ -128,7 +138,18 @@ jobs:
           workers = session["workers"]
           assert len(workers) == len(expected)
           assert {(w["workload"], w["tree"], w["pair_index"]) for w in workers} == expected
-          pins = {tree["name"]: tree["native_pin"] for tree in session["trees"]}
+          # Pinned here, not taken from the launcher's own records, which
+          # already compare the worker reports the same way.
+          EXPECTED = {
+              "old": ("0.31.2", "fba4470b89073180056c9ea46c443051375f7399"),
+              "new": ("0.32.4", "a26f2d584a14ec619ae8db9a09be03becd47598a"),
+          }
+          worker_path = "jmlx-benchmarks/src/main/java/se/alipsa/jmlx/benchmarks/VlmFirstUseWorker.java"
+          pins = {}
+          for tree in session["trees"]:
+              assert (tree["native_pin"]["mlxMetalVersion"], tree["native_pin"]["mlxcCommit"]) == EXPECTED[tree["name"]]
+              assert tree["untracked"] == ([worker_path] if tree["name"] == "old" else [])
+              pins[tree["name"]] = tree["native_pin"]
           for worker in workers:
               report = worker["report"]
               assert worker["classification"] == "ok"
@@ -146,7 +167,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: wp4-vlm-first-use-smoke-${{ github.run_id }}-${{ github.run_attempt }}
-          path: ${{ runner.temp }}/wp4-vlm-smoke-${{ github.run_id }}-${{ github.run_attempt }}/
+          path: ${{ env.WP4_RUN_ROOT }}/
           if-no-files-found: warn
           retention-days: 14
 

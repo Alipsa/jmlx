@@ -6,7 +6,11 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import sys
 
+# model_cache.py lives with the Tier-B manifests in tools/tier-b (the Tier-B
+# workflow also calls it directly); make that directory importable.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tier-b"))
 from model_cache import clean_model_dir
 
 
@@ -72,7 +76,7 @@ def main() -> None:
 
     spec = {
         "schema": "jmlx-vlm-first-use-spec-1",
-        "session": f"wp4-native-smoke-{run_root.name}",
+        "session": run_root.name,
         "out_root": str(run_root / "session"),
         "repo_root": str(repo),
         "hostrec_script": str(repo / "tools/gpu-burn/hostrec.sh"),

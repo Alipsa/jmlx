@@ -4159,8 +4159,87 @@ performance evidence**; they do not change either cell's `unstable`
 closure in section 17.6 or support runtime attribution.
 
 The downloaded 18-file Actions artifact is archived as
-`req/plans/evidence/wp4-native-smoke-43307319179-1.zip` (SHA-256
-`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`).
-`req/plans/phase8-2-wp4-raw-digests.json` schema v3 records the archive
-and every contained file's digest, independently of the Actions artifact's
-14-day retention. Its 181 historical scratch-tree digests remain unchanged.
+`req/plans/evidence/wp4-native-smoke-43307319179-1.zip`; its v3
+digests (archive SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`)
+were superseded in review round 4 by the redacted re-archive
+(section 17.9). `req/plans/phase8-2-wp4-raw-digests.json` schema
+v4 records the archive and every contained file's digest,
+independently of the Actions artifact's 14-day retention. Its 181
+historical scratch-tree digests remain unchanged.
+
+### 17.9 Review round 4 (2026-11-13, PR #92)
+
+Round 4 addressed the eight findings on the smoke workflow, the
+Tier-B call site and the committed evidence. No Java source
+changed: the worker and launcher are untouched, so the old
+worktree's untracked worker copy and both trees' `installDist`
+outputs remain in sync, and no old-tree re-sync or digest
+re-recording was needed.
+
+The shared model-cache cleaner moved from `tools/vlm-first-use/`
+(WP4-specific) to `tools/tier-b/model_cache.py`, next to the
+manifests it cleans against: the four self-hosted Tier-B arms
+must not depend on a directory that WP4 cleanup could later
+remove. The Tier-B call site passes the new path;
+`prepare-smoke.py` adds `tools/tier-b` to `sys.path` and imports
+`clean_model_dir` from there; the stale "stdlib-only report
+heredoc" comment in `tier-b.yml` now names the script. The
+script was re-tested from the repository root after the move:
+it keeps the listed files and removes unlisted files, symlinks
+and the empty directories they leave. `tier-b.yml` runs once on
+this branch before merge, with the result recorded below.
+
+The smoke's verify step no longer compares the worker reports
+against the launcher's own `session["trees"]` records (written
+by the same code that classified them). It pins the expected
+native pins directly (old 0.31.2 / `fba4470b89073180056c9ea46c443051375f7399`,
+new 0.32.4 / `a26f2d584a14ec619ae8db9a09be03becd47598a`) and
+asserts each tree against that tuple, plus the untracked-file
+invariant the workflow's design relies on: the old tree's
+untracked list is exactly the byte-copied worker source file and
+the new tree's is empty.
+
+Both workflows that clean and download into the persistent
+`$HOME/tier-b-models` cache now declare the shared
+`concurrency.group: tier-b-model-cache` with
+`cancel-in-progress: false`, so a queued run waits for a live
+cleanup/download instead of racing it. The "unverified" part of
+the finding is now checked: the repository's runner listing
+shows exactly one instance carrying the `self-macos-xl` label,
+online and not busy, so with a single runner at its default
+concurrency the race was not possible today; the guard is
+future-proofing against a second instance. In `tier-b.yml` only
+the self-hosted arms take the shared group: the hosted arms use
+per-run workspace caches (no `$HOME/tier-b-models`), so they get
+a unique per-run group and keep running in parallel as before.
+
+The label-trigger comment no longer names PR #92; it documents
+the label as a general opt-in for same-repository PRs.
+`prepare-smoke.py` names the session `run_root.name`
+(`wp4-vlm-smoke-<run>-<attempt>`) instead of double-prefixing it
+with `wp4-native-smoke-`, and the smoke's artifact upload uses
+`${{ env.WP4_RUN_ROOT }}` instead of re-deriving the
+`$RUNNER_TEMP` path (a drift between the two would have ended
+the upload at `if-no-files-found: warn`).
+
+Owner decision on the committed evidence: redact and record.
+The re-archived zip at the same path replaces the v3 archive
+(SHA-256
+`a85a1e2b44452a9dbe246d107a849349618cb0a32b18c1f9ff58a0a4b33e12b6`,
+preserved in git history and in
+`ci_smoke.redaction.preimage_archive_sha256`). Exactly 11 of the
+18 files changed: the two runner-host path prefixes
+(`/Users/ghrunner/actions-runner/_work` → `[host-workspace]`,
+`/Users/ghrunner/tier-b-models` → `[host-models]`) in
+`spec.json`, `session-report.json` and the eight job/report
+files, and the eight per-fork `omlx=<pct>%` values in
+`host.log` → `omlx=redacted`. The other seven files
+(`host.log.cmds`, the four worker-stderr logs, both thermal
+files) are byte-identical to the v3 archive.
+`phase8-2-wp4-raw-digests.json` is schema v4 with the new
+archive and per-file digests plus the `ci_smoke.redaction`
+record, and the smoke's verify logic was re-run against the
+redacted tree (4/4 `ok` workers). The section 17.8 observation
+that quoted a redacted value (`omlx=40.0%` in the first pre
+record, "host was not quiet") remains recorded here in text.

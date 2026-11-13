@@ -50,6 +50,17 @@ jobs:
     # still OOM-kill the job before the assertion runs.
     runs-on: ${{ matrix.runner || 'macos-26' }}
     timeout-minutes: 90
+    # The self-hosted arms clean and download into the persistent per-host model
+    # cache ($HOME/tier-b-models/<arm>); the WP4 smoke workflow
+    # (vlm-first-use-smoke.yml) cleans and downloads into the qwen3vl and phi3v
+    # directories of that same cache. The shared group (cancel-in-progress:
+    # false, so a queued run waits for the live one) keeps the two workflows
+    # from racing, should more than one runner instance carry the
+    # self-macos-xl label. Hosted arms use per-run workspace caches, so they
+    # get a unique per-run group and keep running in parallel.
+    concurrency:
+      group: ${{ matrix.runner && 'tier-b-model-cache' || format('tier-b-arm-{0}-{1}', matrix.name, github.run_id) }}
+      cancel-in-progress: false
     strategy:
       fail-fast: false
       matrix:
@@ -201,7 +212,7 @@ jobs:
           : "${HOME:?the job environment must set HOME}"
           MODEL_DIR="$HOME/tier-b-models/${{ matrix.name }}"
           echo "Model dir: $MODEL_DIR"
-          python3 tools/vlm-first-use/model_cache.py "$MODEL_DIR" "$JMLX_TIER_B_MANIFEST"
+          python3 tools/tier-b/model_cache.py "$MODEL_DIR" "$JMLX_TIER_B_MANIFEST"
           echo "JMLX_TIER_B_MODEL_DIR=$MODEL_DIR" >> "$GITHUB_ENV"
       - uses: actions/setup-java@v6
         with:
@@ -213,9 +224,9 @@ jobs:
       # process.platform === 'darwin'), which is the GitHub-hosted runner's
       # tool cache, so on the self-hosted arm it dies with "mkdir: /Users/runner:
       # Permission denied" before Python is even resolved. The self-hosted arm
-      # uses the machine's python3 instead (brew's, first on PATH); the only
-      # Python this job runs is a stdlib-only report heredoc, so no pinned
-      # toolchain is needed there.
+      # uses the machine's python3 instead (brew's, first on PATH); the Python
+      # this job runs there is stdlib-only (tools/tier-b/model_cache.py and the
+      # report heredoc), so no pinned toolchain is needed.
       - uses: actions/setup-python@v6
         if: '!matrix.runner'
         with:

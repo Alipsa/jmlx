@@ -4276,5 +4276,19 @@ arms that ran exercised the moved
 against a persistent directory (smolvlm in both runs, qwen3vl
 in the second) and passed, while the remaining arms were the
 shared-group cancellations recorded above. The dispatch under
-the per-directory groups (the state of the follow-up commit)
-and its result are recorded in the close of this section.
+the per-directory groups (run
+[43425816840](https://github.com/Alipsa/jmlx/actions/runs/43425816840),
+12:30:59Z–12:35:54Z) completed **11/11 success** at head
+`f09129e4009d71a61c30b7d27e771a8b417c088e`: all seven hosted
+arms and all four self-hosted arms (smolvlm, phi3v, qwen35,
+qwen3vl, chained on the single runner), with no cancellations.
+The phi3v and qwen35 arms that the shared group had cancelled
+in both earlier dispatches now ran and passed, and every
+self-hosted arm exercised the moved `model_cache.py` call
+site. The label was re-applied once more, and the smoke run
+[43428911217](https://github.com/Alipsa/jmlx/actions/runs/43428911217)
+(12:53:06Z–12:55:43Z) passed 4/4 `ok` workers at that same
+final head; ci.yml run 43425810144 is green there as well.
+All three workflows that touch the model cache were therefore
+executed at the head that merges, under the per-directory
+groups.

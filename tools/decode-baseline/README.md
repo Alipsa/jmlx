@@ -22,7 +22,7 @@ Phase 9.1.
 | `install.sh` / `verify.sh` | Create / verify the hash-locked CPython 3.12 venv (see Setup). |
 | `requirements.in` / `requirements.lock` | The pinned environment: `mlx-lm==0.32.2`, `mlx==0.32.4`, `mlx-metal==0.32.4`, `transformers==5.22.1`, `Pillow==12.3.0`, `numpy==2.5.3`, `safetensors==0.8.0`, `tokenizers==0.23.2` (hash-locked wheels, macOS arm64). |
 | `installed-source-digests.json` | The WP0 source freeze of the installed `mlx_lm` package: every `*.py` file's SHA-256 and the complete file set. `verify.sh` and every Python worker re-check it **before** importing `mlx_lm`, so a drifted or tampered tree fails without being loaded. |
-| `artifacts/<case>/` | The three pre-downloaded text checkpoints, byte-pinned by the manifest (no network access at run time; every worker re-hashes every file it consumes and aborts on mismatch). |
+| `artifacts/<case>/` | The three text checkpoints, downloaded in an explicit setup step (see below) and byte-pinned by the manifest. Git-ignored (like every other checkpoint download in this repo); no network access at run time — every worker re-hashes every file it consumes and aborts on mismatch. |
 | `.venv/` | Local, git-ignored venv created by `install.sh`. |
 
 ## Requirements
@@ -47,6 +47,24 @@ Phase 9.1.
 `mlx_lm` source digest against the freeze, imports the stack and records the
 default device and `device_info` (the WP0 device record in the findings §4.1
 came from this command).
+
+The three text checkpoints are **not committed** (they are git-ignored, like every
+other checkpoint download in this repo). Download them in an explicit setup step,
+pinned to the exact revision recorded in the manifest, with the Hugging Face CLI
+(`pip install -U "huggingface_hub[cli]"` for the `hf` entry point):
+
+```sh
+hf download Qwen/Qwen3-0.6B        --revision c1899de289a04d12100db370d81485cdf75e47ca --local-dir tools/decode-baseline/artifacts/qwen3-0.6b
+hf download M4-ai/TinyMistral-6x248M --revision 2b4c0793c2e1dc58df51b9a6ce6852ba28e1a72c --local-dir tools/decode-baseline/artifacts/tinymistral-6x248m
+hf download mlx-community/Qwen3-8B-4bit --revision 545dc4251c05440727734bcd94334791f6ab0192 --local-dir tools/decode-baseline/artifacts/qwen3-8b-4bit
+```
+
+The WP4 VLM checkpoints are the Tier-B artifacts named in the manifest's
+`vlm_cases` (re-pinned through `tools/tier-b/qwen3vl-2b-instruct.json` and
+`tools/tier-b/phi3v-4b-instruct.json`); obtain them the same way at their pinned
+revisions. Every worker re-hashes every checkpoint file it consumes against the
+manifest's per-file digests and aborts on mismatch, so a wrong or drifted download
+fails the worker rather than producing a report.
 
 ## Running the text baseline (WP3)
 

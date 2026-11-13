@@ -1,0 +1,3 @@
+20:31:08 | pre:qual-fc-tf320 | load 1.90 2.10 2.22 | therm-warnings=2 | omlx=0.2% | memfree=75%
+20:32:08 | poll:qual-fc-tf320 | load 1.55 1.99 2.17 | therm-warnings=2 | omlx=0.2% | memfree=71%
+20:32:37 | post:qual-fc-tf320 | load 1.71 1.99 2.17 | therm-warnings=2 | omlx=0.2% | memfree=75%

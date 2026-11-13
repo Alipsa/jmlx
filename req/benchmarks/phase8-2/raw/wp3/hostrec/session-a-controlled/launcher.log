@@ -1,0 +1,151 @@
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-core:processTestFixturesResources NO-SOURCE
+> Task :jmlx-models:processResources NO-SOURCE
+> Task :jmlx-tokenizer:processResources NO-SOURCE
+> Task :jmlx-benchmarks:processResources UP-TO-DATE
+> Task :jmlx-core:processResources NO-SOURCE
+> Task :jmlx-models:processTestResources UP-TO-DATE
+> Task :jmlx-jinja:compileJava UP-TO-DATE
+> Task :jmlx-ffi:compileJava UP-TO-DATE
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes UP-TO-DATE
+> Task :jmlx-ffi:processResources NO-SOURCE
+> Task :jmlx-ffi:classes UP-TO-DATE
+> Task :jmlx-ffi:jar UP-TO-DATE
+> Task :jmlx-jinja:jar UP-TO-DATE
+> Task :jmlx-vision:compileJava UP-TO-DATE
+> Task :jmlx-vision:processResources NO-SOURCE
+> Task :jmlx-vision:classes UP-TO-DATE
+> Task :jmlx-core:compileJava UP-TO-DATE
+> Task :jmlx-vision:jar UP-TO-DATE
+> Task :jmlx-tokenizer:compileJava UP-TO-DATE
+> Task :jmlx-tokenizer:classes UP-TO-DATE
+> Task :jmlx-ffi:compileTestFixturesJava UP-TO-DATE
+> Task :jmlx-tokenizer:jar UP-TO-DATE
+> Task :jmlx-ffi:processTestFixturesResources NO-SOURCE
+> Task :jmlx-ffi:testFixturesClasses UP-TO-DATE
+> Task :jmlx-core:compileTestFixturesJava UP-TO-DATE
+> Task :jmlx-core:testFixturesClasses UP-TO-DATE
+> Task :jmlx-ffi:testFixturesJar UP-TO-DATE
+> Task :jmlx-models:compileJava UP-TO-DATE
+> Task :jmlx-models:classes UP-TO-DATE
+> Task :jmlx-core:bindingAgent UP-TO-DATE
+> Task :jmlx-core:classes UP-TO-DATE
+> Task :jmlx-core:jar UP-TO-DATE
+> Task :jmlx-core:testFixturesJar UP-TO-DATE
+> Task :jmlx-benchmarks:compileJava UP-TO-DATE
+> Task :jmlx-benchmarks:classes UP-TO-DATE
+> Task :jmlx-models:compileTestJava UP-TO-DATE
+> Task :jmlx-models:jar UP-TO-DATE
+> Task :jmlx-models:testClasses UP-TO-DATE
+
+> Task :jmlx-benchmarks:benchmarkBaseline FAILED
+spec: workers[2] duplicate cell python/controlled/qwen3-0.6b/32/headline/none
+spec: workers[3] duplicate cell java/controlled/qwen3-0.6b/32/headline/none
+spec: workers[4] duplicate cell java/controlled/qwen3-0.6b/32/headline/none
+spec: workers[5] duplicate cell python/controlled/qwen3-0.6b/32/headline/none
+spec: workers[6] duplicate cell python/controlled/qwen3-0.6b/32/headline/none
+spec: workers[7] duplicate cell java/controlled/qwen3-0.6b/32/headline/none
+spec: workers[8] duplicate cell java/controlled/qwen3-0.6b/32/headline/none
+spec: workers[9] duplicate cell python/controlled/qwen3-0.6b/32/headline/none
+spec: workers[10] duplicate cell python/controlled/qwen3-0.6b/32/headline/none
+spec: workers[11] duplicate cell java/controlled/qwen3-0.6b/32/headline/none
+spec: workers[14] duplicate cell python/controlled/qwen3-0.6b/512/headline/none
+spec: workers[15] duplicate cell java/controlled/qwen3-0.6b/512/headline/none
+spec: workers[16] duplicate cell java/controlled/qwen3-0.6b/512/headline/none
+spec: workers[17] duplicate cell python/controlled/qwen3-0.6b/512/headline/none
+spec: workers[18] duplicate cell python/controlled/qwen3-0.6b/512/headline/none
+spec: workers[19] duplicate cell java/controlled/qwen3-0.6b/512/headline/none
+spec: workers[20] duplicate cell java/controlled/qwen3-0.6b/512/headline/none
+spec: workers[21] duplicate cell python/controlled/qwen3-0.6b/512/headline/none
+spec: workers[22] duplicate cell python/controlled/qwen3-0.6b/512/headline/none
+spec: workers[23] duplicate cell java/controlled/qwen3-0.6b/512/headline/none
+spec: workers[26] duplicate cell python/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[27] duplicate cell java/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[28] duplicate cell java/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[29] duplicate cell python/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[30] duplicate cell python/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[31] duplicate cell java/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[32] duplicate cell java/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[33] duplicate cell python/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[34] duplicate cell python/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[35] duplicate cell java/controlled/qwen3-0.6b/2048/headline/none
+spec: workers[38] duplicate cell python/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[39] duplicate cell java/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[40] duplicate cell java/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[41] duplicate cell python/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[42] duplicate cell python/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[43] duplicate cell java/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[44] duplicate cell java/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[45] duplicate cell python/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[46] duplicate cell python/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[47] duplicate cell java/controlled/qwen3-8b-4bit/32/headline/none
+spec: workers[50] duplicate cell python/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[51] duplicate cell java/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[52] duplicate cell java/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[53] duplicate cell python/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[54] duplicate cell python/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[55] duplicate cell java/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[56] duplicate cell java/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[57] duplicate cell python/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[58] duplicate cell python/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[59] duplicate cell java/controlled/qwen3-8b-4bit/512/headline/none
+spec: workers[62] duplicate cell python/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[63] duplicate cell java/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[64] duplicate cell java/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[65] duplicate cell python/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[66] duplicate cell python/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[67] duplicate cell java/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[68] duplicate cell java/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[69] duplicate cell python/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[70] duplicate cell python/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[71] duplicate cell java/controlled/qwen3-8b-4bit/2048/headline/none
+spec: workers[74] duplicate cell python/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[75] duplicate cell java/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[76] duplicate cell java/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[77] duplicate cell python/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[78] duplicate cell python/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[79] duplicate cell java/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[80] duplicate cell java/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[81] duplicate cell python/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[82] duplicate cell python/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[83] duplicate cell java/controlled/tinymistral-6x248m/32/headline/none
+spec: workers[86] duplicate cell python/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[87] duplicate cell java/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[88] duplicate cell java/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[89] duplicate cell python/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[90] duplicate cell python/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[91] duplicate cell java/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[92] duplicate cell java/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[93] duplicate cell python/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[94] duplicate cell python/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[95] duplicate cell java/controlled/tinymistral-6x248m/512/headline/none
+spec: workers[98] duplicate cell python/controlled/tinymistral-6x248m/2048/headline/none
+spec: workers[99] duplicate cell java/controlled/tinymistral-6x248m/2048/headline/none
+spec: workers[100] duplicate cell java/controlled/tinymistral-6x248m/2048/headline/none
+spec: workers[101] duplicate cell python/controlled/tinymistral-6x248m/2048/headline/none
+spec: workers[102] duplicate cell python/controlled/tinymistral-6x248m/2048/headline/none
+spec: workers[103] duplicate cell java/controlled/tinymistral-6x248m/2048/headline/none
+spec: workers[104] duplicate cell java/controlled/tinymistral-6x248m/2048/headline/none
+spec: workers[105] duplicate cell python/controlled/tinymistral-6x248m/2048/headline/none
+spec: workers[106] duplicate cell python/controlled/tinymistral-6x248m/2048/headline/none
+spec: workers[107] duplicate cell java/controlled/tinymistral-6x248m/2048/headline/none
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':jmlx-benchmarks:benchmarkBaseline' (registered in build file 'jmlx-benchmarks/build.gradle').
+> Process 'command '../../.gradle/jdks/eclipse_adoptium-25-aarch64-os_x.2/jdk-25.0.4.1+1/Contents/Home/bin/java'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 526ms
+24 actionable tasks: 1 executed, 23 up-to-date

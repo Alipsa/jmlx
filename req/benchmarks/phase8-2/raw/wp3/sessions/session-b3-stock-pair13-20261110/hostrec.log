@@ -1,0 +1,3 @@
+18:23:23 | pre:session-b3-stock-pair13 | load 1.25 1.68 1.54 | therm-warnings=2 | omlx=none% | memfree=96%
+18:24:23 | poll:session-b3-stock-pair13 | load 1.63 1.70 1.56 | therm-warnings=2 | omlx=none% | memfree=90%
+18:24:48 | post:session-b3-stock-pair13 | load 1.90 1.76 1.58 | therm-warnings=2 | omlx=none% | memfree=95%

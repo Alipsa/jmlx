@@ -1,0 +1,2 @@
+20:36:50 | pre:session-a-controlled | load 1.26 1.64 1.96 | therm-warnings=2 | omlx=16.9% | memfree=64%
+20:36:51 | post:session-a-controlled | load 1.26 1.64 1.96 | therm-warnings=2 | omlx=87.2% | memfree=64%

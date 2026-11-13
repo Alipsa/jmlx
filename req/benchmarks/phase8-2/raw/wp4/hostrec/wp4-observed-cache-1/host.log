@@ -1,0 +1,9 @@
+15:38:49 | pre:wp4-observed-cache-1 | load 1.40 1.44 1.53 | therm-warnings=2 | omlx=76.6% | memfree=59%
+15:39:49 | poll:wp4-observed-cache-1 | load 1.61 1.52 1.55 | therm-warnings=2 | omlx=13.7% | memfree=44%
+15:40:49 | poll:wp4-observed-cache-1 | load 2.26 1.70 1.62 | therm-warnings=2 | omlx=12.8% | memfree=35%
+15:41:49 | poll:wp4-observed-cache-1 | load 1.54 1.60 1.58 | therm-warnings=2 | omlx=14.5% | memfree=36%
+15:42:49 | poll:wp4-observed-cache-1 | load 2.41 1.81 1.66 | therm-warnings=2 | omlx=12.8% | memfree=35%
+15:43:49 | poll:wp4-observed-cache-1 | load 2.99 2.09 1.77 | therm-warnings=2 | omlx=0.4% | memfree=39%
+15:44:49 | poll:wp4-observed-cache-1 | load 2.87 2.23 1.84 | therm-warnings=2 | omlx=0.4% | memfree=39%
+15:45:49 | poll:wp4-observed-cache-1 | load 3.32 2.57 2.00 | therm-warnings=2 | omlx=0.5% | memfree=41%
+15:46:07 | post:wp4-observed-cache-1 | load 3.07 2.56 2.01 | therm-warnings=2 | omlx=0.4% | memfree=55%

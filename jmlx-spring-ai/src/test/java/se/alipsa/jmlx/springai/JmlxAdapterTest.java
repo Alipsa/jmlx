@@ -371,4 +371,19 @@ class JmlxAdapterTest {
       subscriber.dispose();
     }
   }
+
+  @Test
+  void customClientNullResultFailsWithoutWaitingForDemandTimeout() {
+    StubInferenceClient client = new StubInferenceClient();
+    client.pending = CompletableFuture.completedFuture(null);
+    IllegalStateException failure =
+        assertThrows(
+            IllegalStateException.class,
+            () ->
+                new JmlxChatModel(client)
+                    .stream(new Prompt("hello"))
+                        .collectList()
+                        .block(java.time.Duration.ofSeconds(1)));
+    assertEquals("inference client returned a null generation result", failure.getMessage());
+  }
 }

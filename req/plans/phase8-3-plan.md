@@ -142,3 +142,24 @@ A native artifact regression stalls more subscriptions than the slot count,
 requires overflow errors without new demand, and proves later streams still
 start; another checks terminal timeout. Arbitrary blocked user callbacks remain
 outside the framework's ability to terminate safely.
+
+## Queued cancellation and stream semantics clarification
+
+Cancelling a sequence removes a queued operation under the admission lock and
+returns its permit, sequence permit and waiting slot immediately. Completion
+observers run after unlocking; idempotent capacity release prevents double
+cancellation from increasing capacity. Worker dequeue and continuation requeue
+use the same lock, with cancellation rechecked before requeue. Running text
+work still reaches a safe boundary before returning capacity.
+
+With maxQueuedRequests=1, an active embedding batch owns the only waiting slot
+and generation submissions are rejected; the configuration Javadoc now states
+this consequence. Streaming errors and cancellation discard undelivered queued
+text rather than draining it. Already delivered or in-progress callbacks are
+not undone. Spring's timeout applies per demand wait, including ordinary text,
+not merely terminal metadata, as both constructors now document.
+
+A custom client's normally completed null result is an IllegalStateException
+reported through failureSignal and interruptible await. Regressions cover both
+already-completed and later-null stages, Spring error delivery, and repeated
+queued cancellation plus immediate retry while a generation cohort is held.

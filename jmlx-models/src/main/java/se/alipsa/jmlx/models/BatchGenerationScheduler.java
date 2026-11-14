@@ -654,6 +654,8 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     final boolean reserved;
     final List<T> values = new ArrayList<>();
     int nextStep;
+    final AtomicBoolean cancelRequested = new AtomicBoolean();
+    boolean capacityReleased;
 
     Operation(List<WorkerOperation<T>> steps, CancellationToken cancellation, boolean reserved) {
       this.steps = steps;
@@ -680,23 +682,37 @@ public final class BatchGenerationScheduler implements AutoCloseable {
 
   <T> CompletionStage<T> execute(WorkerOperation<T> body, CancellationToken cancellation) {
     return executeSteps(List.of(Objects.requireNonNull(body, "body")), cancellation, false)
+        .stage()
         .thenApply(values -> values.getFirst());
   }
 
   // A batch is admitted once and retains its permit/queue slot across all text forwards.
   <T> CompletionStage<List<T>> executeSequence(
       List<WorkerOperation<T>> steps, CancellationToken cancellation) {
+    return submitSequence(steps, cancellation).stage();
+  }
+
+  record SequenceHandle<T>(CompletionStage<List<T>> stage, Runnable cancellation) {
+    void cancel() {
+      cancellation.run();
+    }
+  }
+
+  <T> SequenceHandle<T> submitSequence(
+      List<WorkerOperation<T>> steps, CancellationToken cancellation) {
     return executeSteps(List.copyOf(steps), cancellation, true);
   }
 
-  private <T> CompletionStage<List<T>> executeSteps(
+  private <T> SequenceHandle<T> executeSteps(
       List<WorkerOperation<T>> steps, CancellationToken cancellation, boolean reserved) {
     Objects.requireNonNull(cancellation, "cancellation");
     lock.lock();
     try {
       requireAcceptingState();
       if (steps.isEmpty()) {
-        return CompletableFuture.<List<T>>completedFuture(List.of()).minimalCompletionStage();
+        return new SequenceHandle<>(
+            CompletableFuture.<List<T>>completedFuture(List.of()).minimalCompletionStage(),
+            () -> {});
       }
       if (occupiedWaitingSlots() >= config.maxQueuedRequests()) {
         throw new BatchAdmissionRejectedException("inference waiting capacity exhausted");
@@ -716,7 +732,8 @@ public final class BatchGenerationScheduler implements AutoCloseable {
       }
       operations.addLast(operation);
       notEmpty.signalAll();
-      return operation.result.minimalCompletionStage();
+      return new SequenceHandle<>(
+          operation.result.minimalCompletionStage(), () -> cancelOperation(operation));
     } finally {
       lock.unlock();
     }
@@ -726,17 +743,20 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     Throwable failure = null;
     try {
       requireAcceptingState();
-      if (operation.cancellation.isCancelled()) {
+      if (operation.cancelRequested.get() || operation.cancellation.isCancelled()) {
         throw new java.util.concurrent.CancellationException("worker operation cancelled");
       }
       operation.values.add(operation.steps.get(operation.nextStep++).run(workerRoot));
-      if (operation.cancellation.isCancelled()) {
+      if (operation.cancelRequested.get() || operation.cancellation.isCancelled()) {
         throw new java.util.concurrent.CancellationException("worker operation cancelled");
       }
       if (operation.nextStep < operation.steps.size()) {
         lock.lock();
         try {
           requireAcceptingState();
+          if (operation.cancelRequested.get() || operation.cancellation.isCancelled()) {
+            throw new java.util.concurrent.CancellationException("worker operation cancelled");
+          }
           // Requeue without readmission; reservation and permit remain owned by this batch.
           operations.addLast(operation);
           notEmpty.signalAll();
@@ -754,19 +774,48 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     }
   }
 
+  // Called with the admission lock held. Queue removal and capacity return must be atomic
+  // with respect to a retry, worker dequeue and continuation requeue.
+  private void releaseOperationCapacity(Operation<?> operation) {
+    if (operation.capacityReleased) {
+      return;
+    }
+    operation.capacityReleased = true;
+    if (operation.reserved) {
+      reservedSequenceSlots--;
+      sequencePermits.release();
+    }
+    permits.release();
+  }
+
+  private void cancelOperation(Operation<?> operation) {
+    operation.cancelRequested.set(true);
+    boolean removed;
+    lock.lock();
+    try {
+      removed = operations.remove(operation);
+      if (removed) {
+        releaseOperationCapacity(operation);
+        notEmpty.signalAll();
+      }
+    } finally {
+      lock.unlock();
+    }
+    // Never complete a stage while holding admission: observers can submit a replacement.
+    // A running operation retains capacity until its next native-safe boundary.
+    if (removed) {
+      operation.result.completeExceptionally(
+          new java.util.concurrent.CancellationException("embedding batch cancelled"));
+    }
+  }
+
   private <T> void completeOperation(Operation<T> operation, Throwable failure) {
     Runnable completion =
         () -> {
-          // All steps have finished. Release the one batch reservation before publishing the
-          // result;
-          // no per-text continuation ever competes with another submit for this permit or slot.
+          // Release the reservation once, before publishing the completed batch.
           lock.lock();
           try {
-            if (operation.reserved) {
-              reservedSequenceSlots--;
-              sequencePermits.release();
-            }
-            permits.release();
+            releaseOperationCapacity(operation);
           } finally {
             lock.unlock();
           }

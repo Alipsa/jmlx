@@ -46,18 +46,20 @@ On the local Apple Silicon host with the staged runtime and Java 25:
   ownership, shared admission, exceptional completion on close, recovery from
   an operation failure, active-memory release after evaluated BERT use, reserved
   batch continuation with a generation-filled queue, and cancellation between texts.
-- SchedulerInferenceClientTest: 12 native tests, none skipped. Covers concurrent
+- SchedulerInferenceClientTest: 13 native tests, none skipped. Covers concurrent
   chat/embeddings, stable repeated embedding values and scratch memory,
   throwing callbacks, bounded slow-consumer overflow, aggregate delivery
   admission, sticky encoder-load failure, overlong positional and sentence-transformers
   inputs, invalid-constructor cleanup, missing/null roles, null embedding inputs,
-  complete caller-side ID validation and embedding cancellation.
-- The adapter mapping suites: 14 Spring and 9 LangChain4j pure-Java tests, none skipped. Cover
+  complete caller-side ID validation, embedding cancellation, and repeated queued
+  cancellation with immediate retry during a held generation cohort.
+- The adapter mapping suites: 15 Spring and 9 LangChain4j pure-Java tests, none skipped. Cover
   ordered roles, supported options, explicit rejection, Unicode streaming,
   bounded demand, interruption/cancellation, unwrapped failures, cancellation/error
   delivery, independent overflow wakeups, terminal-demand timeout, usage and ordered
   embedding results. EncoderInputSpecTest separately validates vocabulary/type IDs,
-  masks and CLS requirements without native loading.
+  masks and CLS requirements without native loading. InferenceCallTest adds two
+  pure-Java regressions for normally completed null results.
 - tools/release-smoke/run.sh ci --profile all passed against nine locally
   published Maven modules under a fresh consumer Gradle home. POM-only and
   Gradle-metadata resolution agreed on 45 runtime components. License/NOTICE,
@@ -127,8 +129,8 @@ to dispose subscriptions promptly. Spring demand waits have a configurable timeo
 Embedding batches are admitted once. One permit and queue slot remain
 reserved across all text steps; continuations never reacquire capacity.
 Concurrent batches are limited to max(1, maxQueuedRequests / 4), leaving
-generation queue headroom at ordinary queue sizes. Cancellation releases the
-reservation when the worker reaches its safe boundary. Every BERT static input
+generation queue headroom at ordinary queue sizes. Queued cancellation returns the
+reservation immediately; a running text returns it at its next safe boundary. Every BERT static input
 check runs before native work, and null text lists/elements are validation
 errors. Batch latency under generation load is documented: each text can wait
 behind cohorts despite the admission guarantee.
@@ -147,3 +149,30 @@ Native artifact smoke overflows more subscribers than the delivery capacity
 and verifies slot reuse, plus terminal timeout. Root checks in both precision
 modes and isolated Ubuntu ARM64 caller-validation/adapter checks passed.
 The BatchSchedulerConfig Javadoc's literal backslash-n was removed.
+
+## Queued cancellation and null-result follow-up
+
+Queued embedding cancellation now removes the operation and returns the
+sequence permit, waiting slot and admission permit under the scheduler lock.
+Completion observers run after unlocking. Idempotent release prevents a
+second cancellation from increasing capacity. Worker continuation requeue
+rechecks cancellation under that same lock; already-running work still
+reaches a safe boundary first. The regression holds a generation cohort open,
+cancels queued batches twice, retries repeatedly before releasing the cohort,
+and verifies both the configured batch limit and the final embedding result.
+
+A custom client's null result completes failureSignal with an explicit
+IllegalStateException, both when the source is already complete and when it
+completes later. Interruptible await reports the same contract violation;
+Spring reports it immediately instead of waiting for demand timeout.
+
+The configuration Javadoc now states the maxQueuedRequests=1 consequence:
+a batch owns the only waiting slot and generation submissions are rejected.
+Both adapter READMEs explicitly state that failed/cancelled generation drops
+undelivered queued text. Both Spring constructors describe the timeout per
+wait, including text chunks and terminal responses. The affected comments
+were shortened to avoid awkward sentence wrapping.
+
+Full root checks in both native precision modes and isolated Ubuntu ARM64
+adapter/null-result/input-validation checks passed. Native artifact smoke
+also passed for the updated APIs and published Javadocs.

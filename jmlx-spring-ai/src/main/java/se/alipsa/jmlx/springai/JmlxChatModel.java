@@ -27,13 +27,17 @@ public final class JmlxChatModel implements ChatModel {
   private final InferenceClient client;
   private final long demandTimeoutNanos;
 
-  /** Borrows a client; the application closes it after all adapter views are finished. */
+  /**
+   * Borrows a client with a 30-second timeout per downstream-demand wait, including text chunks and
+   * the terminal response. The application closes the client after all views finish.
+   */
   public JmlxChatModel(InferenceClient client) {
     this(client, java.time.Duration.ofSeconds(30));
   }
 
   /**
-   * Borrows a client with a positive timeout for each downstream-demand wait, including terminal.
+   * Borrows a client with a positive timeout per downstream-demand wait, for text and terminal
+   * responses. Each new wait gets the full timeout; user-paced consumers must request within it.
    */
   public JmlxChatModel(InferenceClient client, java.time.Duration demandTimeout) {
     this.client = Objects.requireNonNull(client, "client");
@@ -100,10 +104,7 @@ public final class JmlxChatModel implements ChatModel {
                                   if (failure != null) {
                                     sink.error(SchedulerInferenceClient.unwrap(failure));
                                   } else {
-                                    // Build/check before waiting for terminal demand so
-                                    // cancellation is an error
-                                    // immediately, rather than a success waiting indefinitely for
-                                    // another request.
+                                    // Reject cancellation before waiting for terminal demand.
                                     ChatResponse terminal = response("", result);
                                     if (demand.await()) {
                                       sink.next(terminal);

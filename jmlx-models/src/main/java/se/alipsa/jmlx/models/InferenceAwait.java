@@ -28,6 +28,9 @@ final class InferenceAwait {
   }
 
   static GenerationResult completed(GenerationResult result) {
+    if (result == null) {
+      throw new IllegalStateException("inference client returned a null generation result");
+    }
     if (result.finishReason() == FinishReason.CANCELLED) {
       throw new CancellationException("generation cancelled");
     }

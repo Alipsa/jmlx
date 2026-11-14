@@ -431,3 +431,12 @@ wake a framework demand wait during native overflow/cancellation. Its observers
 may run on the MLX worker: they must only signal monitors and must never invoke
 or block in user code. Spring uses this signal plus a configurable demand
 timeout (30 seconds by default, including terminal delivery).
+
+Queued embedding cancellation removes its operation and returns all reserved
+capacity under the admission lock before notifying completion observers. A
+running operation still releases capacity at its next safe boundary. Repeated
+cancellation cannot release the reservation twice.
+
+Streaming failures discard undelivered queued deltas instead of flushing them
+before the error. InferenceCall treats a custom client's null generation result
+as an explicit IllegalStateException and completes its failure signal promptly.

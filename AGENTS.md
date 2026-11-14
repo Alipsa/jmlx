@@ -1312,3 +1312,13 @@ configurable 30-second default timeout. Artifact smoke repeatedly overflows more
 stalled subscribers than the delivery-slot count, then verifies a new stream works;
 it also checks terminal-demand timeout. Large embedding batches may wait behind many
 generation cohorts, so ingestion latency depends on generation load.
+
+Queued embedding cancellation now removes the operation under the scheduler lock and
+returns its reservation immediately; running work retains capacity to a safe boundary.
+Completion observers run after releasing admission. A custom client's null generation
+result is an explicit failure rather than leaving failureSignal pending. Streaming
+failure/cancellation discards undelivered queued deltas; both adapter READMEs state that
+fail-fast policy. The Spring constructor documents the 30-second timeout per demand
+wait, including text chunks and terminal responses. With maxQueuedRequests=1, a batch's
+reservation blocks generation submissions until it finishes or queued cancellation
+returns the slot.

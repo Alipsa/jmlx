@@ -197,8 +197,9 @@ public final class SchedulerInferenceClient implements InferenceClient {
           });
     }
     int tokens = tokenCount;
-    scheduler
-        .executeSequence(steps, cancelled::get)
+    var sequence = scheduler.submitSequence(steps, cancelled::get);
+    sequence
+        .stage()
         .whenComplete(
             (vectors, failure) -> {
               if (failure == null) {
@@ -211,6 +212,7 @@ public final class SchedulerInferenceClient implements InferenceClient {
         result.minimalCompletionStage(),
         () -> {
           cancelled.set(true);
+          sequence.cancel();
           result.completeExceptionally(new CancellationException("embedding batch cancelled"));
         });
   }

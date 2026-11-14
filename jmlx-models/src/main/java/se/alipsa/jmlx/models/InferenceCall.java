@@ -33,6 +33,9 @@ public record InferenceCall(
         (value, failure) -> {
           if (failure != null) {
             signal.complete(SchedulerInferenceClient.unwrap(failure));
+          } else if (value == null) {
+            signal.complete(
+                new IllegalStateException("inference client returned a null generation result"));
           } else if (value.finishReason() == FinishReason.CANCELLED) {
             signal.complete(new CancellationException("generation cancelled"));
           }

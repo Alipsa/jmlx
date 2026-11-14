@@ -89,6 +89,9 @@ many generation cohorts across its texts, even though it was admitted once.
 Size ingestion jobs with that latency trade-off in mind. The shared client's embedCall method returns
 an EmbeddingCall with cancel() and interruptible await(). Cancellation skips
 queued/remaining texts but cannot interrupt a native forward already running.
+Cancelling a queued batch removes it and returns its sequence permit, waiting
+slot and admission permit immediately, so retry does not wait for a generation
+cohort. A running text retains that capacity until its next safe boundary.
 The first use loads encoder weights on the worker; that load temporarily
 blocks generation. Failed loading is sticky for the client's lifetime; repair
 the checkpoint and create a new client to retry. Sentence-only encoding pools
@@ -108,3 +111,8 @@ returns keeps its delivery thread, result and admission slot even after
 overflow cancels native generation. Java cannot safely stop arbitrary user
 code; enough permanently blocked consumers exhaust the bounded delivery
 capacity. Dispose subscriptions and make callbacks cooperate with timeouts.
+
+Streaming failure is fail-fast: cancellation, overflow or a failed generation
+discards queued text that has not reached the consumer. Already delivered text
+remains visible, and an in-progress callback may finish. Queued deltas are not
+flushed before reporting the error.

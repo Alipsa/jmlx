@@ -381,4 +381,68 @@ class SchedulerInferenceClientTest {
                   .get(60, TimeUnit.SECONDS));
     }
   }
+
+  @Test
+  void cancellingQueuedBatchAllowsImmediateRetryWhileACohortRuns() throws Exception {
+    Path directory = encoderDirectory();
+    CountDownLatch cohortStarted = new CountDownLatch(1);
+    CountDownLatch finishCohort = new CountDownLatch(1);
+    AtomicBoolean firstToken = new AtomicBoolean(true);
+    BatchGenerationScheduler scheduler =
+        BatchGenerationScheduler.start(
+            new BatchSchedulerConfig(1, 4, 4096, 256),
+            root -> TextGenerationModels.load(root, checkpoint("mistral")));
+    try (SchedulerInferenceClient client = client(scheduler, directory)) {
+      final EmbeddingCall retry;
+      final BatchRequestHandle generation;
+      try {
+        generation =
+            scheduler.submit(
+                SchedulerFixtures.greedy(new int[] {1, 3}, 2),
+                event -> {
+                  if (event.tokenId() != null && firstToken.getAndSet(false)) {
+                    // Hold the generation cohort at a token boundary. The worker cannot reach any
+                    // queued embedding operation until the test releases this latch.
+                    cohortStarted.countDown();
+                    try {
+                      if (!finishCohort.await(60, TimeUnit.SECONDS)) {
+                        throw new IllegalStateException("test timed out");
+                      }
+                    } catch (InterruptedException interrupted) {
+                      Thread.currentThread().interrupt();
+                      throw new IllegalStateException(interrupted);
+                    }
+                  }
+                });
+        assertTrue(cohortStarted.await(60, TimeUnit.SECONDS));
+        for (int i = 0; i < 8; i++) {
+          EmbeddingCall cancelled = client.embedCall(List.of("hello world"));
+          cancelled.cancel();
+          cancelled.cancel();
+          assertThrows(java.util.concurrent.CancellationException.class, cancelled::await);
+        }
+        retry = client.embedCall(List.of("hello world"));
+        // Cancelling twice must not over-release the single sequence permit.
+        assertThrows(
+            BatchAdmissionRejectedException.class,
+            () -> client.embedCall(List.of("another sentence")));
+        assertTrue(!retry.stage().toCompletableFuture().isDone());
+      } finally {
+        finishCohort.countDown();
+      }
+      assertEquals(
+          2,
+          generation
+              .stage()
+              .toCompletableFuture()
+              .get(60, TimeUnit.SECONDS)
+              .generatedTokenIds()
+              .size());
+      assertEquals(
+          1, retry.stage().toCompletableFuture().get(60, TimeUnit.SECONDS).vectors().size());
+    } finally {
+      finishCohort.countDown();
+      scheduler.close();
+    }
+  }
 }

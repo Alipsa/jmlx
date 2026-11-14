@@ -13,6 +13,16 @@ public interface TextEncoderModel extends AutoCloseable {
   /** Encodes with an explicit pooling policy. */
   EncoderResult encode(TokenizerEncoding input, Pooling pooling);
 
+  /** Sentence-only inference; implementations may pool natively and avoid full-state readback. */
+  default float[] embed(TokenizerEncoding input) {
+    return encode(input).embedding();
+  }
+
+  /** Sentence-only inference with explicit pooling. */
+  default float[] embed(TokenizerEncoding input, Pooling pooling) {
+    return encode(input, pooling).embedding();
+  }
+
   /** Model lifetime is controlled by its caller-owned scope. */
   @Override
   default void close() {}

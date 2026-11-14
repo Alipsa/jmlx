@@ -33,8 +33,8 @@ release) is built in milestones, each with its own plan under `req/plans/`:
 
 `req/phase6-compatibility.md` is the source of truth for which families are verified and how
 (real Tier-B artifact versus synthetic Tier-A fixture). `req/phase6-inference-report.md` summarizes
-the Phase 6 state and lists the remaining release steps. Nothing has been published to Maven
-Central yet.
+the Phase 6 state and lists the remaining release steps. The pure-Java 8.1 tuple is
+on Central; native modules and adapters have not been published.
 
 Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain. The native bootstrap also needs
 the Xcode Command Line Tools (`git`, `cc`, `otool`) and `cmake` (`brew install cmake`); see
@@ -229,9 +229,10 @@ to that list. Otherwise a native skip passes CI unnoticed.
 
 ## Releasing a module
 
-Seven modules publish to Maven Central independently of each other and of the root project's
+Nine publishable modules target Maven Central independently of each other and of the root project's
 version: `jmlx-jinja`, `jmlx-tokenizer`, `jmlx-vision`, `jmlx-native-macos-arm64`, `jmlx-ffi`,
-`jmlx-core`, and `jmlx-models`. Each has its own `release.sh` (all seven byte-identical, enforced
+`jmlx-core`, `jmlx-models`, `jmlx-spring-ai`, and `jmlx-langchain4j`. Each has its own
+`release.sh` (all nine byte-identical, enforced
 by `verifyReleaseScriptsMatch`). `jmlx-examples` (an application demo) and `jmlx-benchmarks`
 (opt-in performance experiments) are unpublished.
 
@@ -243,6 +244,8 @@ by `verifyReleaseScriptsMatch`). `jmlx-examples` (an application demo) and `jmlx
 ./jmlx-ffi/release.sh                # publishes se.alipsa:jmlx-ffi
 ./jmlx-core/release.sh               # publishes se.alipsa:jmlx-core
 ./jmlx-models/release.sh             # publishes se.alipsa:jmlx-models
+./jmlx-spring-ai/release.sh          # publishes se.alipsa:jmlx-spring-ai
+./jmlx-langchain4j/release.sh        # publishes se.alipsa:jmlx-langchain4j
 ```
 
 Every script refuses to publish a `-SNAPSHOT`, and refuses a module that has no `version` line of
@@ -255,7 +258,9 @@ via `api project(...)`; `jmlx-core` depends on `jmlx-ffi` via `implementation pr
 `jmlx-models` depends on `jmlx-core`, `jmlx-tokenizer` and `jmlx-vision` via `api project(...)`.
 Gradle publishes every one of these as a concrete coordinate, and `verifyNoSnapshotDependencies`
 fails a release while any of them is still a SNAPSHOT. Release jinja before tokenizer, and ffi
-before core before models. `jmlx-vision` itself has no published project dependency, but models
+before core before models. Both adapters api-depend on models, so release models
+before jmlx-spring-ai and jmlx-langchain4j, and keep models at its released version
+until both adapters release. `jmlx-vision` itself has no published project dependency, but models
 needs it, so release vision before models too. `jmlx-native-macos-arm64` has no published-POM
 dependency relationship to either chain, and jmlx-core deliberately does not depend on it (see
 Decision 5 in
@@ -268,7 +273,7 @@ chain should its modules be bumped back to their next `-SNAPSHOT` versions.
 **The pure-Java modules release through the combined flow, not these scripts.** Since Phase 8.1,
 `jmlx-jinja`, `jmlx-tokenizer` and `jmlx-vision` publish as one `releaseAll` deployment of
 nexus-release-plugin (`se.alipsa.nexus-release-plugin`, pinned in `gradle/libs.versions.toml`)
-driven by `./releaseAll.sh`: the root `combinedRelease.modules` list names all seven published
+driven by `./releaseAll.sh`: the root `combinedRelease.modules` list names all nine publishable
 modules, the plan derives the candidate set (SNAPSHOT modules are excluded and reported), the
 script gates the plan's selected set against the expected release tuple, and `releaseAll` runs
 the selected modules' checks, signs, stages and bundles — including the `.module` each POM
@@ -309,7 +314,7 @@ published shape. It has two named module-set profiles, selected with `--profile`
 `settings.gradle` includes only the profile's consumer projects, and `run.sh` invokes exactly
 `:app:smoke` or `:pure-java:smoke` by full project path:
 
-- **`all`** — publishes the seven modules to a disposable `build/smoke-repo` (each module's
+- **`all`** — publishes the nine modules to a disposable `build/smoke-repo` (each module's
   opt-in `smoke` Maven repository, `publishMavenPublicationToSmokeRepository`), then the Java 25
   `:app:smoke` resolves `jmlx-models` plus the runtime-only native jar from it under a fresh
   `GRADLE_USER_HOME` with `exclusiveContent` for `se.alipsa`, a disposable
@@ -487,7 +492,7 @@ inheriting the root's Java 25 — that 25 exists for `jmlx-core`/`jmlx-ffi`'s Pa
 those pure-Java modules needs it, so targeting 21 keeps their published artifacts usable by Java 21
 consumers. `jmlx-tokenizer`'s and `jmlx-vision`'s `verifyBytecodeLevel` tasks enforce this.
 
-**Seven modules are published**, each carrying its own version independent of the root's
+**Nine modules are publishable**, each carrying its own version independent of the root's
 `0.5.0-SNAPSHOT` (`jmlx-examples` and `jmlx-benchmarks` are unpublished applications): `jmlx-jinja` is
 `0.6.2-SNAPSHOT` (continuing the archived hfjinja project's line; `0.6.1` was published in
 Phase 8.1 after the `0.6.0` cut was superseded), `jmlx-tokenizer` and `jmlx-vision` are
@@ -495,7 +500,8 @@ Phase 8.1 after the `0.6.0` cut was superseded), `jmlx-tokenizer` and `jmlx-visi
 cut was superseded), `jmlx-native-macos-arm64` is `0.1.0-SNAPSHOT` (never published), `jmlx-ffi`
 and `jmlx-core` are both `0.5.0-SNAPSHOT` (an explicit line carrying forward
 the number they already had via the root's default), and `jmlx-models` is `0.1.0-SNAPSHOT` (also
-never published). `jmlx-core`/`jmlx-models`/`jmlx-vision` disable Javadoc's `missing` doclint
+never published). The two adapters are each 0.1.0-SNAPSHOT and have never been published.
+`jmlx-core`/`jmlx-models`/`jmlx-vision` disable Javadoc's `missing` doclint
 category (`-Xdoclint:all,-missing`) rather than retrofitting `@param`/`@return`/`@throws` tags onto
 an already prose-documented public surface — the root's reactive `maven-publish` wiring's `-Werror`
 still gates every other Javadoc problem. `jmlx-ffi` instead restricts Javadoc's (and `checkstyleMain`'s) source
@@ -673,7 +679,7 @@ report for local evidence and the pending new macOS 26 CI gate. Versions and pub
 `jmlx-vision` is a new pure-Java 21 module (no native dependency, Jackson only): image decoding
 (PNG/JPEG, including palette PNGs), Pillow-exact bilinear/bicubic/LANCZOS resampling, normalization,
 and the SmolVLM/Idefics3 image processor, with its byte-exactness evidence coming from the
-`tools/image-oracle/` fixtures. `jmlx-models` now `api`-depends on it, so seven modules are
+`tools/image-oracle/` fixtures. `jmlx-models` now `api`-depends on it, so at that milestone seven modules were
 published (jmlx-vision starts a fresh `0.1.0-SNAPSHOT` line; its `release.sh` is byte-identical to
 the others and covered by `verifyReleaseScriptsMatch`). CI: the Ubuntu job runs
 `:jmlx-vision:check` plus the executable image-oracle verification; root `check` carries the
@@ -1252,3 +1258,43 @@ with the exact setup/execution/verification commands is
   results and do not claim native publication anywhere.
 - No native pins, generated bindings, publication or versions changed in this
   milestone.
+
+## Phase 8.3 additions
+
+jmlx-spring-ai (Spring AI 2.0.2) and jmlx-langchain4j (LangChain4j 1.23.0)
+are Java 25 publishable adapter modules, each on 0.1.0-SNAPSHOT. They expose
+chat, streaming and BERT sentence embeddings through the frameworks' own
+interfaces. No publication or native pin changed. Both borrow the
+jmlx-models InferenceClient; SchedulerInferenceClient owns the scheduler
+and lazily loads its encoder on the existing worker. Native operations stay
+on that worker. Encoder operations share bounded admission with generation
+and run between cohorts; framework text callbacks use a separate bounded
+delivery queue. Close the shared client once all views finish.
+
+SchedulerOperationTest and SchedulerInferenceClientTest are required native
+suites in CI. Adapter mapping/cancellation tests are pure Java. Full release
+smoke now resolves nine Maven modules and runs both adapters through public
+framework interfaces against tiny Mistral/BERT fixtures, including virtual
+threads, streaming cancellation, embedding order and native release on close.
+The pure-Java profile retains its original three-module selection.
+The two new release scripts match the existing scripts; the combined-release
+module list includes the adapters, excluded as snapshots until 8.4.
+See req/plans/phase8-3-plan.md and both adapter READMEs. The dated 8.2 scope
+amendment accepts the limited evidence deliverable for advancing development;
+it never promotes affected measurement cells to passing gates.
+
+Phase 8.3 review hardening: blocking calls wait interruptibly and cancel native work on
+interruption, rethrow the underlying runtime cause, and treat scheduler cancellation as
+an error consistently in both frameworks. Spring streaming waits for downstream demand
+without an unbounded Reactor buffer. Text delivery uses event-driven wakeups rather than
+polling; blocking chat uses no delivery thread. Callbacks that never return retain their
+bounded delivery slot and must cooperate with application timeouts.
+
+Embedding batches accept at most 128 texts. Tokenization, encoder-capacity checks and
+sentence-transformers max_seq_length checks cover the whole batch on the caller before
+any native operation. Overlong input is rejected, never silently truncated. Valid inputs
+run one per worker operation, allowing generation between texts. EmbeddingCall exposes
+cancellation and interruptible await; encoder load failure is sticky. BERT's sentence-only
+path pools natively and reads back [hidden], retaining the original full-state API and its
+references. Constructor failures close the transferred scheduler, including its guard.
+Both adapter READMEs state that sampled requests reuse the configured seed.

@@ -8,6 +8,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -312,6 +314,9 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition notEmpty = lock.newCondition();
   private final ArrayDeque<Req> waiting = new ArrayDeque<>();
+  private final ArrayDeque<Operation<?>> operations = new ArrayDeque<>();
+  private MLXScope workerRoot;
+
   private final AtomicReference<State> state = new AtomicReference<>(State.RUNNING);
   private final CountDownLatch ready = new CountDownLatch(1);
   private final AtomicLong forwardCalls = new AtomicLong();
@@ -461,10 +466,12 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     lock.lock();
     try {
       requireAcceptingState();
-      if (waiting.size() >= config.maxQueuedRequests()) {
+      if (waiting.size() + operations.size() >= config.maxQueuedRequests()) {
         permits.release();
         throw new BatchAdmissionRejectedException(
-            "waiting queue is full (" + config.maxQueuedRequests() + " waiting)");
+            "waiting queue is full ("
+                + config.maxQueuedRequests()
+                + " generation requests and encoder operations waiting)");
       }
       waiting.addLast(new Req(request, listener, handle, cachePolicy));
       notEmpty.signalAll();
@@ -624,12 +631,111 @@ public final class BatchGenerationScheduler implements AutoCloseable {
 
   // ---------------------------------------------------------------------------------- worker
 
+  int admissionCapacity() {
+    return config.admissionPermits();
+  }
+
+  int maxNewTokensPerRequest() {
+    return config.maxNewTokensPerRequest();
+  }
+
+  @FunctionalInterface
+  interface WorkerOperation<T> {
+    T run(MLXScope root) throws Exception;
+  }
+
+  private record Operation<T>(
+      WorkerOperation<T> body, CompletableFuture<T> result, CancellationToken cancellation) {}
+
+  // Package-private: only the shared inference client may schedule encoder work. Values returned
+  // here must be detached Java data, never a native handle or a worker-owned scope.
+  <T> CompletionStage<T> execute(WorkerOperation<T> body) {
+    return execute(body, CancellationToken.NONE);
+  }
+
+  <T> CompletionStage<T> execute(WorkerOperation<T> body, CancellationToken cancellation) {
+    Objects.requireNonNull(body, "body");
+    Objects.requireNonNull(cancellation, "cancellation");
+    lock.lock();
+    try {
+      requireAcceptingState();
+      if (waiting.size() + operations.size() >= config.maxQueuedRequests()
+          || !permits.tryAcquire()) {
+        throw new BatchAdmissionRejectedException("inference admission capacity exhausted");
+      }
+      CompletableFuture<T> result = new CompletableFuture<>();
+      operations.addLast(new Operation<>(body, result, cancellation));
+      notEmpty.signalAll();
+      return result.minimalCompletionStage();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private <T> void runOperation(Operation<T> operation) {
+    T value = null;
+    Throwable failure = null;
+    try {
+      requireAcceptingState();
+      if (operation.cancellation().isCancelled()) {
+        throw new java.util.concurrent.CancellationException("worker operation cancelled");
+      }
+      value = operation.body().run(workerRoot);
+    } catch (Throwable t) {
+      failure = t;
+    }
+    completeOperation(operation, value, failure);
+    if (failure instanceof Error error) {
+      throw error;
+    }
+  }
+
+  private <T> void completeOperation(Operation<T> operation, T value, Throwable failure) {
+    Runnable completion =
+        () -> {
+          // Release before publishing so a batch continuation can submit its next single-text
+          // operation without transiently exhausting its own admission permit.
+          permits.release();
+          if (failure == null) {
+            operation.result().complete(value);
+          } else {
+            operation.result().completeExceptionally(failure);
+          }
+        };
+    try {
+      dispatcher.execute(completion);
+    } catch (RejectedExecutionException rejected) {
+      // Same defensive fallback as generation dispatch: never strand a future or permit.
+      completion.run();
+    }
+  }
+
+  private void failOperations() {
+    List<Operation<?>> pending;
+    lock.lock();
+    try {
+      pending = new ArrayList<>(operations);
+      operations.clear();
+    } finally {
+      lock.unlock();
+    }
+    for (Operation<?> operation : pending) {
+      completeOperation(
+          operation,
+          null,
+          schedulerFailure == null
+              ? new SchedulerClosedException("scheduler is closed")
+              : new SchedulerFailedException(schedulerFailure.getCause()));
+    }
+  }
+
   private void run() {
     MLXScope root = null;
     TextGenerationModel model = null;
     Throwable runtimeFailure = null;
     try {
       root = new MLXScope();
+      workerRoot = root;
       model = factory.create(root);
       decoder = acceptModel(root, model);
       facts = decoder.batchFacts();
@@ -645,6 +751,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
         failWorker(t);
       }
     } finally {
+      failOperations();
       exit(model, root);
     }
     if (runtimeFailure instanceof Error e) {
@@ -747,9 +854,22 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     long gateDeadline = -1;
     while (true) {
       drainWaiting();
+      Operation<?> operation;
+      lock.lock();
+      try {
+        operation = operations.pollFirst();
+      } finally {
+        lock.unlock();
+      }
+      if (operation != null) {
+        runOperation(operation);
+      }
       lock.lock();
       try {
         if (waiting.isEmpty()) {
+          if (!operations.isEmpty()) {
+            continue;
+          }
           if (state.get() != State.RUNNING) {
             return null;
           }

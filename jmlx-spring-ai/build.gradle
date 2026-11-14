@@ -1,0 +1,54 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+version = '0.1.0-SNAPSHOT'
+
+java {
+    withSourcesJar()
+    withJavadocJar()
+}
+
+tasks.named('jar') {
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.springai')
+}
+
+tasks.named('javadoc', Javadoc) {
+    options.addStringOption('Xdoclint:all,-missing', '-quiet')
+}
+
+dependencies {
+    api project(':jmlx-models')
+    api libs.spring.ai.model
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            pom {
+                name = 'jmlx-spring-ai'
+                description = 'Spring AI chat, streaming and sentence embeddings on the jmlx scheduler.'
+                url = 'https://github.com/Alipsa/jmlx'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://opensource.org/license/mit'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'pernyfelt'
+                        name = 'Per Nyfelt'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:https://github.com/Alipsa/jmlx.git'
+                    developerConnection = 'scm:git:ssh://git@github.com:Alipsa/jmlx.git'
+                    url = 'https://github.com/Alipsa/jmlx'
+                }
+            }
+        }
+    }
+}

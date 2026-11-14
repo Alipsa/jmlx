@@ -1147,10 +1147,10 @@ final class Phase82SummaryVerifierTest {
         assertEquals(t.path("tree_sha").asString(), t.path("expected_tree_sha").asString());
         assertFalseBoolean(t.path("tracked_dirty"), treeName + " tracked_dirty");
         JsonNode pub = sess.path("trees").path(treeName);
+        assertTrue(pub.isObject(), name + " missing summary tree " + treeName);
         assertEquals(t.path("tree_sha").asString(), pub.path("tree_sha").asString());
         assertEquals(
             t.path("worker_source_sha256").asString(), pub.path("worker_source_sha256").asString());
-        assertTrue(pub.isObject(), name + " missing summary tree " + treeName);
         JsonNode pin = t.path("native_pin");
         JsonNode pubPin = pub.path("native_pin");
         assertNonEmptyObject(pin, name + " raw native_pin");

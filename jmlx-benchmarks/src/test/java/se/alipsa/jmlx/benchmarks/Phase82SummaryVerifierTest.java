@@ -34,11 +34,12 @@ import tools.jackson.databind.node.ObjectNode;
  * Raw-to-summary verifier for the published Phase 8.2 evidence (WP5, plan section 7): re-derives
  * every aggregate in {@code req/benchmarks/phase8-2/summary.json} from the committed raw trees
  * {@code req/benchmarks/phase8-2/raw/wp3} and {@code raw/wp4} (639 files, SHA-256-pinned in {@code
- * evidence-index.json}), and pins the measured code, the workload manifest and the Tier-B input
- * bytes against what the workers recorded. A reviewer can run this one test to confirm that every
- * published number is reproducible from the committed raw bytes, that the exact measured code and
- * input bytes are identified, and that the FFM budget medians hold within the calibration-recording
- * bound stated in {@code wp3_ffm.note}. Pure Java (no native runtime, no network); part of {@code
+ * evidence-index.json}), and pins the measured code and workload manifest bytes. The historical
+ * Tier-B inputs are pinned by worker-recorded digests in the index; their current files are not
+ * re-hashed. A reviewer can run this one test to confirm that every published number is
+ * reproducible from the committed raw bytes, that the exact measured code and input bytes are
+ * identified, and that the FFM budget medians hold within the calibration-recording bound stated in
+ * {@code wp3_ffm.note}. Pure Java (no native runtime, no network); part of {@code
  * :jmlx-benchmarks:test}, so it runs on the cross-platform Linux CI job as well.
  *
  * <p>Conventions re-implemented here (identical to the Python generator that produced {@code
@@ -1388,7 +1389,9 @@ final class Phase82SummaryVerifierTest {
       }
     }
     assertEquals(WP3_WORKER_COUNT, wp3Workers);
-    assertEquals(6, idx.path("historical_wp4_inputs").size(), "historical WP4 input pins");
+    JsonNode historicalInputs = idx.path("historical_wp4_inputs");
+    assertEquals(6, historicalInputs.size(), "historical WP4 input pins");
+    Set<String> referencedInputs = new HashSet<>();
     int wp4Workers = 0;
     for (Map.Entry<String, JsonNode> e : idx.path("committed_files").path("wp4").properties()) {
       String p = e.getKey();
@@ -1402,21 +1405,25 @@ final class Phase82SummaryVerifierTest {
           w.path("workload").isObject() ? w.path("workload") : w.path("workload_inputs");
       assertTrue(inputs.isObject() && !inputs.isEmpty(), "no workload input block in " + p);
       String manifestPath = inputs.path("manifest_path").asString();
+      referencedInputs.add(manifestPath);
       assertEquals(
           inputs.path("manifest_sha256").asString(),
-          idx.path("historical_wp4_inputs").path(manifestPath).asString(),
+          historicalInputs.path(manifestPath).asString(),
           "historical manifest pin vs " + p);
       JsonNode images = inputs.path("images");
       assertTrue(images.isArray() && !images.isEmpty(), "images missing in " + p);
       for (JsonNode img : images) {
+        String imagePath = img.path("path").asString();
+        referencedInputs.add(imagePath);
         assertEquals(
             img.path("sha256").asString(),
-            idx.path("historical_wp4_inputs").path(img.path("path").asString()).asString(),
+            historicalInputs.path(imagePath).asString(),
             "historical image pin vs " + p);
       }
       assertEquals(JAVA_VERSION, w.path("java_version").asString(), p);
       assertEquals("0", w.path("precision").path("value").asString(), p);
     }
     assertEquals(WP4_WORKER_COUNT, wp4Workers);
+    assertEquals(fieldNames(historicalInputs), referencedInputs, "historical WP4 input pin set");
   }
 }

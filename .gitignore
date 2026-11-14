@@ -3,6 +3,9 @@
 
 # Log file
 *.log
+# ...except the committed Phase 8.2 evidence host/worker records (digest-pinned in
+# req/benchmarks/phase8-2/evidence-index.json and verified by Phase82SummaryVerifierTest)
+!req/benchmarks/phase8-2/raw/**/*.log
 
 # BlueJ files
 *.ctxt

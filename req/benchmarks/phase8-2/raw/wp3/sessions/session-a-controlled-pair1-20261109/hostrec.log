@@ -1,0 +1,11 @@
+21:07:53 | pre:session-a-controlled-pair1 | load 1.87 1.63 1.67 | therm-warnings=2 | omlx=0.3% | memfree=89%
+21:08:53 | poll:session-a-controlled-pair1 | load 2.34 1.78 1.72 | therm-warnings=2 | omlx=0.1% | memfree=83%
+21:09:54 | poll:session-a-controlled-pair1 | load 2.44 1.91 1.77 | therm-warnings=2 | omlx=0.2% | memfree=89%
+21:10:54 | poll:session-a-controlled-pair1 | load 1.80 1.84 1.75 | therm-warnings=2 | omlx=0.3% | memfree=83%
+21:11:54 | poll:session-a-controlled-pair1 | load 1.87 1.87 1.77 | therm-warnings=2 | omlx=0.2% | memfree=85%
+21:12:54 | poll:session-a-controlled-pair1 | load 1.95 1.88 1.78 | therm-warnings=2 | omlx=0.3% | memfree=72%
+21:13:54 | poll:session-a-controlled-pair1 | load 1.60 1.82 1.76 | therm-warnings=2 | omlx=0.1% | memfree=85%
+21:14:54 | poll:session-a-controlled-pair1 | load 1.38 1.72 1.73 | therm-warnings=2 | omlx=0.2% | memfree=64%
+21:15:54 | poll:session-a-controlled-pair1 | load 1.86 1.79 1.75 | therm-warnings=2 | omlx=0.1% | memfree=87%
+21:16:54 | poll:session-a-controlled-pair1 | load 2.11 1.88 1.78 | therm-warnings=2 | omlx=0.2% | memfree=85%
+21:17:40 | post:session-a-controlled-pair1 | load 2.00 1.88 1.79 | therm-warnings=2 | omlx=0.2% | memfree=90%

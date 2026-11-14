@@ -15,3 +15,8 @@ tools/release-smoke/released-8.1.properties text eol=lf
 # Binary files should be left untouched
 *.jar           binary
 
+# Preserve the byte-pinned Phase 8.2 evidence across checkout settings.
+req/benchmarks/phase8-2/** -text
+tools/decode-baseline/workloads.json -text
+req/plans/phase8-2-wp3-raw-digests.json -text
+req/plans/phase8-2-wp4-raw-digests.json -text

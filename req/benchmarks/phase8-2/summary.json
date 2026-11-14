@@ -1,0 +1,3104 @@
+{
+ "schema": "jmlx-phase8-2-summary-1",
+ "created": "2026-11-13",
+ "note": "Published aggregates of the Phase 8.2 WP3 (text decode baseline) and WP4 (both-pin, both-VLM first inference) measurements, computed from the committed raw trees raw/wp3 and raw/wp4 (639 files, digest-pinned in evidence-index.json, pre-normalization digests in req/plans/phase8-2-wp3-raw-digests.json and req/plans/phase8-2-wp4-raw-digests.json). Every value is recomputed from the raw bytes by the pure-Java verifier Phase82SummaryVerifierTest in jmlx-benchmarks (part of :jmlx-benchmarks:test, runs cross-platform); the FFM budget medians are checked within the calibration-recording bound stated in wp3_ffm.note. Values are stored at full double precision; req/phase8-2-benchmark.md shows the rounded display values. The measurement narrative, host observations and review history are in req/plans/phase8-2-reference-findings.md (sections 15-17).",
+ "quantile_convention": "linear-interpolation-type-7",
+ "measured_code": {
+  "wp3": {
+   "sha": "cc0c603455caca69d434963990843aca98e6e606",
+   "branch": "phase8-2-wp3",
+   "dirty": false
+  },
+  "wp4": {
+   "old_tree": "46cb325bec9b4878534cc5c6bda1a569dfe4aa4c",
+   "new_tree": {
+    "wp4-observed-cache-1": "e4cb1f0f43ddd90242237f7e155a399ca5c84cfd",
+    "wp4-observed-cache-2": "ecc69a50e7a7263e955ac20c716b71344ce86c34"
+   },
+   "label": "code-and-pin comparison (the two trees differ in 156 commits, not only the native pin; findings 17.1)"
+  },
+  "host": {
+   "chip": "Mac17,6",
+   "ram_bytes": 137438953472,
+   "os": "Darwin",
+   "os_build": "27.2.0",
+   "note": "M5 Max, 128 GiB; one host for all WP3/WP4 measurements"
+  },
+  "java": {
+   "vendor": "Eclipse Adoptium",
+   "version": "25.0.4.1"
+  },
+  "precision": {
+   "wp3": "MLX_ENABLE_TF32=1",
+   "wp4": "MLX_ENABLE_TF32=0"
+  },
+  "workload_manifest": {
+   "path": "tools/decode-baseline/workloads.json",
+   "sha256": "e8c7730178a2e8f1bf1ace461db14119d2394fff4f60fa90deca34ef4857a270"
+  }
+ },
+ "wp3_text_baseline": {
+  "mode": "headline",
+  "precision_env": "MLX_ENABLE_TF32=1",
+  "cache_regime": "primed-per-request",
+  "emitted_tokens": 128,
+  "first_requests": 1,
+  "warmups": 5,
+  "measured_requests": 20,
+  "convention": "per-pair warm median = type-7 median over the 20 measured requests; cell quantiles = type-7 p10/median/p90 over the pair medians of the cell's pair set; ratio = type-7 median over the pairs of the per-pair java/python median ratio. The launcher leaves session.json summary.pairs empty for WP3, so this is the frozen cross-session convention (findings 16.4). Quantile arrays are [p10, median, p90].",
+  "controlled": {
+   "settled": [
+    {
+     "case": "qwen3-0.6b",
+     "prompt_length": 32,
+     "status": "stable",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "a",
+       "pair": 0
+      },
+      {
+       "session": "a",
+       "pair": 1
+      },
+      {
+       "session": "a",
+       "pair": 2
+      },
+      {
+       "session": "a",
+       "pair": 3
+      },
+      {
+       "session": "a",
+       "pair": 4
+      },
+      {
+       "session": "a",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.557417323,
+       0.55771937525,
+       0.5593415104999999
+      ],
+      "streaming_decode_tps": [
+       230.8013890216464,
+       232.87735860364032,
+       233.04246272036545
+      ],
+      "ttft_s": [
+       0.0099811775,
+       0.01347142725,
+       0.0135945625
+      ],
+      "prefill_s": [
+       0.009103093999999999,
+       0.01301562475,
+       0.013130458250000001
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.4909116667499802,
+       0.49373808324992297,
+       0.5026891767499251
+      ],
+      "streaming_decode_tps": [
+       255.30136847626343,
+       260.1751712935299,
+       261.7114064494954
+      ],
+      "ttft_s": [
+       0.005097229250168311,
+       0.005187176749927858,
+       0.006103000000052816
+      ],
+      "prefill_s": [
+       0.0048500310001600155,
+       0.0048856872500664394,
+       0.004941666750028162
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.131803674370436,
+      "streaming_decode_tps": 0.8911924155585011,
+      "ttft_s": 2.4043686641499846,
+      "prefill_s": 2.656748441590641
+     }
+    },
+    {
+     "case": "qwen3-0.6b",
+     "prompt_length": 512,
+     "status": "stable",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "a",
+       "pair": 0
+      },
+      {
+       "session": "a",
+       "pair": 1
+      },
+      {
+       "session": "a",
+       "pair": 2
+      },
+      {
+       "session": "a",
+       "pair": 3
+      },
+      {
+       "session": "a",
+       "pair": 4
+      },
+      {
+       "session": "a",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.653533885,
+       0.65683164575,
+       0.657800781
+      ],
+      "streaming_decode_tps": [
+       199.33853967518488,
+       200.43112262872017,
+       201.35447574283745
+      ],
+      "ttft_s": [
+       0.020145895499999997,
+       0.0248320105,
+       0.02488338575
+      ],
+      "prefill_s": [
+       0.01970410425,
+       0.024433051999999997,
+       0.024458854250000002
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.5156551772502098,
+       0.5178263959999185,
+       0.5255798022500358
+      ],
+      "streaming_decode_tps": [
+       248.14758359958654,
+       251.52582893083957,
+       252.8737768001231
+      ],
+      "ttft_s": [
+       0.012889031250153948,
+       0.012914750000163622,
+       0.012999906249888227
+      ],
+      "prefill_s": [
+       0.012682760499956203,
+       0.012708656250197237,
+       0.012776666749914511
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.2655190854555984,
+      "streaming_decode_tps": 0.7963372703943179,
+      "ttft_s": 1.9191642395209212,
+      "prefill_s": 1.9179654118433374
+     }
+    },
+    {
+     "case": "qwen3-0.6b",
+     "prompt_length": 2048,
+     "status": "stable-pending-ratification-of-a2-deviation",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "a",
+       "pair": 0
+      },
+      {
+       "session": "a",
+       "pair": 1
+      },
+      {
+       "session": "a",
+       "pair": 2
+      },
+      {
+       "session": "a",
+       "pair": 3
+      },
+      {
+       "session": "a",
+       "pair": 4
+      },
+      {
+       "session": "a",
+       "pair": 5
+      },
+      {
+       "session": "a2",
+       "pair": 6
+      },
+      {
+       "session": "a2",
+       "pair": 7
+      },
+      {
+       "session": "a2",
+       "pair": 8
+      }
+     ],
+     "n_pairs": 9,
+     "java": {
+      "full_generation_s": [
+       0.9685454541,
+       0.969133188,
+       0.9762330124999999
+      ],
+      "streaming_decode_tps": [
+       140.5532969758797,
+       141.8429199029278,
+       141.94036975889856
+      ],
+      "ttft_s": [
+       0.0722852543,
+       0.0743037295,
+       0.0744206123
+      ],
+      "prefill_s": [
+       0.0718077334,
+       0.073855417,
+       0.0739795415
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.605661295700429,
+       0.6121634999999515,
+       0.9064179546999642
+      ],
+      "streaming_decode_tps": [
+       194.00800102106302,
+       227.3839171404136,
+       227.82737435518425
+      ],
+      "ttft_s": [
+       0.04725969559995065,
+       0.05530477050024274,
+       0.06522264140000972
+      ],
+      "prefill_s": [
+       0.04702619170011531,
+       0.05505704150004931,
+       0.06499357060019975
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.586282572384791,
+      "streaming_decode_tps": 0.624090630412031,
+      "ttft_s": 1.3456249492920933,
+      "prefill_s": 1.3436878732384074
+     },
+     "note": "9 pairs = session A + A2; the A2 reduced-session deviation (3 pairs, 2/1 leaders) is pending the owner's ratification (findings 16.4a, 16.7 item 2)"
+    },
+    {
+     "case": "qwen3-8b-4bit",
+     "prompt_length": 32,
+     "status": "stable-pending-ratification-of-a2-deviation",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "a",
+       "pair": 0
+      },
+      {
+       "session": "a",
+       "pair": 1
+      },
+      {
+       "session": "a",
+       "pair": 2
+      },
+      {
+       "session": "a",
+       "pair": 3
+      },
+      {
+       "session": "a",
+       "pair": 4
+      },
+      {
+       "session": "a",
+       "pair": 5
+      },
+      {
+       "session": "a2",
+       "pair": 6
+      },
+      {
+       "session": "a2",
+       "pair": 7
+      },
+      {
+       "session": "a2",
+       "pair": 8
+      }
+     ],
+     "n_pairs": 9,
+     "java": {
+      "full_generation_s": [
+       1.3722852627000002,
+       1.3772476249999999,
+       2.1835626253000004
+      ],
+      "streaming_decode_tps": [
+       79.64828166162094,
+       95.19314691261148,
+       95.57306564861331
+      ],
+      "ttft_s": [
+       0.0341486877,
+       0.0433310625,
+       0.059940383200000016
+      ],
+      "prefill_s": [
+       0.033685341699999996,
+       0.042858707999999995,
+       0.05944702490000002
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       1.2665870334995817,
+       1.2698501669999587,
+       1.9831638412999388
+      ],
+      "streaming_decode_tps": [
+       83.8763011948908,
+       103.33366685316989,
+       103.59006171809725
+      ],
+      "ttft_s": [
+       0.03382501690002755,
+       0.04088324949998423,
+       0.05534493290028878
+      ],
+      "prefill_s": [
+       0.033560758400062694,
+       0.040647749999607186,
+       0.05491568310017102
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.084087858008624,
+      "streaming_decode_tps": 0.9219891328010436,
+      "ttft_s": 1.0605387666167956,
+      "prefill_s": 1.0545960969651273
+     },
+     "note": "9 pairs = session A + A2; session-A pair0 remains in the quantiles with the W1 host observations attached (findings 16.4)"
+    },
+    {
+     "case": "tinymistral-6x248m",
+     "prompt_length": 32,
+     "status": "stable",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "a",
+       "pair": 0
+      },
+      {
+       "session": "a",
+       "pair": 1
+      },
+      {
+       "session": "a",
+       "pair": 2
+      },
+      {
+       "session": "a",
+       "pair": 3
+      },
+      {
+       "session": "a",
+       "pair": 4
+      },
+      {
+       "session": "a",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.58032564575,
+       0.5820830102500001,
+       0.585007031
+      ],
+      "streaming_decode_tps": [
+       223.40472886406877,
+       224.5714201091068,
+       225.16776828488025
+      ],
+      "ttft_s": [
+       0.01637510425,
+       0.01649639575,
+       0.016590104499999998
+      ],
+      "prefill_s": [
+       0.015927323,
+       0.016086323,
+       0.016154156500000003
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.5161375729999236,
+       0.5167448750000858,
+       0.5174065827501408
+      ],
+      "streaming_decode_tps": [
+       253.03005181233667,
+       253.3360970417179,
+       253.73390309295846
+      ],
+      "ttft_s": [
+       0.0154746667501513,
+       0.015570791750178614,
+       0.015622280999878058
+      ],
+      "prefill_s": [
+       0.01525786425008846,
+       0.015359125000031781,
+       0.015415166750130993
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.1277662580753256,
+      "streaming_decode_tps": 0.8850658020874906,
+      "ttft_s": 1.0569714619650805,
+      "prefill_s": 1.0451332681532832
+     }
+    },
+    {
+     "case": "tinymistral-6x248m",
+     "prompt_length": 512,
+     "status": "stable",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "a",
+       "pair": 0
+      },
+      {
+       "session": "a",
+       "pair": 1
+      },
+      {
+       "session": "a",
+       "pair": 2
+      },
+      {
+       "session": "a",
+       "pair": 3
+      },
+      {
+       "session": "a",
+       "pair": 4
+      },
+      {
+       "session": "a",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.6305544167499999,
+       0.6317421145,
+       0.6339483335
+      ],
+      "streaming_decode_tps": [
+       209.78699483234126,
+       210.59418801164304,
+       210.9966289841863
+      ],
+      "ttft_s": [
+       0.0286066665,
+       0.028618791499999997,
+       0.02867941675
+      ],
+      "prefill_s": [
+       0.02821527075,
+       0.028231708499999997,
+       0.028274114500000003
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.5379888227498668,
+       0.5384958022499404,
+       0.5409938957499207
+      ],
+      "streaming_decode_tps": [
+       246.92281912628204,
+       248.06290954814278,
+       248.2920865693879
+      ],
+      "ttft_s": [
+       0.026566854250063443,
+       0.02658617699989918,
+       0.026648843749626394
+      ],
+      "prefill_s": [
+       0.026352301749852813,
+       0.02637264575014342,
+       0.026431750000028842
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.1733504806871333,
+      "streaming_decode_tps": 0.8487241664273746,
+      "ttft_s": 1.0763100104908552,
+      "prefill_s": 1.07083315276931
+     }
+    },
+    {
+     "case": "tinymistral-6x248m",
+     "prompt_length": 2048,
+     "status": "stable",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "a",
+       "pair": 0
+      },
+      {
+       "session": "a",
+       "pair": 1
+      },
+      {
+       "session": "a",
+       "pair": 2
+      },
+      {
+       "session": "a",
+       "pair": 3
+      },
+      {
+       "session": "a",
+       "pair": 4
+      },
+      {
+       "session": "a",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.8736380312500001,
+       0.87573422925,
+       0.876255802
+      ],
+      "streaming_decode_tps": [
+       170.14777208357756,
+       170.33653198067913,
+       170.77103251659906
+      ],
+      "ttft_s": [
+       0.1297796565,
+       0.129878427,
+       0.129965031
+      ],
+      "prefill_s": [
+       0.1293767815,
+       0.12947555225000001,
+       0.12954932275
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.663771124750042,
+       0.6639148854999348,
+       0.6642192812498706
+      ],
+      "streaming_decode_tps": [
+       233.28964053566148,
+       233.46198288420902,
+       233.57592181668315
+      ],
+      "ttft_s": [
+       0.11976392750034393,
+       0.11986405224990904,
+       0.11991116650017375
+      ],
+      "prefill_s": [
+       0.1195767917502053,
+       0.11967737499981013,
+       0.11971066650005469
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.3185376215190305,
+      "streaming_decode_tps": 0.730058946334503,
+      "ttft_s": 1.0834555346645782,
+      "prefill_s": 1.0817992845809612
+     }
+    }
+   ],
+   "unstable": [
+    {
+     "case": "qwen3-8b-4bit",
+     "prompt_length": 512,
+     "status": "unstable",
+     "io_affected": true,
+     "pair_set": [
+      {
+       "session": "a",
+       "pair": 0
+      },
+      {
+       "session": "a",
+       "pair": 1
+      },
+      {
+       "session": "a",
+       "pair": 2
+      },
+      {
+       "session": "a",
+       "pair": 3
+      },
+      {
+       "session": "a",
+       "pair": 4
+      },
+      {
+       "session": "a",
+       "pair": 5
+      },
+      {
+       "session": "a2",
+       "pair": 6
+      },
+      {
+       "session": "a2",
+       "pair": 7
+      },
+      {
+       "session": "a2",
+       "pair": 8
+      },
+      {
+       "session": "a3",
+       "pair": 9
+      },
+      {
+       "session": "a3",
+       "pair": 10
+      }
+     ],
+     "n_pairs": 11,
+     "java": {
+      "full_generation_s": {
+       "p10": 1.7894646665,
+       "p90": 6.0462818125
+      },
+      "streaming_decode_tps": {
+       "p10": 22.447168846523212,
+       "p90": 78.03033513486388
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "p10": 1.4046178959999907,
+       "p90": 3.550938687499638
+      },
+      "streaming_decode_tps": {
+       "p10": 38.2922976451994,
+       "p90": 101.38386146640025
+      }
+     },
+     "note": "type-7 p10-p90 over the 11 complete pair medians (A + A2 + A3 pairs 9-10); no ratio attributed; every degraded member is retained with its host observation (findings 16.4a/16.4b/16.7)"
+    },
+    {
+     "case": "qwen3-8b-4bit",
+     "prompt_length": 2048,
+     "status": "incomplete-by-default-unstable-per-recorded-run-rule",
+     "io_affected": true,
+     "pair_set": [
+      {
+       "session": "a",
+       "pair": 0
+      },
+      {
+       "session": "a",
+       "pair": 1
+      },
+      {
+       "session": "a",
+       "pair": 2
+      },
+      {
+       "session": "a",
+       "pair": 3
+      },
+      {
+       "session": "a",
+       "pair": 4
+      },
+      {
+       "session": "a",
+       "pair": 5
+      },
+      {
+       "session": "a2",
+       "pair": 6
+      },
+      {
+       "session": "a2",
+       "pair": 7
+      },
+      {
+       "session": "a2",
+       "pair": 8
+      },
+      {
+       "session": "a3",
+       "pair": 10
+      }
+     ],
+     "n_pairs": 10,
+     "java": {
+      "full_generation_s": {
+       "p10": 3.0769402060999997,
+       "p90": 9.6226059793
+      },
+      "streaming_decode_tps": {
+       "p10": 14.534826489645798,
+       "p90": 52.232560651202505
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "p10": 1.9668522392999308,
+       "p90": 2.2370234165499823
+      },
+      "streaming_decode_tps": {
+       "p10": 87.55574928908975,
+       "p90": 95.16110367149614
+      }
+     },
+     "note": "type-7 p10-p90 over the 10 complete pair medians; A3 pair 9 is incomplete (its java worker timed out with 15 of 20 measured requests) and is excluded from the range; plan section 4.1 defaults a timeout to incomplete, the section 16.4b recorded run rule closes the cell as unstable (findings 16.7 items 3-4)"
+    }
+   ],
+   "greedy_identity": {
+    "session_a": {
+     "qwen3-0.6b/32": {
+      "identical": 120,
+      "total": 120
+     },
+     "qwen3-0.6b/512": {
+      "identical": 120,
+      "total": 120
+     },
+     "qwen3-0.6b/2048": {
+      "identical": 120,
+      "total": 120
+     },
+     "qwen3-8b-4bit/32": {
+      "identical": 120,
+      "total": 120
+     },
+     "qwen3-8b-4bit/512": {
+      "identical": 120,
+      "total": 120
+     },
+     "qwen3-8b-4bit/2048": {
+      "identical": 120,
+      "total": 120
+     },
+     "tinymistral-6x248m/32": {
+      "identical": 120,
+      "total": 120
+     },
+     "tinymistral-6x248m/512": {
+      "identical": 120,
+      "total": 120
+     },
+     "tinymistral-6x248m/2048": {
+      "identical": 120,
+      "total": 120
+     }
+    },
+    "session_a2": {
+     "qwen3-0.6b/2048": {
+      "identical": 60,
+      "total": 60
+     },
+     "qwen3-8b-4bit/32": {
+      "identical": 60,
+      "total": 60
+     },
+     "qwen3-8b-4bit/512": {
+      "identical": 60,
+      "total": 60
+     },
+     "qwen3-8b-4bit/2048": {
+      "identical": 60,
+      "total": 60
+     }
+    },
+    "session_a3": {
+     "qwen3-8b-4bit/512": {
+      "identical": 40,
+      "total": 40
+     },
+     "qwen3-8b-4bit/2048": {
+      "identical": 20,
+      "total": 20
+     }
+    }
+   },
+   "first_requests_session_a": [
+    {
+     "case": "qwen3-0.6b",
+     "prompt_length": 32,
+     "java": {
+      "full_generation_s": {
+       "min": 0.754774458,
+       "max": 2.677332042,
+       "median": 0.7580385835000001
+      },
+      "load_s": {
+       "min": 0.033013708,
+       "max": 0.037806667,
+       "median": 0.0356808125
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "min": 0.509784958999262,
+       "max": 0.5204842920002193,
+       "median": 0.5110613539998212
+      },
+      "load_s": {
+       "min": 0.29242429199985054,
+       "max": 0.3180793339997763,
+       "median": 0.29931647900002645
+      }
+     }
+    },
+    {
+     "case": "qwen3-0.6b",
+     "prompt_length": 512,
+     "java": {
+      "full_generation_s": {
+       "min": 0.846217917,
+       "max": 0.85553475,
+       "median": 0.8493147705
+      },
+      "load_s": {
+       "min": 0.033723583,
+       "max": 0.035921833,
+       "median": 0.034099395500000004
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "min": 0.5365383749999637,
+       "max": 0.5451286670004265,
+       "median": 0.5409270414997991
+      },
+      "load_s": {
+       "min": 0.29884566599957907,
+       "max": 0.309112124999956,
+       "median": 0.30421464549999655
+      }
+     }
+    },
+    {
+     "case": "qwen3-0.6b",
+     "prompt_length": 2048,
+     "java": {
+      "full_generation_s": {
+       "min": 1.267173,
+       "max": 1.292194792,
+       "median": 1.2734764790000002
+      },
+      "load_s": {
+       "min": 0.033310792,
+       "max": 0.0352695,
+       "median": 0.033836979
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "min": 0.6247646669999085,
+       "max": 0.6333972919999269,
+       "median": 0.6269653955000649
+      },
+      "load_s": {
+       "min": 0.29871075000028213,
+       "max": 0.30998112499992203,
+       "median": 0.3002895420002005
+      }
+     }
+    },
+    {
+     "case": "qwen3-8b-4bit",
+     "prompt_length": 32,
+     "java": {
+      "full_generation_s": {
+       "min": 1.644531334,
+       "max": 5.593283458,
+       "median": 1.651077167
+      },
+      "load_s": {
+       "min": 0.049896875,
+       "max": 0.059893208,
+       "median": 0.0546555415
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "min": 1.2724346659997536,
+       "max": 4.747165084000244,
+       "median": 1.2784975414997461
+      },
+      "load_s": {
+       "min": 0.40750441699992734,
+       "max": 0.4713879999999335,
+       "median": 0.410684437999862
+      }
+     }
+    },
+    {
+     "case": "qwen3-8b-4bit",
+     "prompt_length": 512,
+     "java": {
+      "full_generation_s": {
+       "min": 2.015090416,
+       "max": 6.898019333,
+       "median": 2.0308330000000003
+      },
+      "load_s": {
+       "min": 0.050628583,
+       "max": 0.058083083,
+       "median": 0.051866729
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "min": 1.4075179579995165,
+       "max": 5.631414458000108,
+       "median": 1.4169342704999508
+      },
+      "load_s": {
+       "min": 0.4054711250000764,
+       "max": 0.4954436660000283,
+       "median": 0.4079693335002048
+      }
+     }
+    },
+    {
+     "case": "qwen3-8b-4bit",
+     "prompt_length": 2048,
+     "java": {
+      "full_generation_s": {
+       "min": 3.497890792,
+       "max": 19.627973208,
+       "median": 3.608081396
+      },
+      "load_s": {
+       "min": 0.050176542,
+       "max": 0.052320667,
+       "median": 0.051535896
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "min": 1.907806416999847,
+       "max": 1.9848884160001035,
+       "median": 1.9146660834999238
+      },
+      "load_s": {
+       "min": 0.4045100419998562,
+       "max": 0.4442159589998482,
+       "median": 0.4254900835001081
+      }
+     }
+    },
+    {
+     "case": "tinymistral-6x248m",
+     "prompt_length": 32,
+     "java": {
+      "full_generation_s": {
+       "min": 0.740258666,
+       "max": 0.75500425,
+       "median": 0.7436251875
+      },
+      "load_s": {
+       "min": 0.178349125,
+       "max": 0.203141,
+       "median": 0.19578239549999998
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "min": 0.5264905829999407,
+       "max": 0.5321667079997496,
+       "median": 0.5300282079997487
+      },
+      "load_s": {
+       "min": 0.17837908299998162,
+       "max": 0.19266324999989592,
+       "median": 0.18736606200036476
+      }
+     }
+    },
+    {
+     "case": "tinymistral-6x248m",
+     "prompt_length": 512,
+     "java": {
+      "full_generation_s": {
+       "min": 0.79425975,
+       "max": 0.802733792,
+       "median": 0.7996044795
+      },
+      "load_s": {
+       "min": 0.180304,
+       "max": 0.1885835,
+       "median": 0.18347560400000001
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "min": 0.5455113329999222,
+       "max": 0.5509872909997284,
+       "median": 0.5489391874998546
+      },
+      "load_s": {
+       "min": 0.17187250000006316,
+       "max": 0.1813621660003264,
+       "median": 0.1755036879999352
+      }
+     }
+    },
+    {
+     "case": "tinymistral-6x248m",
+     "prompt_length": 2048,
+     "java": {
+      "full_generation_s": {
+       "min": 1.076729791,
+       "max": 1.087755208,
+       "median": 1.0832959165
+      },
+      "load_s": {
+       "min": 0.178185542,
+       "max": 0.187661667,
+       "median": 0.184112958
+      }
+     },
+     "python": {
+      "full_generation_s": {
+       "min": 0.6763913750000938,
+       "max": 0.6775622920004025,
+       "median": 0.6766578954996021
+      },
+      "load_s": {
+       "min": 0.1735932500000672,
+       "max": 0.18102470900066692,
+       "median": 0.1746503534996009
+      }
+     }
+    }
+   ]
+  },
+  "stock": {
+   "settled": [
+    {
+     "case": "qwen3-0.6b",
+     "prompt_length": 32,
+     "status": "greedy-divergent-ratio-rejected-timing-recorded",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "b",
+       "pair": 0
+      },
+      {
+       "session": "b",
+       "pair": 1
+      },
+      {
+       "session": "b",
+       "pair": 2
+      },
+      {
+       "session": "b",
+       "pair": 3
+      },
+      {
+       "session": "b",
+       "pair": 4
+      },
+      {
+       "session": "b",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.5322022605,
+       0.5334129375000001,
+       0.535070354
+      ],
+      "streaming_decode_tps": [
+       243.81510407235226,
+       244.49816495605427,
+       245.0965224148312
+      ],
+      "ttft_s": [
+       0.0130683855,
+       0.013209302,
+       0.013275385249999999
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.39476316649916043,
+       0.39533399975016437,
+       0.3970668542503972
+      ],
+      "streaming_decode_tps": [
+       330.49780066552285,
+       331.7527561009049,
+       332.4174350430128
+      ],
+      "ttft_s": [
+       0.009553187249366601,
+       0.009710395999718457,
+       0.009840010250172782
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.3484535593126146,
+      "streaming_decode_tps": 0.7372237141039356,
+      "ttft_s": 1.3530064790048868
+     }
+    },
+    {
+     "case": "qwen3-0.6b",
+     "prompt_length": 512,
+     "status": "greedy-divergent-ratio-rejected-timing-recorded",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "b",
+       "pair": 0
+      },
+      {
+       "session": "b",
+       "pair": 1
+      },
+      {
+       "session": "b",
+       "pair": 2
+      },
+      {
+       "session": "b",
+       "pair": 3
+      },
+      {
+       "session": "b",
+       "pair": 4
+      },
+      {
+       "session": "b",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.6317014897500001,
+       0.63340502075,
+       0.634960604
+      ],
+      "streaming_decode_tps": [
+       208.3359810458532,
+       208.91949696144144,
+       209.4700736474599
+      ],
+      "ttft_s": [
+       0.024605760249999997,
+       0.02464540625,
+       0.02466885425
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.4232057184999576,
+       0.42375752074940465,
+       0.4258943330003149
+      ],
+      "streaming_decode_tps": [
+       315.9374707914492,
+       317.1461683783616,
+       317.6676310100282
+      ],
+      "ttft_s": [
+       0.020112114749736065,
+       0.020223135250489577,
+       0.020920551749668448
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.4934859489463892,
+      "streaming_decode_tps": 0.6591797885298813,
+      "ttft_s": 1.2198349210591095
+     }
+    },
+    {
+     "case": "qwen3-0.6b",
+     "prompt_length": 2048,
+     "status": "greedy-divergent-ratio-rejected-timing-recorded",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "b",
+       "pair": 0
+      },
+      {
+       "session": "b",
+       "pair": 1
+      },
+      {
+       "session": "b",
+       "pair": 2
+      },
+      {
+       "session": "b",
+       "pair": 3
+      },
+      {
+       "session": "b",
+       "pair": 4
+      },
+      {
+       "session": "b",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.94574355175,
+       0.94684778125,
+       0.948855208
+      ],
+      "streaming_decode_tps": [
+       145.3389901428391,
+       145.68782244370567,
+       145.84651389449579
+      ],
+      "ttft_s": [
+       0.0741041145,
+       0.07413231275,
+       0.074190281
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.5094182812495092,
+       0.5117660832502224,
+       0.5186839895000048
+      ],
+      "streaming_decode_tps": [
+       279.4120180355631,
+       282.649498710637,
+       283.93927025590375
+      ],
+      "ttft_s": [
+       0.05889163550000376,
+       0.059382375000041066,
+       0.06105820850029886
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.8515675181276217,
+      "streaming_decode_tps": 0.5149619255204658,
+      "ttft_s": 1.2482365753847513
+     }
+    },
+    {
+     "case": "qwen3-8b-4bit",
+     "prompt_length": 32,
+     "status": "greedy-divergent-ratio-rejected-timing-recorded",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "b",
+       "pair": 0
+      },
+      {
+       "session": "b",
+       "pair": 1
+      },
+      {
+       "session": "b",
+       "pair": 2
+      },
+      {
+       "session": "b",
+       "pair": 3
+      },
+      {
+       "session": "b",
+       "pair": 4
+      },
+      {
+       "session": "b",
+       "pair": 5
+      },
+      {
+       "session": "b2",
+       "pair": 6
+      },
+      {
+       "session": "b2",
+       "pair": 7
+      },
+      {
+       "session": "b2",
+       "pair": 8
+      },
+      {
+       "session": "b2",
+       "pair": 9
+      },
+      {
+       "session": "b2",
+       "pair": 10
+      },
+      {
+       "session": "b2",
+       "pair": 11
+      },
+      {
+       "session": "b3",
+       "pair": 12
+      },
+      {
+       "session": "b3",
+       "pair": 13
+      },
+      {
+       "session": "b3",
+       "pair": 14
+      },
+      {
+       "session": "b3",
+       "pair": 15
+      },
+      {
+       "session": "b3",
+       "pair": 16
+      },
+      {
+       "session": "b3",
+       "pair": 17
+      }
+     ],
+     "n_pairs": 18,
+     "java": {
+      "full_generation_s": [
+       1.3563681668499998,
+       1.37395814575,
+       1.45249101035
+      ],
+      "streaming_decode_tps": [
+       90.32781066212787,
+       95.5362940503226,
+       96.78536679854207
+      ],
+      "ttft_s": [
+       0.04302094175,
+       0.043173875,
+       0.04445244784999999
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       1.1869104146998324,
+       1.1952583124984812,
+       1.2991805646503964
+      ],
+      "streaming_decode_tps": [
+       103.57538073325273,
+       112.1655785067363,
+       112.95052723098148
+      ],
+      "ttft_s": [
+       0.057657295600256474,
+       0.05793981275019178,
+       0.0649110855505569
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.1375258777726653,
+      "streaming_decode_tps": 0.8604009312659007,
+      "ttft_s": 0.7429085240776954
+     },
+     "note": "18 pairs = B + B2 + B3 (final stock session, findings 16.5b); B2-pair6's contaminated java member (1.850 s) stays in the quantiles with its observation"
+    },
+    {
+     "case": "qwen3-8b-4bit",
+     "prompt_length": 512,
+     "status": "greedy-divergent-ratio-rejected-timing-recorded",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "b",
+       "pair": 0
+      },
+      {
+       "session": "b",
+       "pair": 1
+      },
+      {
+       "session": "b",
+       "pair": 2
+      },
+      {
+       "session": "b",
+       "pair": 3
+      },
+      {
+       "session": "b",
+       "pair": 4
+      },
+      {
+       "session": "b",
+       "pair": 5
+      },
+      {
+       "session": "b2",
+       "pair": 6
+      },
+      {
+       "session": "b2",
+       "pair": 7
+      },
+      {
+       "session": "b2",
+       "pair": 8
+      },
+      {
+       "session": "b2",
+       "pair": 9
+      },
+      {
+       "session": "b2",
+       "pair": 10
+      },
+      {
+       "session": "b2",
+       "pair": 11
+      }
+     ],
+     "n_pairs": 12,
+     "java": {
+      "full_generation_s": [
+       1.7794945288500001,
+       1.784579875,
+       1.9149957289000001
+      ],
+      "streaming_decode_tps": [
+       73.71469742651392,
+       78.37583358205018,
+       78.71678839644245
+      ],
+      "ttft_s": [
+       0.16177187915,
+       0.1618734685,
+       0.18376381279999998
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       1.329171427401525,
+       1.3423334899998736,
+       1.4888605898993774
+      ],
+      "streaming_decode_tps": [
+       100.21315061621105,
+       109.04854545316435,
+       110.08400580575889
+      ],
+      "ttft_s": [
+       0.17077292319772824,
+       0.1731333439984155,
+       0.21644304189912872
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.3268629479140093,
+      "streaming_decode_tps": 0.7206721328440738,
+      "ttft_s": 0.9407628432018073
+     },
+     "note": "12 pairs = B + B2 (findings 16.5a)"
+    },
+    {
+     "case": "tinymistral-6x248m",
+     "prompt_length": 32,
+     "status": "stable",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "b",
+       "pair": 0
+      },
+      {
+       "session": "b",
+       "pair": 1
+      },
+      {
+       "session": "b",
+       "pair": 2
+      },
+      {
+       "session": "b",
+       "pair": 3
+      },
+      {
+       "session": "b",
+       "pair": 4
+      },
+      {
+       "session": "b",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.5609647295,
+       0.5614225104999999,
+       0.56304804175
+      ],
+      "streaming_decode_tps": [
+       232.4585615272891,
+       233.12601523248082,
+       233.31075151631805
+      ],
+      "ttft_s": [
+       0.016166708499999998,
+       0.01620745825,
+       0.0162510935
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.4569721145003314,
+       0.4578447190001498,
+       0.4584052184995926
+      ],
+      "streaming_decode_tps": [
+       300.07274047693585,
+       300.4066376474274,
+       300.97216226624414
+      ],
+      "ttft_s": [
+       0.032186281499889446,
+       0.032223208250343305,
+       0.03226221849990907
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.2271702210818143,
+      "streaming_decode_tps": 0.7754107112189675,
+      "ttft_s": 0.5023883622575096
+     }
+    },
+    {
+     "case": "tinymistral-6x248m",
+     "prompt_length": 512,
+     "status": "stable",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "b",
+       "pair": 0
+      },
+      {
+       "session": "b",
+       "pair": 1
+      },
+      {
+       "session": "b",
+       "pair": 2
+      },
+      {
+       "session": "b",
+       "pair": 3
+      },
+      {
+       "session": "b",
+       "pair": 4
+      },
+      {
+       "session": "b",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.611086271,
+       0.6117209690000001,
+       0.612127073
+      ],
+      "streaming_decode_tps": [
+       217.71596439508602,
+       217.87635063220443,
+       218.1486223796712
+      ],
+      "ttft_s": [
+       0.028247520749999998,
+       0.02828153125,
+       0.028356885499999998
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.4665214375004325,
+       0.4676691980002943,
+       0.46831688524980564
+      ],
+      "streaming_decode_tps": [
+       293.94777027272744,
+       294.4639254365994,
+       295.12576296537503
+      ],
+      "ttft_s": [
+       0.03335201049958414,
+       0.03341444825036888,
+       0.03352772925018144
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.3078393460345377,
+      "streaming_decode_tps": 0.7402451412073733,
+      "ttft_s": 0.8457379938135068
+     }
+    },
+    {
+     "case": "tinymistral-6x248m",
+     "prompt_length": 2048,
+     "status": "stable",
+     "io_affected": false,
+     "pair_set": [
+      {
+       "session": "b",
+       "pair": 0
+      },
+      {
+       "session": "b",
+       "pair": 1
+      },
+      {
+       "session": "b",
+       "pair": 2
+      },
+      {
+       "session": "b",
+       "pair": 3
+      },
+      {
+       "session": "b",
+       "pair": 4
+      },
+      {
+       "session": "b",
+       "pair": 5
+      }
+     ],
+     "n_pairs": 6,
+     "java": {
+      "full_generation_s": [
+       0.8547462085,
+       0.8556226665,
+       0.85685400025
+      ],
+      "streaming_decode_tps": [
+       174.71397219198653,
+       174.9772711128784,
+       175.2295674739994
+      ],
+      "ttft_s": [
+       0.12937435425,
+       0.12943715625,
+       0.129505646
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       0.6002406457500911,
+       0.600496082999598,
+       0.6016176042498955
+      ],
+      "streaming_decode_tps": [
+       273.67538881008034,
+       274.0177582298393,
+       274.0848714380571
+      ],
+      "ttft_s": [
+       0.1345359894999092,
+       0.13478773924998677,
+       0.13510197899995546
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.424485977244866,
+      "streaming_decode_tps": 0.638687518148632,
+      "ttft_s": 0.9602441840816787
+     }
+    }
+   ],
+   "blocked": [
+    {
+     "case": "qwen3-8b-4bit",
+     "prompt_length": 2048,
+     "status": "blocked-pending-owner-decision",
+     "io_affected": true,
+     "pair_set": [
+      {
+       "session": "b",
+       "pair": 1
+      },
+      {
+       "session": "b",
+       "pair": 2
+      },
+      {
+       "session": "b",
+       "pair": 3
+      },
+      {
+       "session": "b",
+       "pair": 4
+      },
+      {
+       "session": "b",
+       "pair": 5
+      },
+      {
+       "session": "b2",
+       "pair": 7
+      },
+      {
+       "session": "b2",
+       "pair": 8
+      },
+      {
+       "session": "b2",
+       "pair": 9
+      },
+      {
+       "session": "b2",
+       "pair": 10
+      },
+      {
+       "session": "b2",
+       "pair": 11
+      }
+     ],
+     "n_pairs": 10,
+     "java": {
+      "full_generation_s": [
+       3.0455337940500002,
+       3.0633701355,
+       3.1558894184
+      ],
+      "streaming_decode_tps": [
+       52.39342178760351,
+       52.48667991813066,
+       52.900851619349936
+      ],
+      "ttft_s": [
+       0.6202995686999999,
+       0.637284646,
+       0.7497813328499999
+      ]
+     },
+     "python": {
+      "full_generation_s": [
+       1.9234098918008384,
+       2.031675718500992,
+       2.1404967561002195
+      ],
+      "streaming_decode_tps": [
+       96.75277746735996,
+       98.71570094313506,
+       101.52985122292512
+      ],
+      "ttft_s": [
+       0.6675661649005633,
+       0.7403088854989619,
+       0.8214977933993396
+      ]
+     },
+     "ratio": {
+      "full_generation_s": 1.5020778127076975,
+      "streaming_decode_tps": 0.5312999425758815,
+      "ttft_s": 0.9017239283831027
+     },
+     "note": "10 complete pairs = B pairs 1-5 + B2 pairs 7-11; B pair 0 and B2 pair 6 java members are strike-excluded (first-request event-check) and the memfree strikes fall inside their windows (findings 16.5/16.5a/16.7 item 5). The >10% adjacent-fork trigger fires counting the excluded members' validated measured medians, so one further alternating session is required before attribution; the three-session cap is not consumed (B3 ran for 4bit/32 only).",
+     "excluded_members": [
+      {
+       "session": "b",
+       "pair": 0,
+       "runtime": "java",
+       "reason": "first-request event-check exclusion (full_generation_s led the last host-visible event by +352 ms at b-pair0; the b2-pair6 member ran in the block-start memfree strike)",
+       "n_measured": 20,
+       "validated_full_generation_s_median": 3.5040519375,
+       "validated_streaming_decode_tps_median": 44.896727901213445
+      },
+      {
+       "session": "b2",
+       "pair": 6,
+       "runtime": "java",
+       "reason": "first-request event-check exclusion (full_generation_s led the last host-visible event by +352 ms at b-pair0; the b2-pair6 member ran in the block-start memfree strike)",
+       "n_measured": 20,
+       "validated_full_generation_s_median": 3.4746308125,
+       "validated_streaming_decode_tps_median": 45.62832162547379
+      }
+     ],
+     "with_excluded_ratio": {
+      "full_generation_s": 1.5226341700969597,
+      "streaming_decode_tps": 0.5271952220118601,
+      "n_pairs": 12
+     }
+    }
+   ],
+   "greedy_identity": {
+    "session_b": {
+     "qwen3-0.6b/32": {
+      "identical": 0,
+      "total": 120
+     },
+     "qwen3-0.6b/512": {
+      "identical": 0,
+      "total": 120
+     },
+     "qwen3-0.6b/2048": {
+      "identical": 0,
+      "total": 120
+     },
+     "qwen3-8b-4bit/32": {
+      "identical": 0,
+      "total": 120
+     },
+     "qwen3-8b-4bit/512": {
+      "identical": 0,
+      "total": 120
+     },
+     "qwen3-8b-4bit/2048": {
+      "identical": 120,
+      "total": 120
+     },
+     "tinymistral-6x248m/32": {
+      "identical": 120,
+      "total": 120
+     },
+     "tinymistral-6x248m/512": {
+      "identical": 120,
+      "total": 120
+     },
+     "tinymistral-6x248m/2048": {
+      "identical": 120,
+      "total": 120
+     }
+    },
+    "session_b2": {
+     "qwen3-8b-4bit/32": {
+      "identical": 0,
+      "total": 120
+     },
+     "qwen3-8b-4bit/512": {
+      "identical": 0,
+      "total": 120
+     },
+     "qwen3-8b-4bit/2048": {
+      "identical": 120,
+      "total": 120
+     }
+    },
+    "session_b3": {
+     "qwen3-8b-4bit/32": {
+      "identical": 0,
+      "total": 120
+     }
+    }
+   },
+   "greedy_divergence_note": "Stock greedy outputs diverge between the runtimes in five of the nine cells (qwen3-0.6b x3, qwen3-8b-4bit/32 and /512; findings 16.5): within each runtime every request emits the same sequence, the stock java sequences are identical to the controlled ones, so the divergence lies in the stock mlx-lm loop (cause not investigated). Per plan section 3.3 the five cells' matched-generation ratios are rejected pending review; their timing is recorded as stock-default-loop observations. tinymistral x3 and 4bit/2048 are greedy-identical."
+  }
+ },
+ "wp3_diagnostics": {
+  "note": "Plan section 5.1 diagnostics from the diag-5-1 session (18 instrumented java workers, 9 cells x {binding-count, tracing}, TF32=1, measured requests only); ineligible for the headline aggregates. Tracing: caller-thread CPU/wall windows per phase (medians over the 20 measured requests; the step-phase values are the type-7 median over the pooled 20 x 127 position samples); the residual is the request wall/cpu minus the sum of the phase windows. Memory: medians over the 20 measured requests of the binding-count worker (the table values of findings 16.6); rss is shown for both workers. The 4bit/2048 binding-count rss is suspect (its worker ran in a low-memory event; findings 16.6). No Python worker recorded a memory block and no headline worker records one (memory is null by design); the separate memory runs with Python counters that WP3 calls for are not done (open item, findings 16.7 item 6).",
+  "cells": [
+   {
+    "case": "qwen3-0.6b",
+    "prompt_length": 32,
+    "tracing": {
+     "wall_ms": 559.521854,
+     "cpu_ms": 236.891,
+     "residual_wall_ms": 1.9656089999999238,
+     "residual_cpu_ms": 1.6069999999999973,
+     "prefill_sync_us": 4818.5625,
+     "step_construction_us": 366.04150000000004,
+     "step_sync_us": 3557.1875,
+     "step_selection_us": 252.66600000000003,
+     "step_release_us": 116.625,
+     "request_release_us": 811.229
+    },
+    "memory": {
+     "note": "medians over the 20 measured requests; the table values are the binding-count worker's (findings 16.6)",
+     "active_bytes": 1503264768,
+     "peak_bytes": 1574285476,
+     "allocator_cached_bytes": 794083284,
+     "rss_peak_bytes_binding_count": 3032064000,
+     "rss_peak_bytes_tracing": 2740183040,
+     "rss_peak_bytes_binding_count_suspect": false
+    }
+   },
+   {
+    "case": "qwen3-0.6b",
+    "prompt_length": 512,
+    "tracing": {
+     "wall_ms": 662.8781250000001,
+     "cpu_ms": 243.25699999999998,
+     "residual_wall_ms": 1.8769154999999649,
+     "residual_cpu_ms": 1.5489999999999948,
+     "prefill_sync_us": 14393.688000000002,
+     "step_construction_us": 386.458,
+     "step_sync_us": 4264.4375,
+     "step_selection_us": 254.417,
+     "step_release_us": 124.87500000000001,
+     "request_release_us": 829.0
+    },
+    "memory": {
+     "note": "medians over the 20 measured requests; the table values are the binding-count worker's (findings 16.6)",
+     "active_bytes": 1503264768,
+     "peak_bytes": 2659905172,
+     "allocator_cached_bytes": 7338571508,
+     "rss_peak_bytes_binding_count": 3047497728,
+     "rss_peak_bytes_tracing": 2731048960,
+     "rss_peak_bytes_binding_count_suspect": false
+    }
+   },
+   {
+    "case": "qwen3-0.6b",
+    "prompt_length": 2048,
+    "tracing": {
+     "wall_ms": 975.8603335,
+     "cpu_ms": 266.15,
+     "residual_wall_ms": 2.2453275000000605,
+     "residual_cpu_ms": 1.797999999999994,
+     "prefill_sync_us": 72328.875,
+     "step_construction_us": 394.66650000000004,
+     "step_sync_us": 6286.5,
+     "step_selection_us": 262.08299999999997,
+     "step_release_us": 127.0,
+     "request_release_us": 842.4585
+    },
+    "memory": {
+     "note": "medians over the 20 measured requests; the table values are the binding-count worker's (findings 16.6)",
+     "active_bytes": 1503264768,
+     "peak_bytes": 5869893692,
+     "allocator_cached_bytes": 26190149876,
+     "rss_peak_bytes_binding_count": 3029581824,
+     "rss_peak_bytes_tracing": 2727239680,
+     "rss_peak_bytes_binding_count_suspect": false
+    }
+   },
+   {
+    "case": "qwen3-8b-4bit",
+    "prompt_length": 32,
+    "tracing": {
+     "wall_ms": 1555.5028750000001,
+     "cpu_ms": 320.291,
+     "residual_wall_ms": 2.465665000000117,
+     "residual_cpu_ms": 1.9030000000000158,
+     "prefill_sync_us": 48764.7295,
+     "step_construction_us": 475.91650000000004,
+     "step_sync_us": 10847.2915,
+     "step_selection_us": 294.9585,
+     "step_release_us": 161.1455,
+     "request_release_us": 1083.208
+    },
+    "memory": {
+     "note": "medians over the 20 measured requests; the table values are the binding-count worker's (findings 16.6)",
+     "active_bytes": 4607731712,
+     "peak_bytes": 5040084856,
+     "allocator_cached_bytes": 4174067732,
+     "rss_peak_bytes_binding_count": 6166159360,
+     "rss_peak_bytes_tracing": 5867896832,
+     "rss_peak_bytes_binding_count_suspect": false
+    }
+   },
+   {
+    "case": "qwen3-8b-4bit",
+    "prompt_length": 512,
+    "tracing": {
+     "wall_ms": 1865.618896,
+     "cpu_ms": 342.6165,
+     "residual_wall_ms": 2.883188000000092,
+     "residual_cpu_ms": 2.240500000000006,
+     "prefill_sync_us": 172164.8125,
+     "step_construction_us": 482.584,
+     "step_sync_us": 12129.0415,
+     "step_selection_us": 268.709,
+     "step_release_us": 175.79100000000003,
+     "request_release_us": 1087.021
+    },
+    "memory": {
+     "note": "medians over the 20 measured requests; the table values are the binding-count worker's (findings 16.6)",
+     "active_bytes": 4607731712,
+     "peak_bytes": 8846267964,
+     "allocator_cached_bytes": 28043284532,
+     "rss_peak_bytes_binding_count": 6156681216,
+     "rss_peak_bytes_tracing": 5871468544,
+     "rss_peak_bytes_binding_count_suspect": false
+    }
+   },
+   {
+    "case": "qwen3-8b-4bit",
+    "prompt_length": 2048,
+    "tracing": {
+     "wall_ms": 3138.2870625,
+     "cpu_ms": 402.382,
+     "residual_wall_ms": 4.095953999999846,
+     "residual_cpu_ms": 3.093499999999999,
+     "prefill_sync_us": 669804.208,
+     "step_construction_us": 552.917,
+     "step_sync_us": 16980.354,
+     "step_selection_us": 275.02099999999996,
+     "step_release_us": 224.0,
+     "request_release_us": 1112.5835
+    },
+    "memory": {
+     "note": "medians over the 20 measured requests; the table values are the binding-count worker's (findings 16.6)",
+     "active_bytes": 4607731712,
+     "peak_bytes": 21570379804,
+     "allocator_cached_bytes": 103258458676,
+     "rss_peak_bytes_binding_count": 1290371072,
+     "rss_peak_bytes_tracing": 5864128512,
+     "rss_peak_bytes_binding_count_suspect": true
+    }
+   },
+   {
+    "case": "tinymistral-6x248m",
+    "prompt_length": 32,
+    "tracing": {
+     "wall_ms": 586.7349790000001,
+     "cpu_ms": 213.922,
+     "residual_wall_ms": 1.62197899999994,
+     "residual_cpu_ms": 1.3544999999999945,
+     "prefill_sync_us": 15320.896,
+     "step_construction_us": 334.10450000000003,
+     "step_sync_us": 3804.8955,
+     "step_selection_us": 209.875,
+     "step_release_us": 99.958,
+     "request_release_us": 356.125
+    },
+    "memory": {
+     "note": "medians over the 20 measured requests; the table values are the binding-count worker's (findings 16.6)",
+     "active_bytes": 4012412928,
+     "peak_bytes": 4111210336,
+     "allocator_cached_bytes": 716412912,
+     "rss_peak_bytes_binding_count": 2070364160,
+     "rss_peak_bytes_tracing": 1661796352,
+     "rss_peak_bytes_binding_count_suspect": false
+    }
+   },
+   {
+    "case": "tinymistral-6x248m",
+    "prompt_length": 512,
+    "tracing": {
+     "wall_ms": 637.5312085,
+     "cpu_ms": 211.54500000000002,
+     "residual_wall_ms": 1.6316875000000897,
+     "residual_cpu_ms": 1.3665000000000065,
+     "prefill_sync_us": 27473.9165,
+     "step_construction_us": 320.0,
+     "step_sync_us": 4108.4585,
+     "step_selection_us": 212.125,
+     "step_release_us": 101.084,
+     "request_release_us": 352.875
+    },
+    "memory": {
+     "note": "medians over the 20 measured requests; the table values are the binding-count worker's (findings 16.6)",
+     "active_bytes": 4012412928,
+     "peak_bytes": 5725913392,
+     "allocator_cached_bytes": 3804729673,
+     "rss_peak_bytes_binding_count": 2067496960,
+     "rss_peak_bytes_tracing": 1659019264,
+     "rss_peak_bytes_binding_count_suspect": false
+    }
+   },
+   {
+    "case": "tinymistral-6x248m",
+    "prompt_length": 2048,
+    "tracing": {
+     "wall_ms": 883.889604,
+     "cpu_ms": 224.5145,
+     "residual_wall_ms": 1.8787679999999751,
+     "residual_cpu_ms": 1.573999999999992,
+     "prefill_sync_us": 128775.83349999998,
+     "step_construction_us": 328.208,
+     "step_sync_us": 5220.3544999999995,
+     "step_selection_us": 230.042,
+     "step_release_us": 100.25,
+     "request_release_us": 354.27099999999996
+    },
+    "memory": {
+     "note": "medians over the 20 measured requests; the table values are the binding-count worker's (findings 16.6)",
+     "active_bytes": 4012412928,
+     "peak_bytes": 11034528280,
+     "allocator_cached_bytes": 14563062106,
+     "rss_peak_bytes_binding_count": 2072649728,
+     "rss_peak_bytes_tracing": 1659789312,
+     "rss_peak_bytes_binding_count_suspect": false
+    }
+   }
+  ]
+ },
+ "wp3_ffm": {
+  "note": "Calibrated FFM transition estimates (FfmTransitionEstimate, schema jmlx-ffm-transition-estimate-1) over the committed binding-count reports of the diag-5-1 session, measured requests only (1 + 5 warmup + 20 measured per worker; 18 instrumented workers are excluded from every headline aggregate, reason instrumented). It is a calibrated estimate, not a causal partition (the findings section 15.4 assumptions apply). Coverage is 1.0 in all 9 cells (zero uncovered bindings; the 39 descriptor forms map into the 27 calibration shapes). The per-request budget is length-independent (identical at 32/512/2048 within a model): the Java verifier asserts the identity across the three committed reports per case. The published budget medians below were computed at measurement time from the unrounded calibration file; the committed calibration record (evidence-index.json, sources.wp3.ffm_calibration_record) stores the per-call medians to 2 decimal places (the four struct-return shapes to 1 decimal, as recorded in findings 15.4), so the verifier recomputes them within the per-call recording bound (0.05 ns/call for those four shapes, 0.005 ns/call for the rest, times the budget's per-request call count) plus the published value's own display rounding. The calibration RANGES (cal p10-p90) recorded beside each median are NOT reproducible: the measurement-time per-shape p10/p90 samples are not archived (build/ffm-cal/ is not committed).",
+  "calibration": "evidence-index.json sources.wp3.ffm_calibration_record (workload.calls 2000; 27 shape per-call medians; source/binary SHA-256s)",
+  "reports": {
+   "qwen3-0.6b": {
+    "32": "raw/wp3/sessions/diag-5-1-20261109/java-controlled-qwen3-0.6b-32-headline-binding-count/report.json",
+    "512": "raw/wp3/sessions/diag-5-1-20261109/java-controlled-qwen3-0.6b-512-headline-binding-count/report.json",
+    "2048": "raw/wp3/sessions/diag-5-1-20261109/java-controlled-qwen3-0.6b-2048-headline-binding-count/report.json"
+   },
+   "qwen3-8b-4bit": {
+    "32": "raw/wp3/sessions/diag-5-1-20261109/java-controlled-qwen3-8b-4bit-32-headline-binding-count/report.json",
+    "512": "raw/wp3/sessions/diag-5-1-20261109/java-controlled-qwen3-8b-4bit-512-headline-binding-count/report.json",
+    "2048": "raw/wp3/sessions/diag-5-1-20261109/java-controlled-qwen3-8b-4bit-2048-headline-binding-count/report.json"
+   },
+   "tinymistral-6x248m": {
+    "32": "raw/wp3/sessions/diag-5-1-20261109/java-controlled-tinymistral-6x248m-32-headline-binding-count/report.json",
+    "512": "raw/wp3/sessions/diag-5-1-20261109/java-controlled-tinymistral-6x248m-512-headline-binding-count/report.json",
+    "2048": "raw/wp3/sessions/diag-5-1-20261109/java-controlled-tinymistral-6x248m-2048-headline-binding-count/report.json"
+   }
+  },
+  "per_case": [
+   {
+    "case": "qwen3-0.6b",
+    "downcall_counts_per_request": {
+     "prefill_construction": 4948,
+     "prefill_sync": 3,
+     "prefill_selection": 14,
+     "prefill_release": 1145,
+     "step_construction": 5315,
+     "step_sync": 3,
+     "step_selection": 14,
+     "step_release": 1183,
+     "request_release": 56
+    },
+    "total_calls_20_measured": 16671420,
+    "per_decode_step_us": 106.68,
+    "prefill_us": 100.23,
+    "request_total_ms": 13.649,
+    "recorded_not_reproducible_ranges": {
+     "per_decode_step_us": [
+      88.11,
+      137.33
+     ],
+     "prefill_us": [
+      82.68,
+      129.0
+     ],
+     "request_total_ms": [
+      11.273,
+      17.571
+     ]
+    }
+   },
+   {
+    "case": "qwen3-8b-4bit",
+    "downcall_counts_per_request": {
+     "prefill_construction": 4567,
+     "prefill_sync": 3,
+     "prefill_selection": 14,
+     "prefill_release": 1215,
+     "step_construction": 5062,
+     "step_sync": 3,
+     "step_selection": 14,
+     "step_release": 1269,
+     "request_release": 72
+    },
+    "total_calls_20_measured": 16241340,
+    "per_decode_step_us": 111.12,
+    "prefill_us": 102.37,
+    "request_total_ms": 14.214,
+    "recorded_not_reproducible_ranges": {
+     "per_decode_step_us": [
+      91.72,
+      143.74
+     ],
+     "prefill_us": [
+      84.37,
+      132.45
+     ],
+     "request_total_ms": [
+      11.733,
+      18.388
+     ]
+    }
+   },
+   {
+    "case": "tinymistral-6x248m",
+    "downcall_counts_per_request": {
+     "prefill_construction": 3980,
+     "prefill_sync": 3,
+     "prefill_selection": 14,
+     "prefill_release": 1009,
+     "step_construction": 3719,
+     "step_sync": 3,
+     "step_selection": 14,
+     "step_release": 859,
+     "request_release": 24
+    },
+    "total_calls_20_measured": 11771900,
+    "per_decode_step_us": 76.65,
+    "prefill_us": 85.54,
+    "request_total_ms": 9.82,
+    "recorded_not_reproducible_ranges": {
+     "per_decode_step_us": [
+      63.26,
+      98.74
+     ],
+     "prefill_us": [
+      70.53,
+      110.21
+     ],
+     "request_total_ms": [
+      8.105,
+      12.65
+     ]
+    }
+   }
+  ]
+ },
+ "wp4_vlm_first_use": {
+  "note": "Both-pin, both-VLM first inference (plan section 5.2), observed-cache regime, TF32=0, 6 alternating old/new process pairs per VLM, one fixed image+text case per process, fresh JVM per worker (the first in-process request carries the lazy loader work). First-request values are a separate distribution and are never pooled with the warm statistics. The two sessions and the cell closures are recorded without runtime attribution (findings 17.3/17.6): the qwen3vl regime boundary coincides with decaying omlx activity; the phi3v early-pair slowness of session 1 did not recur on the quiet session-2 host; the controlled shader-cache experiment that would attribute it was not run. This closes the issue #73 follow-up: actual first inference and warmed generation are measured separately on both pins and workloads, with per-run host observations.",
+  "cell_closure": {
+   "qwen3vl-2b": "unstable (no settled ratio, no runtime attribution)",
+   "phi3v-4b": "unstable (no settled ratio, no runtime attribution)",
+   "session_3": "not run; ending collection after two sessions before the three-session limit is a recorded deviation from plan section 4.1 (findings 17.6)"
+  },
+  "sessions": [
+   {
+    "session": "wp4-observed-cache-1",
+    "schema": "jmlx-vlm-first-use-session-1",
+    "utc_start": "2026-11-11T15:38:49.805679Z",
+    "utc_end": "2026-11-11T15:46:07.667238Z",
+    "warmups": 3,
+    "measured_per_worker": 5,
+    "precision": {
+     "env": "MLX_ENABLE_TF32",
+     "value": "0"
+    },
+    "peak_semantics": "lifetime-cumulative (schema -1; the worker never reset the peak counter, so after_first includes the load and after_load phases)",
+    "trees": {
+     "old": {
+      "tree_sha": "46cb325bec9b4878534cc5c6bda1a569dfe4aa4c",
+      "worker_source_sha256": "405a839c2f0399391b67e399bfbbb83218a4ee44bab9c2c56d9631665ed02130",
+      "native_pin": {
+       "mlxMetalVersion": "0.31.2",
+       "mlxcCommit": "fba4470b89073180056c9ea46c443051375f7399",
+       "library_path": "../../jmlx-wp4-oldpin/native/install/lib"
+      }
+     },
+     "new": {
+      "tree_sha": "e4cb1f0f43ddd90242237f7e155a399ca5c84cfd",
+      "worker_source_sha256": "405a839c2f0399391b67e399bfbbb83218a4ee44bab9c2c56d9631665ed02130",
+      "native_pin": {
+       "mlxMetalVersion": "0.32.4",
+       "mlxcCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a",
+       "library_path": "native/install/lib"
+      }
+     }
+    },
+    "host_state": "not the plan section 4 quiet-host baseline: the resident serving-model server (omlx) ran at up to 97.9% in four bursts bracketing the qwen3vl phase (48 per-fork hostrec records, digest-pinned); no gpu-burn contention was applied",
+    "workloads": [
+     {
+      "workload": "qwen3vl-2b",
+      "per_tree": {
+       "old": {
+        "first_request": {
+         "ttft_s": {
+          "min": 0.248587417,
+          "max": 0.690937833,
+          "median": 0.4493495625
+         },
+         "full_generation_s": {
+          "min": 0.613072542,
+          "max": 1.139324,
+          "median": 0.7758154165
+         },
+         "load_wall_s": {
+          "min": 0.793155292,
+          "max": 1.306375166,
+          "median": 1.0903592290000002
+         }
+        },
+        "warm": {
+         "n": 30,
+         "ttft_s": [
+          0.25217460830000005,
+          0.3289878335,
+          0.35277852950000005
+         ],
+         "full_generation_s": [
+          0.4952039086,
+          0.6051542285,
+          0.6266311122
+         ]
+        },
+        "memory": {
+         "after_load": {
+          "peak_bytes": [
+           8514863104,
+           8514865152
+          ],
+          "active_bytes": [
+           8510144512,
+           8510146560
+          ]
+         },
+         "after_first": {
+          "peak_bytes": [
+           9828890684,
+           9828892836
+          ],
+          "active_bytes": [
+           8510144512,
+           8510146560
+          ]
+         },
+         "after_final": {
+          "peak_bytes": [
+           9828890684,
+           9828892836
+          ],
+          "active_bytes": [
+           8510144512,
+           8510146560
+          ]
+         }
+        }
+       },
+       "new": {
+        "first_request": {
+         "ttft_s": {
+          "min": 0.4749465,
+          "max": 0.672896667,
+          "median": 0.508641417
+         },
+         "full_generation_s": {
+          "min": 0.77749625,
+          "max": 1.046533167,
+          "median": 0.8271925835
+         },
+         "load_wall_s": {
+          "min": 1.06990775,
+          "max": 1.408596084,
+          "median": 1.3597763335000002
+         }
+        },
+        "warm": {
+         "n": 30,
+         "ttft_s": [
+          0.1449193215,
+          0.3241615835,
+          0.35173677950000004
+         ],
+         "full_generation_s": [
+          0.2660664545,
+          0.5976119165,
+          0.6300454375000001
+         ]
+        },
+        "memory": {
+         "after_load": {
+          "peak_bytes": [
+           8514863104,
+           8514863104
+          ],
+          "active_bytes": [
+           8510144512,
+           8510144512
+          ]
+         },
+         "after_first": {
+          "peak_bytes": [
+           9828890684,
+           9828890788
+          ],
+          "active_bytes": [
+           8510144512,
+           8510144512
+          ]
+         },
+         "after_final": {
+          "peak_bytes": [
+           9828890684,
+           9828890788
+          ],
+          "active_bytes": [
+           8510144512,
+           8510144512
+          ]
+         }
+        }
+       }
+      },
+      "paired": {
+       "warm_full_generation_medians": {
+        "old": [
+         0.615954584,
+         0.549220959,
+         0.59606125,
+         0.589779,
+         0.617767292,
+         0.613630708
+        ],
+        "new": [
+         0.612228917,
+         0.5856065,
+         0.284758541,
+         0.533686708,
+         0.601125292,
+         0.484358917
+        ]
+       },
+       "ratio_new_over_old": {
+        "full_generation_s": [
+         0.9939513933384414,
+         1.0662493672241666,
+         0.4777336909587731,
+         0.9048926937039127,
+         0.973061053546357,
+         0.7893329174784389
+        ],
+        "ttft_s": [
+         0.9379006259104753,
+         1.1171510805032794,
+         0.5246310628071582,
+         0.8927327614451263,
+         0.9767873104769442,
+         0.9631327359072693
+        ],
+        "full_generation_s_median": 0.9389768736251348,
+        "ttft_s_median": 0.9505166809088723
+       }
+      }
+     },
+     {
+      "workload": "phi3v-4b",
+      "per_tree": {
+       "old": {
+        "first_request": {
+         "ttft_s": {
+          "min": 1.340497791,
+          "max": 2.470349167,
+          "median": 1.572539854
+         },
+         "full_generation_s": {
+          "min": 2.421545833,
+          "max": 5.776187625,
+          "median": 3.1236669790000002
+         },
+         "load_wall_s": {
+          "min": 0.836041459,
+          "max": 1.924173875,
+          "median": 1.082336604
+         }
+        },
+        "warm": {
+         "n": 30,
+         "ttft_s": [
+          1.3811608831000002,
+          1.5719146455,
+          2.4159344208999998
+         ],
+         "full_generation_s": [
+          2.2681574664,
+          2.447982042,
+          4.0232516587000005
+         ]
+        },
+        "memory": {
+         "after_load": {
+          "peak_bytes": [
+           16643123200,
+           16643127296
+          ],
+          "active_bytes": [
+           16536107008,
+           16536111104
+          ]
+         },
+         "after_first": {
+          "peak_bytes": [
+           31100376165,
+           31100380261
+          ],
+          "active_bytes": [
+           16536107008,
+           16536111104
+          ]
+         },
+         "after_final": {
+          "peak_bytes": [
+           31100376165,
+           31100380261
+          ],
+          "active_bytes": [
+           16536107008,
+           16536111104
+          ]
+         }
+        }
+       },
+       "new": {
+        "first_request": {
+         "ttft_s": {
+          "min": 1.270444333,
+          "max": 2.183519291,
+          "median": 1.353867521
+         },
+         "full_generation_s": {
+          "min": 2.370686583,
+          "max": 3.856458583,
+          "median": 2.4478370625
+         },
+         "load_wall_s": {
+          "min": 0.822421125,
+          "max": 1.937421208,
+          "median": 0.845775229
+         }
+        },
+        "warm": {
+         "n": 30,
+         "ttft_s": [
+          1.3962461035,
+          1.5075846249999998,
+          2.1029505581
+         ],
+         "full_generation_s": [
+          2.2549307166,
+          2.3970628124999998,
+          3.6704424666
+         ]
+        },
+        "memory": {
+         "after_load": {
+          "peak_bytes": [
+           16643123200,
+           16643123200
+          ],
+          "active_bytes": [
+           16536107008,
+           16536107008
+          ]
+         },
+         "after_first": {
+          "peak_bytes": [
+           30202745961,
+           30202748009
+          ],
+          "active_bytes": [
+           16536107008,
+           16536107008
+          ]
+         },
+         "after_final": {
+          "peak_bytes": [
+           30202745961,
+           30202748009
+          ],
+          "active_bytes": [
+           16536107008,
+           16536107008
+          ]
+         }
+        }
+       }
+      },
+      "paired": {
+       "warm_full_generation_medians": {
+        "old": [
+         3.99821325,
+         4.015289666,
+         2.268379458,
+         2.453871791,
+         2.441907584,
+         2.301479041
+        ],
+        "new": [
+         3.634663084,
+         3.665863083,
+         2.3826265,
+         2.390434958,
+         2.384271583,
+         2.2549725
+        ]
+       },
+       "ratio_new_over_old": {
+        "full_generation_s": [
+         0.909071842028436,
+         0.9129759962378764,
+         1.0503650487563179,
+         0.9741482691831475,
+         0.9763971407527271,
+         0.9797927592771852
+        ],
+        "ttft_s": [
+         0.8497218001228801,
+         0.8819492604875283,
+         1.081948537504182,
+         0.9545229798261453,
+         0.9622220323906644,
+         0.9730392698721941
+        ],
+        "full_generation_s_median": 0.9752727049679373,
+        "ttft_s_median": 0.9583725061084049
+       }
+      }
+     }
+    ]
+   },
+   {
+    "session": "wp4-observed-cache-2",
+    "schema": "jmlx-vlm-first-use-session-2",
+    "utc_start": "2026-11-11T21:00:17.235053Z",
+    "utc_end": "2026-11-11T21:07:00.738799Z",
+    "warmups": 3,
+    "measured_per_worker": 5,
+    "precision": {
+     "env": "MLX_ENABLE_TF32",
+     "value": "0"
+    },
+    "peak_semantics": "phase-local (schema -2; MLXMemory.resetPeak() after the after_load and after_first samples)",
+    "trees": {
+     "old": {
+      "tree_sha": "46cb325bec9b4878534cc5c6bda1a569dfe4aa4c",
+      "worker_source_sha256": "fede0c00ac0528f044cb322ad24ed0d93c03068582cd47ec8e20ad04eabbccac",
+      "native_pin": {
+       "mlxMetalVersion": "0.31.2",
+       "mlxcCommit": "fba4470b89073180056c9ea46c443051375f7399",
+       "library_path": "../../jmlx-wp4-oldpin/native/install/lib"
+      }
+     },
+     "new": {
+      "tree_sha": "ecc69a50e7a7263e955ac20c716b71344ce86c34",
+      "worker_source_sha256": "fede0c00ac0528f044cb322ad24ed0d93c03068582cd47ec8e20ad04eabbccac",
+      "native_pin": {
+       "mlxMetalVersion": "0.32.4",
+       "mlxcCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a",
+       "library_path": "native/install/lib"
+      }
+     }
+    },
+    "host_state": "omlx at 89.4% in the pre record, decaying monotonically across the first four qwen3vl forks (the owner's pre-launch activity, recorded without causal attribution) and at or below 0.7% from qwen3vl old:p4 to the end; the entire phi3v phase ran on the quiet host",
+    "workloads": [
+     {
+      "workload": "qwen3vl-2b",
+      "per_tree": {
+       "old": {
+        "first_request": {
+         "ttft_s": {
+          "min": 0.203516875,
+          "max": 0.764984917,
+          "median": 0.49955712500000005
+         },
+         "full_generation_s": {
+          "min": 0.335084958,
+          "max": 1.327261084,
+          "median": 0.8346971245
+         },
+         "load_wall_s": {
+          "min": 0.785568625,
+          "max": 1.458896042,
+          "median": 1.3655668125
+         }
+        },
+        "warm": {
+         "n": 30,
+         "ttft_s": [
+          0.1103106997,
+          0.239485271,
+          0.3783018756
+         ],
+         "full_generation_s": [
+          0.2243625337,
+          0.3915411665,
+          0.6539264086000001
+         ]
+        },
+        "memory": {
+         "after_load": {
+          "peak_bytes": [
+           8514863104,
+           8514865152
+          ],
+          "active_bytes": [
+           8510144512,
+           8510146560
+          ]
+         },
+         "after_first": {
+          "peak_bytes": [
+           9828890788,
+           9828892836
+          ],
+          "active_bytes": [
+           8510144512,
+           8510146560
+          ]
+         },
+         "after_final": {
+          "peak_bytes": [
+           9828890685,
+           9828892733
+          ],
+          "active_bytes": [
+           8510144512,
+           8510146560
+          ]
+         }
+        }
+       },
+       "new": {
+        "first_request": {
+         "ttft_s": {
+          "min": 0.232944541,
+          "max": 0.92248225,
+          "median": 0.5260973744999999
+         },
+         "full_generation_s": {
+          "min": 0.36560825,
+          "max": 1.35038375,
+          "median": 0.8389696455
+         },
+         "load_wall_s": {
+          "min": 0.818715417,
+          "max": 2.844800416,
+          "median": 1.391114625
+         }
+        },
+        "warm": {
+         "n": 30,
+         "ttft_s": [
+          0.1110014545,
+          0.3376852085,
+          0.3888818163
+         ],
+         "full_generation_s": [
+          0.2263787747,
+          0.61589775,
+          0.6739490247000001
+         ]
+        },
+        "memory": {
+         "after_load": {
+          "peak_bytes": [
+           8514863104,
+           8514863104
+          ],
+          "active_bytes": [
+           8510144512,
+           8510144512
+          ]
+         },
+         "after_first": {
+          "peak_bytes": [
+           9828890684,
+           9828890788
+          ],
+          "active_bytes": [
+           8510144512,
+           8510144512
+          ]
+         },
+         "after_final": {
+          "peak_bytes": [
+           9828890684,
+           9828890685
+          ],
+          "active_bytes": [
+           8510144512,
+           8510144512
+          ]
+         }
+        }
+       }
+      },
+      "paired": {
+       "warm_full_generation_medians": {
+        "old": [
+         0.562536458,
+         0.627320708,
+         0.632403916,
+         0.27160875,
+         0.2261375,
+         0.224491292
+        ],
+        "new": [
+         0.669492,
+         0.666817708,
+         0.628884708,
+         0.646209792,
+         0.244060416,
+         0.2257235
+        ]
+       },
+       "ratio_new_over_old": {
+        "full_generation_s": [
+         1.1901308625937983,
+         1.0629614159014817,
+         0.9944351894240958,
+         2.3791935716356707,
+         1.0792567177049361,
+         1.0054888899654957
+        ],
+        "ttft_s": [
+         1.3029379977160205,
+         1.0683319278715582,
+         0.9856700142583532,
+         2.3279831229340515,
+         1.0360826602507558,
+         1.0013031147005687
+        ],
+        "full_generation_s_median": 1.071109066803209,
+        "ttft_s_median": 1.0522072940611569
+       }
+      }
+     },
+     {
+      "workload": "phi3v-4b",
+      "per_tree": {
+       "old": {
+        "first_request": {
+         "ttft_s": {
+          "min": 1.3553285,
+          "max": 1.6552515,
+          "median": 1.5347227085
+         },
+         "full_generation_s": {
+          "min": 2.472274917,
+          "max": 6.568406375,
+          "median": 3.7953829585
+         },
+         "load_wall_s": {
+          "min": 0.89643625,
+          "max": 1.351242125,
+          "median": 1.0936769375
+         }
+        },
+        "warm": {
+         "n": 30,
+         "ttft_s": [
+          1.4163994756,
+          1.6171259165,
+          1.8689640247000001
+         ],
+         "full_generation_s": [
+          2.3320276664,
+          2.4914273125,
+          2.7942584333
+         ]
+        },
+        "memory": {
+         "after_load": {
+          "peak_bytes": [
+           16643123200,
+           16643125248
+          ],
+          "active_bytes": [
+           16536107008,
+           16536107008
+          ]
+         },
+         "after_first": {
+          "peak_bytes": [
+           31100376165,
+           31100378213
+          ],
+          "active_bytes": [
+           16536107008,
+           16536107008
+          ]
+         },
+         "after_final": {
+          "peak_bytes": [
+           31100376165,
+           31100378213
+          ],
+          "active_bytes": [
+           16536107008,
+           16536107008
+          ]
+         }
+        }
+       },
+       "new": {
+        "first_request": {
+         "ttft_s": {
+          "min": 1.316359959,
+          "max": 1.817288084,
+          "median": 1.4243951460000002
+         },
+         "full_generation_s": {
+          "min": 2.446724625,
+          "max": 9.754609834,
+          "median": 2.6962601045000003
+         },
+         "load_wall_s": {
+          "min": 0.936660792,
+          "max": 1.315199417,
+          "median": 1.0349819585
+         }
+        },
+        "warm": {
+         "n": 30,
+         "ttft_s": [
+          1.3477120914,
+          1.7329350835,
+          1.8553977417000003
+         ],
+         "full_generation_s": [
+          2.2335435667,
+          2.671765208,
+          2.8640225411
+         ]
+        },
+        "memory": {
+         "after_load": {
+          "peak_bytes": [
+           16643123200,
+           16643125248
+          ],
+          "active_bytes": [
+           16536107008,
+           16536109056
+          ]
+         },
+         "after_first": {
+          "peak_bytes": [
+           30202744781,
+           30202748009
+          ],
+          "active_bytes": [
+           16536107008,
+           16536109056
+          ]
+         },
+         "after_final": {
+          "peak_bytes": [
+           30202744781,
+           30202748009
+          ],
+          "active_bytes": [
+           16536107008,
+           16536109056
+          ]
+         }
+        }
+       }
+      },
+      "paired": {
+       "warm_full_generation_medians": {
+        "old": [
+         2.366842667,
+         2.744911125,
+         2.788093125,
+         2.442376709,
+         2.553172708,
+         2.334377042
+        ],
+        "new": [
+         2.135659042,
+         2.815272875,
+         2.766321958,
+         2.735815958,
+         2.701893584,
+         2.376567125
+        ]
+       },
+       "ratio_new_over_old": {
+        "full_generation_s": [
+         0.9023240419723261,
+         1.0256335257484885,
+         0.9921913773952582,
+         1.1201449587685206,
+         1.0582494382514762,
+         1.0180733798529191
+        ],
+        "ttft_s": [
+         0.8295192834725231,
+         1.0128390291493474,
+         0.9635315755461545,
+         1.1666342555111977,
+         1.026712186847036,
+         1.033605202420747
+        ],
+        "full_generation_s_median": 1.0218534528007037,
+        "ttft_s_median": 1.0197756079981917
+       }
+      }
+     }
+    ]
+   }
+  ]
+ },
+ "open_items_and_limits": {
+  "wp3": [
+   "stock greedy divergence (five cells): matched-generation ratios rejected pending review (findings 16.7 item 1)",
+   "A2 (3 pairs, 2/1 leaders) and A3 (2 pairs) reduced-size deviations pending ratification; the post-timeout A3 pair10 counts as a fourth session for the two controlled 4bit cells, over the three-session cap (findings 16.7 items 2-3)",
+   "controlled 4bit/2048 status: incomplete by the plan section 4.1 timeout default, unstable per the recorded run rule (findings 16.7 item 4)",
+   "stock 4bit/2048 blocked: a further alternating session is required before attribution and was not run (findings 16.7 item 5)",
+   "separate memory runs with Python counters not done (findings 16.7 item 6)",
+   "the 4bit memory-consumer hypothesis (worker allocator pool) is open (findings 16.7 item 7)"
+  ],
+  "wp4": [
+   "both VLM cells closed unstable: no settled performance ratio and no runtime attribution; any later attribution needs another complete alternating session or a recorded plan revision (findings 17.6)",
+   "shader-cache attribution remains explicit and unresolved: the controlled shader-cache experiment was not run (plan section 7, findings 17.6)"
+  ],
+  "wp3_ffm": [
+   "calibrated estimate, not a causal partition; the calibration p10/p90 samples are not archived, so the recorded ranges are not bit-reproducible (the medians are, within the 2-decimal per-call recording bound)"
+  ]
+ },
+ "handoff": {
+  "8_4": "req/phase8-2-benchmark.md section 8 (what the first native release may state about performance on the measured host/settings)",
+  "9_1": "req/phase8-2-benchmark.md section 9 (observed bottlenecks and testable hypotheses, without implementing them)"
+ }
+}

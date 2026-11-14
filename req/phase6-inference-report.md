@@ -424,6 +424,26 @@ KV_bytes_per_position=512, features_bytes=5120, visual_release=709210, prefill_r
 early=24064, mid=47104, late=56320`, exactly 512 B × positions (46/47/92/110) at every endpoint —
 against at most 11,264 B on the 0.31.2 recordings.
 
+**Phase 8.2 WP4 follow-up (executed 2026-11-11, published 2026-11-13).** The 8.2
+methodology required above was executed as two alternating both-pin, both-VLM
+first-inference sessions (`wp4-observed-cache-1/-2`, 24 workers each; per-fork
+hostrec records; observed-cache regime — the OS/Metal caches were recorded as
+observed, never reset). Both VLM cells closed `unstable` under plan section 4.1:
+all required samples exist and are retained with their ranges and host records,
+but there is no settled cross-pin performance ratio and no runtime attribution —
+session 1's phi3v early-pair slowness (both trees, one session position) did not
+recur on session 2's quiet host, which is consistent with host state after the
+09:03 reboot, but the attribution experiment (the controlled shader-cache test)
+was not run. First-request and warmed statistics, the paired per-pair ratios and
+the per-fork host records are published in `req/phase8-2-benchmark.md` section 6
+(narrative: `req/plans/phase8-2-reference-findings.md` section 17). One
+measurement relevant to this section: the phi3v after-first-forward peak is
+~897.6 MB lower on the new tree (combined spans across both sessions: old
+31,100,376,165–31,100,380,261 B, new 30,202,744,781–30,202,748,009 B). Under the
+code-and-pin label (the two trees differ in 156 commits, not only the native
+pin) this is not attributable to the pin; the old tree's number matches the
+Phase 7.3c WP8 measurement (31,100,376,165 B) within one page.
+
 ### Verification
 
 Local (M5 Max / macOS 27.0.1, both precision modes): `:jmlx-core:test` 444/444,

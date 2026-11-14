@@ -1186,3 +1186,69 @@ while endpoint requests are below 16 KiB or their reuse windows contain no other
 size (the PR #46 `VisionLanguageMemoryTest` rule); otherwise assert the derived set of
 physically possible values, as `Qwen35MemoryTest` does at position 128. No native pins,
 generated bindings, publication or versions changed in this milestone.
+
+## Phase 8.2 additions
+
+Phase 8.2 is the decode-baseline milestone: a measurement only, no optimization
+(Phase 9.1) and no native publication (8.4 ships it). `req/plans/phase8-2-plan.md`
+and `req/plans/phase8-2-reference-findings.md` (the measurement narrative and
+review history is in its sections 15–17) are the authoritative records; the
+published report is `req/phase8-2-benchmark.md`, and the tooling documentation
+with the exact setup/execution/verification commands is
+`tools/decode-baseline/README.md`.
+
+- `tools/decode-baseline/` holds the frozen workload manifest
+  `workloads.json` (schema `jmlx-decode-baseline-workloads-1`, SHA-256
+  `e8c77301…`, re-hashed by the pure-Java `verifyDecodeBaselineManifest` guard
+  in root `check` and by every worker), the frozen Python worker sources
+  (`worker.py` + `controlled.py`, digest-pinned in the manifest's
+  `worker_sources` and re-hashed by the §2.3 guard), the hash-locked CPython
+  3.12 venv (`install.sh`/`verify.sh`; `verify.sh` also re-checks the installed
+  `mlx_lm` source freeze in `installed-source-digests.json` **before**
+  importing it) and the pre-downloaded, per-file digest-pinned checkpoints
+  (`artifacts/`). Python execution stays an explicit, venv-dependent step;
+  ordinary builds gain no Python prerequisite and no download.
+- `jmlx-benchmarks` (opt-in, never part of `check`) adds `BaselineBenchmark`
+  (`benchmarkBaseline --args=<spec.json>`, the WP3 text-baseline launcher),
+  `VlmFirstUseBenchmark` (`benchmarkVlmFirstUse --args=<spec.json>`, the WP4
+  both-pin/both-VLM first-inference launcher), `FfmCalibration` /
+  `FfmTransitionEstimate` (`benchmarkFfmCalibration --args='out [200 2000 5
+  2000]'`) and their statistics/validation helpers. The benchmark-only adapters
+  live in `jmlx-models` test sources (the `@models-test` classpath alias);
+  they are never published API.
+- Published evidence: `req/benchmarks/phase8-2/` — the raw trees
+  (`raw/wp3/` 458 files, `raw/wp4/` 181 files; absolute local paths
+  normalized to repo-relative, no usernames in the committed tree), the
+  digest-pinned `evidence-index.json` (every committed raw file, the manifest,
+  the FFM calibration record with per-shape medians, the environment and the
+  CI smoke zip under `req/plans/evidence/`) and `summary.json` (schema
+  `jmlx-phase8-2-summary-1`, full double precision). Pre-normalization digests
+  are `req/plans/phase8-2-wp3-raw-digests.json` (458) and
+  `req/plans/phase8-2-wp4-raw-digests.json` (181).
+- `Phase82SummaryVerifierTest` (pure Java, part of `:jmlx-benchmarks:test`, so
+  it runs on the Linux CI job) re-derives every `summary.json` value from the
+  raw bytes and asserts the raw tree is exactly the committed digest-pinned
+  set. CPython 3.12's built-in `sum()` is Neumaier-compensated, not naive
+  left-to-right: the test's `pySum` replicates that exact loop for the two
+  residual window sums, and bit-identical parsing must be verified before
+  suspecting JSON reading.
+- Measured facts (M5 Max / 128 GiB / macOS 27.2, the recorded Java/Python
+  runtimes; the report's rounding rules apply): the controlled
+  single-prefill/127-step matched-generation ratio java/python is
+  1.1278–1.5863 over the settled dense/MoE cells plus 1.0841 for the settled
+  4-bit cell; the stock-loop comparison (1.1375–1.8516×) is a timing
+  observation only — the two runtimes' greedy outputs diverge in five of nine
+  stock cells and those ratios are rejected; the 4-bit/2048 cells are
+  io_affected (the 4.6 GB mmap'd checkpoint's page cache is evicted at 2048),
+  the controlled 4-bit/512 cell is unstable, and the stock 4-bit/2048 cell is
+  blocked pending the owner's decision. Calibrated FFM transition estimates
+  (not a causal partition): 76.65–111.12 µs per decode step, 85.54–102.37 µs
+  prefill, 9.820–14.214 ms per 128-token request. Both WP4 VLM cells closed
+  `unstable` after two alternating sessions: no settled cross-pin ratio, no
+  runtime attribution, and the ~897.6 MB phi3v after-first-forward peak gap is
+  a code-and-pin observation (the trees differ in 156 commits), not a pin
+  claim. The open items in report §7 need a dated owner scope amendment before
+  the WP3 gate passes on those cells; do not retroactively rewrite historical
+  results and do not claim native publication anywhere.
+- No native pins, generated bindings, publication or versions changed in this
+  milestone.

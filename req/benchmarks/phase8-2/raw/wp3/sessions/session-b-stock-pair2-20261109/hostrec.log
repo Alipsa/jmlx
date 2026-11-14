@@ -1,0 +1,11 @@
+07:44:24 | pre:session-b-stock-pair2 | load 1.47 1.70 1.66 | therm-warnings=2 | omlx=0.1% | memfree=88%
+07:45:24 | poll:session-b-stock-pair2 | load 1.74 1.73 1.67 | therm-warnings=2 | omlx=0.1% | memfree=87%
+07:46:24 | poll:session-b-stock-pair2 | load 1.93 1.78 1.69 | therm-warnings=2 | omlx=0.1% | memfree=82%
+07:47:24 | poll:session-b-stock-pair2 | load 2.02 1.82 1.71 | therm-warnings=2 | omlx=0.1% | memfree=84%
+07:48:24 | poll:session-b-stock-pair2 | load 1.97 1.84 1.72 | therm-warnings=2 | omlx=0.1% | memfree=73%
+07:49:24 | poll:session-b-stock-pair2 | load 1.59 1.75 1.70 | therm-warnings=2 | omlx=0.2% | memfree=88%
+07:50:24 | poll:session-b-stock-pair2 | load 1.66 1.74 1.69 | therm-warnings=2 | omlx=0.1% | memfree=58%
+07:51:24 | poll:session-b-stock-pair2 | load 1.47 1.69 1.67 | therm-warnings=2 | omlx=0.1% | memfree=84%
+07:52:24 | poll:session-b-stock-pair2 | load 1.69 1.68 1.67 | therm-warnings=2 | omlx=0.1% | memfree=85%
+07:53:24 | poll:session-b-stock-pair2 | load 1.81 1.70 1.68 | therm-warnings=2 | omlx=0.1% | memfree=74%
+07:54:03 | post:session-b-stock-pair2 | load 1.71 1.68 1.67 | therm-warnings=2 | omlx=0.1% | memfree=88%

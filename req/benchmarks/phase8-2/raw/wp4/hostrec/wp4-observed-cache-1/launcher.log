@@ -1,0 +1,39 @@
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-tokenizer:processResources NO-SOURCE
+> Task :jmlx-core:processResources NO-SOURCE
+> Task :jmlx-models:processResources NO-SOURCE
+> Task :jmlx-benchmarks:processResources UP-TO-DATE
+> Task :jmlx-jinja:compileJava UP-TO-DATE
+> Task :jmlx-ffi:compileJava UP-TO-DATE
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes UP-TO-DATE
+> Task :jmlx-ffi:processResources NO-SOURCE
+> Task :jmlx-ffi:classes UP-TO-DATE
+> Task :jmlx-jinja:jar UP-TO-DATE
+> Task :jmlx-ffi:jar UP-TO-DATE
+> Task :jmlx-core:compileJava UP-TO-DATE
+> Task :jmlx-core:classes UP-TO-DATE
+> Task :jmlx-vision:compileJava UP-TO-DATE
+> Task :jmlx-tokenizer:compileJava UP-TO-DATE
+> Task :jmlx-tokenizer:classes UP-TO-DATE
+> Task :jmlx-vision:processResources NO-SOURCE
+> Task :jmlx-vision:classes UP-TO-DATE
+> Task :jmlx-core:jar UP-TO-DATE
+> Task :jmlx-vision:jar UP-TO-DATE
+> Task :jmlx-tokenizer:jar UP-TO-DATE
+> Task :jmlx-models:compileJava UP-TO-DATE
+> Task :jmlx-models:classes UP-TO-DATE
+> Task :jmlx-models:jar UP-TO-DATE
+> Task :jmlx-benchmarks:compileJava UP-TO-DATE
+> Task :jmlx-benchmarks:classes UP-TO-DATE
+> Task :jmlx-benchmarks:jar UP-TO-DATE
+> Task :jmlx-benchmarks:startScripts UP-TO-DATE
+> Task :jmlx-benchmarks:installDist UP-TO-DATE
+> Task :jmlx-benchmarks:benchmarkVlmFirstUse
+
+BUILD SUCCESSFUL in 7m 18s
+20 actionable tasks: 1 executed, 19 up-to-date

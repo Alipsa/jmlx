@@ -39,6 +39,8 @@ include(
     'jmlx-tokenizer',
     'jmlx-jinja',
     'jmlx-models',
+    'jmlx-spring-ai',
+    'jmlx-langchain4j',
     'jmlx-vision',
     'jmlx-examples',
     'jmlx-benchmarks',

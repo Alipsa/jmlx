@@ -78,6 +78,11 @@ class BertGoldenTest {
       TokenizerEncoding input = input(data);
       for (Pooling.Mode mode : Pooling.Mode.values()) {
         EncoderResult result = model.encode(input, new Pooling(mode, false));
+        for (boolean normalize : List.of(false, true)) {
+          Pooling policy = new Pooling(mode, normalize);
+          assertArrayEquals(
+              model.encode(input, policy).embedding(), model.embed(input, policy), 1e-4f);
+        }
         assertArrayEquals(
             floats(data.path(mode.name().toLowerCase(java.util.Locale.ROOT))),
             result.embedding(),

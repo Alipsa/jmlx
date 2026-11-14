@@ -387,6 +387,36 @@ runtime). A newer development OS does not establish macOS 26 performance, and
 nothing here is a claim about hosted-runner fit or about any published
 artifact.
 
+### Scope amendment — 2026-11-14
+
+Following the owner's instruction to record the remaining scope decisions and
+proceed to 8.3, the delivered 8.2 output is the published evidence with its
+recorded limitations. The affected WP3 cells do **not** acquire a passing
+measurement gate from this amendment. Historical inputs, classifications,
+ratios and sample counts remain unchanged.
+
+- Keep the five divergent stock ratios rejected. Defer stock-loop correctness
+  investigation to 9.1 before any matched-stock performance claim.
+- Retain A2/A3's actual pair counts and leader imbalance and the fourth-session
+  deviation as disclosed deviations; do not treat them as six-pair or
+  three-session-compliant measurements.
+- Retain both the plan-default `incomplete` and recorded `unstable` descriptions
+  for controlled 4bit/2048. No settled performance claim is accepted for it.
+- Leave stock 4bit/2048 blocked; defer the additional session, memfree-strike
+  and event-exclusion investigation to 9.1. No attribution is accepted.
+- Defer Python memory-counter runs and the allocator-pool hypothesis to 9.1;
+  the existing memory observations remain partial evidence.
+- Keep both WP4 cells unstable and shader-cache attribution unresolved. Any
+  later attribution requires the additional alternating experiment or a
+  separately recorded methodology revision.
+- Retain the FFM reproducibility limitation: only the rounded calibration
+  medians are reconstructible; unarchived p10/p90 samples remain unavailable.
+
+This accepts the limited evidence deliverable for advancing development to
+8.3, not the outstanding per-cell measurement gates. The release statements
+in section 8 remain the upper bound for 8.4. Follow-up work is required before
+expanding those statements, rather than before implementing the adapters.
+
 ## 8. Handoff to 8.4 — what the first native release may state
 
 What the first native release (milestone 8.4) may state about performance, on

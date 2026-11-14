@@ -39,13 +39,15 @@ if (!(profile in ['all', 'pure-java'])) {
 // keeps the seven-module native graph, the pure profile resolves jinja/tokenizer/vision only, so
 // an unselected native version never needs to exist or be a release.
 def allModules = ['jmlx-models', 'jmlx-native-macos-arm64', 'jmlx-core', 'jmlx-ffi',
-                  'jmlx-tokenizer', 'jmlx-jinja', 'jmlx-vision']
+                  'jmlx-tokenizer', 'jmlx-jinja', 'jmlx-vision', 'jmlx-spring-ai', 'jmlx-langchain4j']
 def pureModules = ['jmlx-jinja', 'jmlx-tokenizer', 'jmlx-vision']
 def selectedModules = profile == 'pure-java' ? pureModules : allModules
 
 // Property keys per module, matching the consumer gradle.properties defaults.
 def propertyKey = { String module ->
     switch (module) {
+        case 'jmlx-spring-ai': return 'jmlxSpringAiVersion'
+        case 'jmlx-langchain4j': return 'jmlxLangchain4jVersion'
         case 'jmlx-models': return 'jmlxModelsVersion'
         case 'jmlx-native-macos-arm64': return 'jmlxNativeVersion'
         case 'jmlx-core': return 'jmlxCoreVersion'

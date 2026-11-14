@@ -153,6 +153,7 @@ public final class ReleaseSmoke {
                 + "] actual [" + actual.getProperty(key) + "]");
       }
     }
+    AdapterSmoke.run(modelDir, Path.of(requireProperty("smoke.encoder.dir")));
     System.out.println("release smoke OK: " + firstResult.generatedTokenIds() + " " + deltas);
   }
 
@@ -224,6 +225,8 @@ public final class ReleaseSmoke {
     List<Class<?>> probes =
         List.of(
             BatchGenerationScheduler.class,
+            se.alipsa.jmlx.springai.JmlxChatModel.class,
+            se.alipsa.jmlx.langchain4j.JmlxChatModel.class,
             se.alipsa.jmlx.core.MLX.class,
             // jmlx-ffi is runtime-only for a consumer (jmlx-core's `implementation` dependency).
             Class.forName("se.alipsa.jmlx.ffi.NativeLoader"),

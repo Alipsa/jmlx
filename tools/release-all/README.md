@@ -82,3 +82,11 @@ only).
 | --- | --- |
 | `preflight.sh` | Tool preflight sourced by `releaseAll.sh`. |
 | `capture-portal-fixture.groovy` | Captures `req/releaseAll-portal-fixture.json` from the live Portal (manual, credentialed). |
+
+## Phase 8.3 adapter candidates
+
+The root candidate list also names jmlx-spring-ai and jmlx-langchain4j.
+They remain 0.1.0-SNAPSHOT and are excluded until 8.4. The existing 8.1
+expected-selection guard in releaseAll.sh remains intact; 8.4 must update
+that guard to its reviewed release tuple before publishing the native chain
+and adapters. Both adapters depend on models and must release after models.

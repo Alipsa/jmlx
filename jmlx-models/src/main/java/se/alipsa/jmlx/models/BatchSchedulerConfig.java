@@ -3,8 +3,13 @@ package se.alipsa.jmlx.models;
 /**
  * Immutable limits for a {@link BatchGenerationScheduler}.
  *
+ * <p>With {@code maxQueuedRequests == 1}, an embedding batch reserves the only waiting slot, so
+ * generation submissions are rejected until that batch finishes or is cancelled while queued.
+ * Choose a larger queue when generation and embeddings must coexist.
+ *
  * @param maxBatchSize most requests decoded together in one cohort
- * @param maxQueuedRequests most requests waiting to start; further submissions are rejected
+ * @param maxQueuedRequests most generation requests and encoder operations waiting to start,
+ *     combined; an embedding batch reserves one slot through completion, including while running
  * @param maxPromptTokenBudget most prefill work in one cohort, counted as rows times the maximum
  *     padded prompt width (left padding included, not the sum of valid prompt lengths)
  * @param maxNewTokensPerRequest largest {@code maxNewTokens} a request may ask for

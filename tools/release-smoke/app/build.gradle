@@ -50,3 +50,17 @@ tasks.register('smoke', JavaExec) {
         cache.mkdirs()
     }
 }
+
+// Synthetic encoder assembled independently from the decoder fixture.
+def encoderDir = layout.buildDirectory.dir('encoder')
+tasks.register('assembleEncoderDirectory', Sync) {
+    into encoderDir
+    from('../../hf-reference/goldens/checkpoints/bert') {
+        include 'config.json', 'model.safetensors'
+    }
+    from('../fixtures/bert') { include '*.json' }
+}
+tasks.named('smoke') {
+    dependsOn 'assembleEncoderDirectory'
+    systemProperty 'smoke.encoder.dir', encoderDir.get().asFile.absolutePath
+}

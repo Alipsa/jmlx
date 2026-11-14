@@ -87,3 +87,32 @@ local test results and published-artifact evidence. Worker operations are
 package-private; no general native callback API was added to the scheduler's
 public surface. Delivery remains admitted until the consumer finishes, with
 an aggregate bound equal to the scheduler's total admission capacity.
+
+## Review amendment — request control and bounded embedding work
+
+Overlong embedding inputs are rejected before scheduler submission, using the
+minimum of BERT positional capacity and sentence-transformers max_seq_length.
+All texts in a batch are tokenized and checked on the caller. Batches contain
+at most 128 texts and yield the worker between individual text forwards.
+EmbeddingCall exposes cancellation; queued cancelled operations skip native
+work and an executing forward finishes at its next safe boundary. Encoder
+weights still load lazily on the sole worker; native load failure is sticky
+rather than retried on later requests.
+
+Sentence-only BERT inference pools natively, reading back [hidden] rather than
+[sequence, hidden]; the full-state API and its reference assertions remain.
+Blocking framework methods use interruptible waits and cancel on interruption.
+Both frameworks treat scheduler cancellation as an error, and unwrap underlying
+runtime failures. Blocking chat avoids the streaming delivery thread.
+
+Spring streaming waits on demand on the delivery thread, retaining the bounded
+64-delta queue and aggregate admission bound. Completion/disposal wakeups are
+event-driven. Arbitrary callbacks cannot safely be terminated: a callback that
+never returns retains its slot even after native cancellation. This documented
+constraint also applies to a subscription that never requests or disposes.
+
+Constructor argument/configuration failure closes the transferred scheduler.
+The Spring automatic module name is se.alipsa.jmlx.springai before publication.
+Embedding metadata reports the configured encoder directory's basename.
+Sampled requests reuse the configured seed deliberately; a nonzero temperature
+that underflows float32 is rejected.

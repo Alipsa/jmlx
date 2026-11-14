@@ -219,24 +219,132 @@ class SchedulerInferenceClientTest {
   }
 
   @Test
-  void failedEncoderLoadDoesNotPoisonGenerationOrRetainPartialWeights() throws Exception {
-    Path invalid = Files.createDirectory(temporary.resolve("invalid"));
-    BatchGenerationScheduler scheduler = scheduler();
-    try (SchedulerInferenceClient client = client(scheduler, invalid)) {
-      for (int i = 0; i < 2; i++) {
-        assertThrows(
-            ExecutionException.class,
-            () -> client.embed(List.of("hello")).toCompletableFuture().get(60, TimeUnit.SECONDS));
-      }
+  void failedEncoderLoadIsStickyAndDoesNotPoisonGeneration() throws Exception {
+    Path directory = encoderDirectory();
+    Files.delete(directory.resolve("model.safetensors"));
+    try (SchedulerInferenceClient client = client(scheduler(), directory)) {
+      assertThrows(
+          ExecutionException.class,
+          () -> client.embed(List.of("hello")).toCompletableFuture().get(60, TimeUnit.SECONDS));
+      // Repairing the file does not silently retry expensive native loading on the worker.
+      Files.copy(
+          checkpoint("bert").resolve("model.safetensors"), directory.resolve("model.safetensors"));
+      assertThrows(IllegalStateException.class, () -> client.embedCall(List.of("hello")));
       assertEquals(
-          8,
-          client
-              .chat(messages(), client.defaults(), text -> {})
-              .stage()
-              .toCompletableFuture()
-              .get(60, TimeUnit.SECONDS)
-              .generatedTokenIds()
-              .size());
+          8, client.chat(messages(), client.defaults()).await().generatedTokenIds().size());
+    }
+  }
+
+  @Test
+  void validatesAllEmbeddingLengthsBeforeAnyNativeWork() throws Exception {
+    Path directory = encoderDirectory();
+    try (SchedulerInferenceClient client = client(scheduler(), directory)) {
+      IllegalArgumentException error =
+          assertThrows(
+              IllegalArgumentException.class,
+              () -> client.embedCall(List.of("hello world", "hello ".repeat(65))));
+      assertTrue(error.getMessage().contains("64 tokens"));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> client.embedCall(java.util.Collections.nCopies(129, "hello")));
+      // No earlier short text was run: deleting weights now must make the first real load fail.
+      Files.delete(directory.resolve("model.safetensors"));
+      assertThrows(
+          ExecutionException.class,
+          () ->
+              client
+                  .embedCall(List.of("hello"))
+                  .stage()
+                  .toCompletableFuture()
+                  .get(60, TimeUnit.SECONDS));
+    }
+  }
+
+  @Test
+  void missingAndNullRolesAreValidationErrors() throws Exception {
+    try (SchedulerInferenceClient client = client(scheduler(), null)) {
+      Map<String, Object> missing = Map.of("content", "hello");
+      Map<String, Object> nullRole = new java.util.HashMap<>();
+      nullRole.put("content", "hello");
+      nullRole.put("role", null);
+      for (Map<String, Object> message : List.of(missing, nullRole)) {
+        assertThrows(
+            IllegalArgumentException.class, () -> client.chat(List.of(message), client.defaults()));
+      }
+    }
+  }
+
+  @Test
+  void constructorFailuresCloseTheOwnedSchedulerAndReleaseTheGuard() {
+    BatchGenerationScheduler first = scheduler();
+    assertThrows(
+        NullPointerException.class,
+        () ->
+            new SchedulerInferenceClient(
+                first, null, "tiny", GenerationConfig.greedyDefaults(8, Set.of()), null, null));
+    assertEquals(BatchGenerationScheduler.State.CLOSED, first.state());
+    BatchGenerationScheduler second =
+        BatchGenerationScheduler.start(
+            new BatchSchedulerConfig(1, 2, 4096, 2),
+            root -> TextGenerationModels.load(root, checkpoint("mistral")));
+    assertThrows(IllegalArgumentException.class, () -> client(second, null));
+    assertEquals(BatchGenerationScheduler.State.CLOSED, second.state());
+    try (BatchGenerationScheduler replacement = scheduler()) {
+      assertEquals(BatchGenerationScheduler.State.RUNNING, replacement.state());
+    }
+  }
+
+  @Test
+  void queuedEmbeddingCancellationSkipsNativeWork() throws Exception {
+    Path directory = encoderDirectory();
+    CountDownLatch entered = new CountDownLatch(1);
+    CountDownLatch release = new CountDownLatch(1);
+    BatchGenerationScheduler scheduler = scheduler();
+    try (SchedulerInferenceClient client = client(scheduler, directory)) {
+      scheduler.execute(
+          root -> {
+            entered.countDown();
+            if (!release.await(60, TimeUnit.SECONDS)) {
+              throw new IllegalStateException("test timed out");
+            }
+            return true;
+          });
+      assertTrue(entered.await(60, TimeUnit.SECONDS));
+      EmbeddingCall call = client.embedCall(List.of("hello world", "another sentence"));
+      call.cancel();
+      assertThrows(java.util.concurrent.CancellationException.class, call::await);
+      Files.delete(directory.resolve("model.safetensors"));
+      release.countDown();
+      // Wait through another native operation, then repair the checkpoint. A cancelled operation
+      // must not attempt the missing-weight load and poison the client's sticky load state.
+      scheduler.execute(root -> true).toCompletableFuture().get(60, TimeUnit.SECONDS);
+      Files.copy(
+          checkpoint("bert").resolve("model.safetensors"), directory.resolve("model.safetensors"));
+      assertEquals(1, client.embedCall(List.of("hello world")).await().vectors().size());
+    } finally {
+      release.countDown();
+      scheduler.close();
+    }
+  }
+
+  @Test
+  void sentenceTransformerLimitIsCheckedBeforeWorkerSubmission() throws Exception {
+    Path directory = encoderDirectory();
+    Files.createDirectory(directory.resolve("1_Pooling"));
+    Files.writeString(
+        directory.resolve("modules.json"),
+        "[{\"type\":\"sentence_transformers.models.Transformer\",\"path\":\"\"},"
+            + "{\"type\":\"sentence_transformers.models.Pooling\",\"path\":\"1_Pooling\"}]");
+    Files.writeString(
+        directory.resolve("1_Pooling/config.json"),
+        "{\"word_embedding_dimension\":16,\"pooling_mode_mean_tokens\":true}");
+    Files.writeString(directory.resolve("sentence_bert_config.json"), "{\"max_seq_length\":6}");
+    try (SchedulerInferenceClient client = client(scheduler(), directory)) {
+      IllegalArgumentException error =
+          assertThrows(
+              IllegalArgumentException.class, () -> client.embedCall(List.of("hello ".repeat(5))));
+      assertTrue(error.getMessage().contains("6 tokens"));
+      assertEquals(1, client.embedCall(List.of("hello world")).await().vectors().size());
     }
   }
 }

@@ -127,6 +127,7 @@ class JmlxAdapterTest {
     for (ChatRequestParameters options :
         List.of(
             ChatRequestParameters.builder().temperature(0.5).build(),
+            ChatRequestParameters.builder().temperature(1e-50).build(),
             ChatRequestParameters.builder().stopSequences("stop").build(),
             ChatRequestParameters.builder().modelName("other").build())) {
       assertThrows(
@@ -149,5 +150,81 @@ class JmlxAdapterTest {
     assertArrayEquals(new float[] {1, 1}, response.content().getFirst().vector());
     assertArrayEquals(new float[] {6, 1}, response.content().getLast().vector());
     assertEquals(8, response.tokenUsage().inputTokenCount());
+  }
+
+  private static void assertInterruptCancels(StubInferenceClient client, Runnable blocking)
+      throws Exception {
+    java.util.concurrent.atomic.AtomicReference<Throwable> failure =
+        new java.util.concurrent.atomic.AtomicReference<>();
+    java.util.concurrent.atomic.AtomicBoolean interrupted =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    Thread caller =
+        Thread.ofVirtual()
+            .start(
+                () -> {
+                  try {
+                    blocking.run();
+                  } catch (Throwable error) {
+                    failure.set(error);
+                    interrupted.set(Thread.currentThread().isInterrupted());
+                  }
+                });
+    try {
+      assertTrue(client.called.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      caller.interrupt();
+      caller.join(5000);
+      assertFalse(caller.isAlive());
+      assertTrue(failure.get() instanceof java.util.concurrent.CancellationException);
+      assertTrue(interrupted.get());
+      assertTrue(client.cancelled);
+    } finally {
+      caller.interrupt();
+    }
+  }
+
+  @Test
+  void interruptingBlockingChatCancelsAndPreservesInterrupt() throws Exception {
+    StubInferenceClient client = new StubInferenceClient();
+    client.pending = new CompletableFuture<>();
+    assertInterruptCancels(client, () -> new JmlxChatModel(client).chat("hello"));
+  }
+
+  @Test
+  void interruptingBlockingEmbeddingsCancelsAndPreservesInterrupt() throws Exception {
+    StubInferenceClient client = new StubInferenceClient();
+    client.embeddingPending = new CompletableFuture<>();
+    assertInterruptCancels(client, () -> new JmlxEmbeddingModel(client).embed("hello"));
+  }
+
+  @Test
+  void blockingCallsExposeTheUnderlyingFailure() {
+    StubInferenceClient client = new StubInferenceClient();
+    client.pending =
+        CompletableFuture.failedFuture(new IllegalArgumentException("invalid generation"));
+    IllegalArgumentException chatFailure =
+        assertThrows(IllegalArgumentException.class, () -> new JmlxChatModel(client).chat("hello"));
+    assertEquals("invalid generation", chatFailure.getMessage());
+    client.embeddingPending =
+        CompletableFuture.failedFuture(new IllegalArgumentException("invalid embedding"));
+    IllegalArgumentException embedFailure =
+        assertThrows(
+            IllegalArgumentException.class, () -> new JmlxEmbeddingModel(client).embed("hello"));
+    assertEquals("invalid embedding", embedFailure.getMessage());
+  }
+
+  @Test
+  void schedulerCancellationIsAnErrorForBothBlockingViews() {
+    StubInferenceClient client = new StubInferenceClient();
+    client.pending =
+        CompletableFuture.completedFuture(
+            new se.alipsa.jmlx.models.GenerationResult(
+                List.of(1),
+                List.of(),
+                se.alipsa.jmlx.models.FinishReason.CANCELLED,
+                List.of(),
+                ""));
+    assertThrows(
+        java.util.concurrent.CancellationException.class,
+        () -> new JmlxChatModel(client).chat("hello"));
   }
 }

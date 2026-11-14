@@ -13,6 +13,7 @@ import se.alipsa.jmlx.core.DType;
 import se.alipsa.jmlx.core.MLX;
 import se.alipsa.jmlx.core.MLXArray;
 import se.alipsa.jmlx.core.MLXOps;
+import se.alipsa.jmlx.core.MLXShape;
 import se.alipsa.jmlx.memory.MLXScope;
 import se.alipsa.jmlx.nn.Activation;
 import se.alipsa.jmlx.nn.AttentionMask;
@@ -339,6 +340,49 @@ final class BertModels extends Module {
     }
   }
 
+  private float[] embed(TokenizerEncoding input, Pooling policy) {
+    validate(input, policy.mode() == Pooling.Mode.CLS);
+    try (MLXScope step = scope().newChild()) {
+      MLXArray states = forward(step, input);
+      MLXArray pooled;
+      if (policy.mode() == Pooling.Mode.CLS) {
+        pooled = MLXShape.slice(states, new int[] {0, 0, 0}, new int[] {1, 1, hidden});
+      } else {
+        int length = input.ids().size();
+        MLXArray mask =
+            MLX.astype(
+                MLX.array(step, ints(input.attentionMask()), new int[] {1, length, 1}), DType.BOOL);
+        float fill = policy.mode() == Pooling.Mode.MAX ? -Float.MAX_VALUE : 0;
+        MLXArray selected =
+            MLXOps.where(mask, states, MLX.array(step, new float[] {fill}, new int[] {1, 1, 1}));
+        if (policy.mode() == Pooling.Mode.MAX) {
+          pooled = MLXOps.maxAxes(selected, new int[] {1}, false);
+        } else {
+          int count = input.attentionMask().stream().mapToInt(Integer::intValue).sum();
+          pooled =
+              MLXOps.divide(
+                  MLXOps.sum(selected, new int[] {1}, false),
+                  MLX.array(step, new float[] {count}, new int[] {1}));
+        }
+      }
+      float[] vector = pooled.toFloatArray();
+      // Retain the established double-precision Java normalization semantics, over [hidden] only.
+      if (policy.l2Normalize()) {
+        double squared = 0;
+        for (float value : vector) {
+          squared += (double) value * value;
+        }
+        if (squared > 0) {
+          double norm = Math.sqrt(squared);
+          for (int i = 0; i < vector.length; i++) {
+            vector[i] /= norm;
+          }
+        }
+      }
+      return vector;
+    }
+  }
+
   SequenceClassificationResult sequence(TokenizerEncoding input) {
     validate(input, true);
     try (MLXScope step = scope().newChild()) {
@@ -620,6 +664,16 @@ final class BertModels extends Module {
 
     public EncoderResult encode(TokenizerEncoding input, Pooling pooling) {
       return model.encode(input, pooling);
+    }
+
+    @Override
+    public float[] embed(TokenizerEncoding input) {
+      return model.embed(input, model.pooling);
+    }
+
+    @Override
+    public float[] embed(TokenizerEncoding input, Pooling pooling) {
+      return model.embed(input, pooling);
     }
   }
 

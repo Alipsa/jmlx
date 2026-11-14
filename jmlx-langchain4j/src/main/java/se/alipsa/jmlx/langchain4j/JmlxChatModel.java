@@ -20,12 +20,7 @@ public final class JmlxChatModel implements ChatModel {
     return JmlxChatMapping.response(
         client,
         client
-            .chat(
-                JmlxChatMapping.messages(request),
-                JmlxChatMapping.config(client, request),
-                delta -> {})
-            .stage()
-            .toCompletableFuture()
-            .join());
+            .chat(JmlxChatMapping.messages(request), JmlxChatMapping.config(client, request))
+            .await());
   }
 }

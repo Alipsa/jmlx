@@ -22,10 +22,7 @@ public final class JmlxEmbeddingModel implements EmbeddingModel {
   @Override
   public Response<List<Embedding>> embedAll(List<TextSegment> segments) {
     EmbeddingBatch batch =
-        client
-            .embed(segments.stream().map(TextSegment::text).toList())
-            .toCompletableFuture()
-            .join();
+        client.embedCall(segments.stream().map(TextSegment::text).toList()).await();
     return Response.from(
         batch.vectors().stream().map(Embedding::from).toList(),
         new TokenUsage(batch.inputTokens(), 0));

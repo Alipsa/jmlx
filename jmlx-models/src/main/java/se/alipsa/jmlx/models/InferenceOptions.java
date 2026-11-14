@@ -29,6 +29,10 @@ public final class InferenceOptions {
     }
     GenerationConfig base = client.defaults();
     float temp = temperature == null ? base.temperature() : temperature.floatValue();
+    if (temperature != null && temperature != 0 && temp == 0) {
+      throw new IllegalArgumentException(
+          "temperature is too small for float32; use explicit zero for greedy");
+    }
     return new GenerationConfig(
         maxTokens == null ? base.maxNewTokens() : maxTokens,
         temp == 0 ? OptionalLong.empty() : base.seed(),

@@ -469,7 +469,9 @@ public final class BatchGenerationScheduler implements AutoCloseable {
       if (waiting.size() + operations.size() >= config.maxQueuedRequests()) {
         permits.release();
         throw new BatchAdmissionRejectedException(
-            "waiting queue is full (" + config.maxQueuedRequests() + " waiting)");
+            "waiting queue is full ("
+                + config.maxQueuedRequests()
+                + " generation requests and encoder operations waiting)");
       }
       waiting.addLast(new Req(request, listener, handle, cachePolicy));
       notEmpty.signalAll();
@@ -633,17 +635,27 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     return config.admissionPermits();
   }
 
+  int maxNewTokensPerRequest() {
+    return config.maxNewTokensPerRequest();
+  }
+
   @FunctionalInterface
   interface WorkerOperation<T> {
     T run(MLXScope root) throws Exception;
   }
 
-  private record Operation<T>(WorkerOperation<T> body, CompletableFuture<T> result) {}
+  private record Operation<T>(
+      WorkerOperation<T> body, CompletableFuture<T> result, CancellationToken cancellation) {}
 
   // Package-private: only the shared inference client may schedule encoder work. Values returned
   // here must be detached Java data, never a native handle or a worker-owned scope.
   <T> CompletionStage<T> execute(WorkerOperation<T> body) {
+    return execute(body, CancellationToken.NONE);
+  }
+
+  <T> CompletionStage<T> execute(WorkerOperation<T> body, CancellationToken cancellation) {
     Objects.requireNonNull(body, "body");
+    Objects.requireNonNull(cancellation, "cancellation");
     lock.lock();
     try {
       requireAcceptingState();
@@ -652,7 +664,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
         throw new BatchAdmissionRejectedException("inference admission capacity exhausted");
       }
       CompletableFuture<T> result = new CompletableFuture<>();
-      operations.addLast(new Operation<>(body, result));
+      operations.addLast(new Operation<>(body, result, cancellation));
       notEmpty.signalAll();
       return result.minimalCompletionStage();
     } finally {
@@ -665,6 +677,9 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     Throwable failure = null;
     try {
       requireAcceptingState();
+      if (operation.cancellation().isCancelled()) {
+        throw new java.util.concurrent.CancellationException("worker operation cancelled");
+      }
       value = operation.body().run(workerRoot);
     } catch (Throwable t) {
       failure = t;
@@ -676,21 +691,26 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   }
 
   private <T> void completeOperation(Operation<T> operation, T value, Throwable failure) {
-    dispatcher.execute(
+    Runnable completion =
         () -> {
-          try {
-            if (failure == null) {
-              operation.result().complete(value);
-            } else {
-              operation.result().completeExceptionally(failure);
-            }
-          } finally {
-            permits.release();
+          // Release before publishing so a batch continuation can submit its next single-text
+          // operation without transiently exhausting its own admission permit.
+          permits.release();
+          if (failure == null) {
+            operation.result().complete(value);
+          } else {
+            operation.result().completeExceptionally(failure);
           }
-        });
+        };
+    try {
+      dispatcher.execute(completion);
+    } catch (RejectedExecutionException rejected) {
+      // Same defensive fallback as generation dispatch: never strand a future or permit.
+      completion.run();
+    }
   }
 
-  private void failOperations(Throwable failure) {
+  private void failOperations() {
     List<Operation<?>> pending;
     lock.lock();
     try {
@@ -700,7 +720,12 @@ public final class BatchGenerationScheduler implements AutoCloseable {
       lock.unlock();
     }
     for (Operation<?> operation : pending) {
-      completeOperation(operation, null, failure);
+      completeOperation(
+          operation,
+          null,
+          schedulerFailure == null
+              ? new SchedulerClosedException("scheduler is closed")
+              : new SchedulerFailedException(schedulerFailure.getCause()));
     }
   }
 
@@ -726,10 +751,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
         failWorker(t);
       }
     } finally {
-      failOperations(
-          schedulerFailure == null
-              ? new SchedulerClosedException("scheduler is closed")
-              : schedulerFailure);
+      failOperations();
       exit(model, root);
     }
     if (runtimeFailure instanceof Error e) {

@@ -4,9 +4,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
 import se.alipsa.jmlx.models.EmbeddingBatch;
+import se.alipsa.jmlx.models.EmbeddingCall;
 import se.alipsa.jmlx.models.FinishReason;
 import se.alipsa.jmlx.models.GenerationConfig;
 import se.alipsa.jmlx.models.GenerationResult;
@@ -15,7 +15,11 @@ import se.alipsa.jmlx.models.InferenceClient;
 
 final class StubInferenceClient implements InferenceClient {
   int calls;
-  boolean cancelled;
+  final java.util.concurrent.CountDownLatch called = new java.util.concurrent.CountDownLatch(1);
+  CompletableFuture<EmbeddingBatch> embeddingPending;
+  volatile boolean cancelled;
+  final java.util.concurrent.CountDownLatch cancelledSignal =
+      new java.util.concurrent.CountDownLatch(1);
   List<Map<String, Object>> messages;
   GenerationConfig policy;
   CompletableFuture<GenerationResult> pending;
@@ -25,6 +29,11 @@ final class StubInferenceClient implements InferenceClient {
   @Override
   public String modelName() {
     return "tiny";
+  }
+
+  @Override
+  public String embeddingModelName() {
+    return "tiny-bert";
   }
 
   @Override
@@ -39,15 +48,26 @@ final class StubInferenceClient implements InferenceClient {
     messages = input;
     policy = config;
     listener = delta;
+    called.countDown();
     if (failure != null) {
       throw failure;
     }
     if (pending != null) {
-      return new InferenceCall(pending, () -> cancelled = true);
+      return new InferenceCall(
+          pending,
+          () -> {
+            cancelled = true;
+            cancelledSignal.countDown();
+          });
     }
     delta.accept("h");
     delta.accept("é");
-    return new InferenceCall(CompletableFuture.completedFuture(result()), () -> cancelled = true);
+    return new InferenceCall(
+        CompletableFuture.completedFuture(result()),
+        () -> {
+          cancelled = true;
+          cancelledSignal.countDown();
+        });
   }
 
   static GenerationResult result() {
@@ -56,10 +76,19 @@ final class StubInferenceClient implements InferenceClient {
   }
 
   @Override
-  public CompletionStage<EmbeddingBatch> embed(List<String> texts) {
-    return CompletableFuture.completedFuture(
-        new EmbeddingBatch(
-            texts.stream().map(text -> new float[] {text.length(), 1}).toList(), texts.size() * 4));
+  public EmbeddingCall embedCall(List<String> texts) {
+    called.countDown();
+    return new EmbeddingCall(
+        embeddingPending == null
+            ? CompletableFuture.completedFuture(
+                new EmbeddingBatch(
+                    texts.stream().map(text -> new float[] {text.length(), 1}).toList(),
+                    texts.size() * 4))
+            : embeddingPending,
+        () -> {
+          cancelled = true;
+          cancelledSignal.countDown();
+        });
   }
 
   @Override

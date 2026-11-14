@@ -11,7 +11,7 @@ java {
 }
 
 tasks.named('jar') {
-    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.spring.ai')
+    manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.springai')
 }
 
 tasks.named('javadoc', Javadoc) {

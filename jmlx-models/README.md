@@ -385,7 +385,8 @@ contract. SchedulerInferenceClient owns one BatchGenerationScheduler,
 uses the decoder tokenizer's chat template and lazily loads a separate BERT
 encoder on that same worker. Encoder weights live in a child of the worker
 root; request scratch scopes close after each encode. Embedding inputs use
-unbounded tokenization and the model rejects overlong inputs.
+caller-side tokenization and reject every overlong text before any native
+work in the batch. The limit includes sentence-transformers max_seq_length.
 
 [jmlx-spring-ai](../jmlx-spring-ai/README.md) and
 [jmlx-langchain4j](../jmlx-langchain4j/README.md) borrow the client. Close it
@@ -407,3 +408,13 @@ Text delivery also has a client-wide admission bound equal to the scheduler's
 total admission capacity. A completed native generation keeps its delivery
 slot until its consumer finishes, so blocked callbacks cannot create an
 unbounded number of delivery threads through repeated submissions.
+
+Review hardening: embedding batches are limited to 128 texts and execute one
+forward per worker operation, with cancellation exposed by EmbeddingCall.
+Encoder load failure is sticky. BERT sentence-only embed pools natively and
+returns [hidden], while encode still returns full states. Framework blocking
+methods use interruptible waits and expose unwrapped runtime causes; cancellation
+is consistently an error. Text delivery is event-driven and blocking chat
+does not allocate a delivery thread. Never-returning callbacks retain their
+bounded slot and must cooperate with application timeouts. Sampled requests
+reuse the configured seed deliberately.

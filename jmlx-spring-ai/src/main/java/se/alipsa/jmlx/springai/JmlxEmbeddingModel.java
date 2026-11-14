@@ -31,14 +31,16 @@ public final class JmlxEmbeddingModel implements EmbeddingModel {
     if (options != null && (options.getModel() != null || options.getDimensions() != null)) {
       throw new IllegalArgumentException("embedding model and dimensions are fixed by the encoder");
     }
-    EmbeddingBatch batch = client.embed(request.getInstructions()).toCompletableFuture().join();
+    EmbeddingBatch batch = client.embedCall(request.getInstructions()).await();
     List<Embedding> results = new ArrayList<>();
     List<float[]> vectors = batch.vectors();
     for (int i = 0; i < vectors.size(); i++) {
       results.add(new Embedding(vectors.get(i), i));
     }
     return new EmbeddingResponse(
-        results, new EmbeddingResponseMetadata("", new DefaultUsage(batch.inputTokens(), 0)));
+        results,
+        new EmbeddingResponseMetadata(
+            client.embeddingModelName(), new DefaultUsage(batch.inputTokens(), 0)));
   }
 
   @Override

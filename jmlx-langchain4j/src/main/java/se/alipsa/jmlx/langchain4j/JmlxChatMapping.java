@@ -33,7 +33,8 @@ final class JmlxChatMapping {
               }
               if (message instanceof AiMessage assistant
                   && !assistant.hasToolExecutionRequests()
-                  && assistant.thinking() == null) {
+                  && assistant.thinking() == null
+                  && assistant.text() != null) {
                 return Map.<String, Object>of("role", "assistant", "content", assistant.text());
               }
               throw new IllegalArgumentException(

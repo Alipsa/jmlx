@@ -52,7 +52,7 @@ class SchedulerOperationTest {
   void closeRejectsQueuedOperationsAndCompletesEveryAcceptedStage() throws Exception {
     CountDownLatch entered = new CountDownLatch(1);
     CountDownLatch release = new CountDownLatch(1);
-    BatchGenerationScheduler scheduler = start("mistral", config(1, 1));
+    BatchGenerationScheduler scheduler = start("mistral", config(1, 2));
     try {
       final CompletionStage<Integer> active =
           scheduler.execute(
@@ -65,7 +65,8 @@ class SchedulerOperationTest {
               });
       assertTrue(entered.await(60, TimeUnit.SECONDS));
       final CompletionStage<Integer> pending = scheduler.execute(root -> 8);
-      assertThrows(BatchAdmissionRejectedException.class, () -> scheduler.execute(root -> 9));
+      final CompletionStage<Integer> other = scheduler.execute(root -> 9);
+      assertThrows(BatchAdmissionRejectedException.class, () -> scheduler.execute(root -> 10));
       Thread closer = Thread.ofVirtual().start(scheduler::close);
       try {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(60);
@@ -80,9 +81,16 @@ class SchedulerOperationTest {
       closer.join(TimeUnit.SECONDS.toMillis(60));
       assertFalse(closer.isAlive());
       assertEquals(7, active.toCompletableFuture().get(60, TimeUnit.SECONDS));
-      assertThrows(
-          java.util.concurrent.ExecutionException.class,
-          () -> pending.toCompletableFuture().get(60, TimeUnit.SECONDS));
+      var firstFailure =
+          assertThrows(
+              java.util.concurrent.ExecutionException.class,
+              () -> pending.toCompletableFuture().get(60, TimeUnit.SECONDS));
+      var otherFailure =
+          assertThrows(
+              java.util.concurrent.ExecutionException.class,
+              () -> other.toCompletableFuture().get(60, TimeUnit.SECONDS));
+      org.junit.jupiter.api.Assertions.assertNotSame(
+          firstFailure.getCause(), otherFailure.getCause());
       assertThrows(SchedulerClosedException.class, () -> scheduler.execute(root -> 10));
     } finally {
       release.countDown();

@@ -19,6 +19,8 @@ if (smokeProfile == 'pure-java') {
     }
 } else {
     dependencies {
+        implementation "se.alipsa:jmlx-spring-ai:${jmlxVersions['jmlx-spring-ai']}"
+        implementation "se.alipsa:jmlx-langchain4j:${jmlxVersions['jmlx-langchain4j']}"
         implementation "se.alipsa:jmlx-models:${jmlxVersions['jmlx-models']}"
         runtimeOnly "se.alipsa:jmlx-native-macos-arm64:${jmlxVersions['jmlx-native-macos-arm64']}"
     }
@@ -224,6 +226,8 @@ ext.smokeRegisterVerificationTasks = {
             automaticModule(jmlxJars.find { it.name.startsWith('jmlx-tokenizer-') }, 'se.alipsa.jmlx.tokenizer')
             automaticModule(jmlxJars.find { it.name.startsWith('jmlx-vision-') }, 'se.alipsa.jmlx.vision')
             if (nativeSelected) {
+                automaticModule(jmlxJars.find { it.name.startsWith('jmlx-spring-ai-') }, 'se.alipsa.jmlx.spring.ai')
+                automaticModule(jmlxJars.find { it.name.startsWith('jmlx-langchain4j-') }, 'se.alipsa.jmlx.langchain4j')
                 def nativeJar = jmlxJars.find { it.name.startsWith('jmlx-native-macos-arm64') }
                 if (nativeJar == null) throw new GradleException("jmlx-native-macos-arm64 jar not resolved")
                 def required = ['libmlxc.dylib', 'libmlx.dylib', 'libjaccl.dylib', 'mlx.metallib', 'native-pin.properties']

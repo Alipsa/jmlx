@@ -157,7 +157,9 @@ preflight_candidate() {
     done
   else
     local entry module key def override override_var expected producer
-    for entry in jmlx-models:jmlxModelsVersion:JMLX_MODELS_VERSION \
+    for entry in jmlx-spring-ai:jmlxSpringAiVersion:JMLX_SPRING_AI_VERSION \
+                 jmlx-langchain4j:jmlxLangchain4jVersion:JMLX_LANGCHAIN4J_VERSION \
+                 jmlx-models:jmlxModelsVersion:JMLX_MODELS_VERSION \
                  jmlx-native-macos-arm64:jmlxNativeVersion:JMLX_NATIVE_VERSION \
                  jmlx-core:jmlxCoreVersion:JMLX_CORE_VERSION \
                  jmlx-ffi:jmlxFfiVersion:JMLX_FFI_VERSION \
@@ -201,7 +203,7 @@ if [ "$PROFILE" = pure-java ]; then
   modules="jmlx-jinja jmlx-tokenizer jmlx-vision"
   consumer_task=":pure-java:smoke"
 else
-  modules="jmlx-jinja jmlx-tokenizer jmlx-native-macos-arm64 jmlx-ffi jmlx-core jmlx-vision jmlx-models"
+  modules="jmlx-jinja jmlx-tokenizer jmlx-native-macos-arm64 jmlx-ffi jmlx-core jmlx-vision jmlx-models jmlx-spring-ai jmlx-langchain4j"
   consumer_task=":app:smoke"
 fi
 
@@ -248,7 +250,8 @@ args+=("-PsmokeProfile=$PROFILE")
 [ "$RECORD" = true ] && args+=("-PsmokeRecord=true")
 
 # Forward any version overrides (e.g. JMLX_MODELS_VERSION) as -P properties.
-for pair in JMLX_MODELS_VERSION:jmlxModelsVersion JMLX_NATIVE_VERSION:jmlxNativeVersion \
+for pair in JMLX_SPRING_AI_VERSION:jmlxSpringAiVersion JMLX_LANGCHAIN4J_VERSION:jmlxLangchain4jVersion \
+  JMLX_MODELS_VERSION:jmlxModelsVersion JMLX_NATIVE_VERSION:jmlxNativeVersion \
   JMLX_CORE_VERSION:jmlxCoreVersion JMLX_FFI_VERSION:jmlxFfiVersion \
   JMLX_TOKENIZER_VERSION:jmlxTokenizerVersion JMLX_JINJA_VERSION:jmlxJinjaVersion \
   JMLX_VISION_VERSION:jmlxVisionVersion; do

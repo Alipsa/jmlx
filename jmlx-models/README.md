@@ -377,3 +377,33 @@ acceptance: the pinned 0.8B Tier-B (`tools/tier-b/qwen35-08b.json`, task
 [`req/phase6-tier-b-artifacts.md`](../req/phase6-tier-b-artifacts.md) and
 [`req/plans/phase7-6-plan.md`](../req/plans/phase7-6-plan.md) for the full evidence, and
 `req/phase6-golden-precision.md` for the measured maxima.
+
+## Shared framework inference
+
+InferenceClient is the framework-neutral text chat and sentence-embedding
+contract. SchedulerInferenceClient owns one BatchGenerationScheduler,
+uses the decoder tokenizer's chat template and lazily loads a separate BERT
+encoder on that same worker. Encoder weights live in a child of the worker
+root; request scratch scopes close after each encode. Embedding inputs use
+unbounded tokenization and the model rejects overlong inputs.
+
+[jmlx-spring-ai](../jmlx-spring-ai/README.md) and
+[jmlx-langchain4j](../jmlx-langchain4j/README.md) borrow the client. Close it
+once all framework consumers are done. Encoder operations share generation's
+admission permits and waiting-queue limit and run between cohorts. A worker
+operation failure fails its stage; a fatal worker error fails remaining work.
+Closing cancels queued encoder operations and releases the encoder and decoder
+scopes on their owner thread. Completion observers must return promptly and
+must not block on another request's stage.
+
+Text callbacks run on one virtual delivery thread per accepted generation,
+with a bounded 64-delta queue. Slow or throwing consumers cancel only their
+request. This preserves MLX worker ownership and keeps framework callbacks
+from blocking generation. Finish/usage mapping and input limitations are
+documented by each adapter; InferenceOptions shares the supported overrides
+with future consumers such as the Phase 9.3 server.
+
+Text delivery also has a client-wide admission bound equal to the scheduler's
+total admission capacity. A completed native generation keeps its delivery
+slot until its consumer finishes, so blocked callbacks cannot create an
+unbounded number of delivery threads through repeated submissions.

@@ -164,3 +164,20 @@ smoke repository untouched. It is a step of the Linux Java CI job.
   consumer build lost its isolation.
 - `consumer JVM must be Java 21` (pure profile): the Java 21 toolchain was not discovered — see
   the JDK requirements above.
+
+## Phase 8.3 adapter coverage
+
+The all profile now publishes/resolves nine modules, including
+jmlx-spring-ai and jmlx-langchain4j. The pure-Java profile is unchanged.
+AdapterSmoke uses both frameworks' actual chat, streaming and embedding
+interfaces from Maven jars, concurrent virtual-thread callers, incremental
+text decoding, ordered normalized BERT embeddings, streaming cancellation
+and native memory release after client close. The synthetic BERT checkpoint
+comes from the committed HF reference tree and its hand-written tokenizer is
+documented in fixtures/bert/PROVENANCE.md.
+
+The new override properties are jmlxSpringAiVersion and
+jmlxLangchain4jVersion; run.sh forwards JMLX_SPRING_AI_VERSION and
+JMLX_LANGCHAIN4J_VERSION. Both are checked by candidate preflight before side
+effects. Snapshot publication remains local to the disposable smoke repository.
+Actual Central publication and mixed-source candidate resolution remain 8.4.

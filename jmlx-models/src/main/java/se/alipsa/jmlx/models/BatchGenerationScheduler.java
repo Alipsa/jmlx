@@ -8,6 +8,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
@@ -312,6 +314,9 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition notEmpty = lock.newCondition();
   private final ArrayDeque<Req> waiting = new ArrayDeque<>();
+  private final ArrayDeque<Operation<?>> operations = new ArrayDeque<>();
+  private MLXScope workerRoot;
+
   private final AtomicReference<State> state = new AtomicReference<>(State.RUNNING);
   private final CountDownLatch ready = new CountDownLatch(1);
   private final AtomicLong forwardCalls = new AtomicLong();
@@ -461,7 +466,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     lock.lock();
     try {
       requireAcceptingState();
-      if (waiting.size() >= config.maxQueuedRequests()) {
+      if (waiting.size() + operations.size() >= config.maxQueuedRequests()) {
         permits.release();
         throw new BatchAdmissionRejectedException(
             "waiting queue is full (" + config.maxQueuedRequests() + " waiting)");
@@ -624,12 +629,88 @@ public final class BatchGenerationScheduler implements AutoCloseable {
 
   // ---------------------------------------------------------------------------------- worker
 
+  int admissionCapacity() {
+    return config.admissionPermits();
+  }
+
+  @FunctionalInterface
+  interface WorkerOperation<T> {
+    T run(MLXScope root) throws Exception;
+  }
+
+  private record Operation<T>(WorkerOperation<T> body, CompletableFuture<T> result) {}
+
+  // Package-private: only the shared inference client may schedule encoder work. Values returned
+  // here must be detached Java data, never a native handle or a worker-owned scope.
+  <T> CompletionStage<T> execute(WorkerOperation<T> body) {
+    Objects.requireNonNull(body, "body");
+    lock.lock();
+    try {
+      requireAcceptingState();
+      if (waiting.size() + operations.size() >= config.maxQueuedRequests()
+          || !permits.tryAcquire()) {
+        throw new BatchAdmissionRejectedException("inference admission capacity exhausted");
+      }
+      CompletableFuture<T> result = new CompletableFuture<>();
+      operations.addLast(new Operation<>(body, result));
+      notEmpty.signalAll();
+      return result.minimalCompletionStage();
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private <T> void runOperation(Operation<T> operation) {
+    T value = null;
+    Throwable failure = null;
+    try {
+      requireAcceptingState();
+      value = operation.body().run(workerRoot);
+    } catch (Throwable t) {
+      failure = t;
+    }
+    completeOperation(operation, value, failure);
+    if (failure instanceof Error error) {
+      throw error;
+    }
+  }
+
+  private <T> void completeOperation(Operation<T> operation, T value, Throwable failure) {
+    dispatcher.execute(
+        () -> {
+          try {
+            if (failure == null) {
+              operation.result().complete(value);
+            } else {
+              operation.result().completeExceptionally(failure);
+            }
+          } finally {
+            permits.release();
+          }
+        });
+  }
+
+  private void failOperations(Throwable failure) {
+    List<Operation<?>> pending;
+    lock.lock();
+    try {
+      pending = new ArrayList<>(operations);
+      operations.clear();
+    } finally {
+      lock.unlock();
+    }
+    for (Operation<?> operation : pending) {
+      completeOperation(operation, null, failure);
+    }
+  }
+
   private void run() {
     MLXScope root = null;
     TextGenerationModel model = null;
     Throwable runtimeFailure = null;
     try {
       root = new MLXScope();
+      workerRoot = root;
       model = factory.create(root);
       decoder = acceptModel(root, model);
       facts = decoder.batchFacts();
@@ -645,6 +726,10 @@ public final class BatchGenerationScheduler implements AutoCloseable {
         failWorker(t);
       }
     } finally {
+      failOperations(
+          schedulerFailure == null
+              ? new SchedulerClosedException("scheduler is closed")
+              : schedulerFailure);
       exit(model, root);
     }
     if (runtimeFailure instanceof Error e) {
@@ -747,9 +832,22 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     long gateDeadline = -1;
     while (true) {
       drainWaiting();
+      Operation<?> operation;
+      lock.lock();
+      try {
+        operation = operations.pollFirst();
+      } finally {
+        lock.unlock();
+      }
+      if (operation != null) {
+        runOperation(operation);
+      }
       lock.lock();
       try {
         if (waiting.isEmpty()) {
+          if (!operations.isEmpty()) {
+            continue;
+          }
           if (state.get() != State.RUNNING) {
             return null;
           }

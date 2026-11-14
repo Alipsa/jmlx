@@ -89,6 +89,8 @@ jobs:
             :jmlx-tokenizer:check \
             :jmlx-vision:check \
             :jmlx-benchmarks:check \
+            :jmlx-spring-ai:check \
+            :jmlx-langchain4j:check \
             :jmlx-core:test \
             :jmlx-models:check \
             verifyTokenizerOracle \
@@ -197,6 +199,7 @@ jobs:
                               'QuantizedKvFeasibilityProbeTest',
                               'BatchGenerationSchedulerTest', 'BatchSchedulerFailureTest',
                               'BatchSchedulerLifecycleTest', 'BatchSchedulerMemoryTest',
+                              'SchedulerOperationTest', 'SchedulerInferenceClientTest',
                               'BatchStepEquivalenceTest', 'BertGoldenTest', 'T5GoldenTest', 'Seq2SeqMemoryTest', 'Seq2SeqGenerationTest', 'EncoderDefaultPrecisionTest',
                               'ModalityRejectionTest', 'Idefics3VisionTowerSmokeTest',
                               'SmolVlmGoldenTest', 'SmolVlmGenerationTest', 'SmolVlmDefaultPrecisionTest', 'VisionLanguageMemoryTest',

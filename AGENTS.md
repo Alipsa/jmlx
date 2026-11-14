@@ -1252,3 +1252,27 @@ with the exact setup/execution/verification commands is
   results and do not claim native publication anywhere.
 - No native pins, generated bindings, publication or versions changed in this
   milestone.
+
+## Phase 8.3 additions
+
+jmlx-spring-ai (Spring AI 2.0.2) and jmlx-langchain4j (LangChain4j 1.23.0)
+are Java 25 publishable adapter modules, each on 0.1.0-SNAPSHOT. They expose
+chat, streaming and BERT sentence embeddings through the frameworks' own
+interfaces. No publication or native pin changed. Both borrow the
+jmlx-models InferenceClient; SchedulerInferenceClient owns the scheduler
+and lazily loads its encoder on the existing worker. Native operations stay
+on that worker. Encoder operations share bounded admission with generation
+and run between cohorts; framework text callbacks use a separate bounded
+delivery queue. Close the shared client once all views finish.
+
+SchedulerOperationTest and SchedulerInferenceClientTest are required native
+suites in CI. Adapter mapping/cancellation tests are pure Java. Full release
+smoke now resolves nine Maven modules and runs both adapters through public
+framework interfaces against tiny Mistral/BERT fixtures, including virtual
+threads, streaming cancellation, embedding order and native release on close.
+The pure-Java profile retains its original three-module selection.
+The two new release scripts match the existing scripts; the combined-release
+module list includes the adapters, excluded as snapshots until 8.4.
+See req/plans/phase8-3-plan.md and both adapter READMEs. The dated 8.2 scope
+amendment accepts the limited evidence deliverable for advancing development;
+it never promotes affected measurement cells to passing gates.

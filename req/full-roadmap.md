@@ -35,7 +35,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
 | 6 | Complete local text-LLM inference | none | none | delivered |
 | 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | delivered (all milestones delivered; every gate in the Phase 7 done list below passed, hosted Tier-B arm execution being out of scope of that gate per the 2026-11-04 owner amendment in `phase8-1-plan.md` WP0 — the last passing gate, the 7.6 qwen35 self-hosted Tier-B run, in run 41841745005 on 2026-11-04) |
-| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | in progress (8.1 delivered 2026-11-05: `jmlx-jinja` 0.6.1, `jmlx-tokenizer` 0.1.1 and `jmlx-vision` 0.1.1 on Central after the `.module` recovery; 8.2 measurements delivered 2026-11-13 — `req/phase8-2-benchmark.md`; 8.3 and 8.4 not started) |
+| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | in progress (8.1 delivered 2026-11-05: `jmlx-jinja` 0.6.1, `jmlx-tokenizer` 0.1.1 and `jmlx-vision` 0.1.1 on Central after the `.module` recovery; 8.2 measurements delivered 2026-11-13 — `req/phase8-2-benchmark.md`; 8.3 implemented and locally verified; hosted CI/review pending; 8.4 not started) |
 | 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record), Z-Image Base and FLUX.2 Klein Base 4B image generation (9.8, decided in its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
 | 11 | Numerical, random and specialized compute parity; audio inference (11.5, scheduled by the 7.4 decision) | 11.0 | 0.x release | not started |
@@ -374,6 +374,11 @@ published before `jmlx-models` itself.
    so that Phase 9.3's server reuses it. **Gate:** adapter-level tests pass against the
    release-smoke repository: chat, streaming and embeddings through each library's interfaces,
    with native memory released on close.
+   **Status (2026-11-14):** implemented and locally verified; hosted CI/review pending;
+   [phase8-3-plan.md](plans/phase8-3-plan.md) defines the pinned version matrix,
+   shared scheduler/encoder ownership and artifact-smoke gate.\n   [Implementation report](phase8-3-implementation-report.md). The 8.2 dated
+   scope amendment accepts the evidence deliverable with its limitations and
+   leaves the affected measurement gates unpassed.
 4. **8.4 First native release.** `jmlx-native-macos-arm64` 0.1.0, `jmlx-ffi` 0.5.0, `jmlx-core`
    0.5.0, `jmlx-models` 0.1.0 and the two adapters at 0.1.0, plus a new version of any pure-Java
    module that changed since 8.1. Run `tools/release-smoke/run.sh candidate` before publishing

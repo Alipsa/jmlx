@@ -86,16 +86,23 @@ expect "pure preflight rejects a CRLF tuple file" 2 body \
 
 # --- preflight_candidate: all profile (consumer defaults are read from the real gradle.properties) ---
 all_producers="$tmp/all-producers"
-printf 'jmlx-models=0.1.0\njmlx-native-macos-arm64=0.1.0\njmlx-core=0.5.0\njmlx-ffi=0.5.0\njmlx-tokenizer=0.1.2\njmlx-jinja=0.6.2\njmlx-vision=0.1.2\n' > "$all_producers"
+printf 'jmlx-spring-ai=0.1.0\njmlx-langchain4j=0.1.0\njmlx-models=0.1.0\njmlx-native-macos-arm64=0.1.0\njmlx-core=0.5.0\njmlx-ffi=0.5.0\njmlx-tokenizer=0.1.2\njmlx-jinja=0.6.2\njmlx-vision=0.1.2\n' > "$all_producers"
 
 expect "all preflight passes (release producers match stripped defaults)" 0 body \
   "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers'; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
 expect "all preflight passes with a matching override" 0 body \
   "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers' JMLX_CORE_VERSION=0.5.0; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
 expect "all preflight rejects a snapshot producer" 2 body \
-  "printf 'jmlx-models=0.1.0\njmlx-native-macos-arm64=0.1.0\njmlx-core=0.5.0\njmlx-ffi=0.5.0\njmlx-tokenizer=0.1.2\njmlx-jinja=0.6.2-SNAPSHOT\njmlx-vision=0.1.2\n' > '$tmp/all-snapshot.properties'; export JMLX_SMOKE_PRODUCER_VERSIONS='$tmp/all-snapshot.properties'; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
+  "printf 'jmlx-spring-ai=0.1.0\njmlx-langchain4j=0.1.0\njmlx-models=0.1.0\njmlx-native-macos-arm64=0.1.0\njmlx-core=0.5.0\njmlx-ffi=0.5.0\njmlx-tokenizer=0.1.2\njmlx-jinja=0.6.2-SNAPSHOT\njmlx-vision=0.1.2\n' > '$tmp/all-snapshot.properties'; export JMLX_SMOKE_PRODUCER_VERSIONS='$tmp/all-snapshot.properties'; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
 expect "all preflight rejects an override that moves the expectation" 2 body \
   "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers' JMLX_CORE_VERSION=0.4.0; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
+
+expect "all preflight accepts matching adapter overrides" 0 body \
+  "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers' JMLX_SPRING_AI_VERSION=0.1.0 JMLX_LANGCHAIN4J_VERSION=0.1.0; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
+expect "all preflight rejects an adapter override that moves the expectation" 2 body \
+  "export JMLX_SMOKE_PRODUCER_VERSIONS='$all_producers' JMLX_SPRING_AI_VERSION=0.2.0; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
+expect "all preflight rejects a missing adapter producer" 2 body \
+  "sed '/^jmlx-langchain4j=/d' '$all_producers' > '$tmp/no-adapter.properties'; export JMLX_SMOKE_PRODUCER_VERSIONS='$tmp/no-adapter.properties'; MODE=candidate PROFILE=all RECORD=false; preflight_candidate"
 
 # --- a failing preflight is side-effect-free: main runs the preflight immediately after argument
 # parsing, so a failing candidate run must exit 2 before the smoke repository or the consumer's

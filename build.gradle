@@ -72,7 +72,8 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
             // -SNAPSHOT versions until 8.4, so the plan excludes (and reports) them, and a
             // future native cut only needs the version lines.
             modules = [':jmlx-core', ':jmlx-ffi', ':jmlx-jinja', ':jmlx-models',
-                    ':jmlx-native-macos-arm64', ':jmlx-tokenizer', ':jmlx-vision']
+                    ':jmlx-native-macos-arm64', ':jmlx-tokenizer', ':jmlx-vision',
+                    ':jmlx-spring-ai', ':jmlx-langchain4j']
             portalFixture = rootProject.file('req/releaseAll-portal-fixture.json')
             repositoryUrl = repoUrl
             if (portalUrlOverride != null) portalUrl = portalUrlOverride

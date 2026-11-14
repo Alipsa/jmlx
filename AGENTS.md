@@ -1235,7 +1235,7 @@ with the exact setup/execution/verification commands is
 - Measured facts (M5 Max / 128 GiB / macOS 27.2, the recorded Java/Python
   runtimes; the report's rounding rules apply): the controlled
   single-prefill/127-step matched-generation ratio java/python is
-  1.1318–1.5863 over the settled dense/MoE cells plus 1.0841 for the settled
+  1.1278–1.5863 over the settled dense/MoE cells plus 1.0841 for the settled
   4-bit cell; the stock-loop comparison (1.1375–1.8516×) is a timing
   observation only — the two runtimes' greedy outputs diverge in five of nine
   stock cells and those ratios are rejected; the 4-bit/2048 cells are

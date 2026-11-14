@@ -115,54 +115,62 @@
    }
   }
  },
+ "historical_wp4_inputs": {
+   "tools/tier-b/images/phi3v-square-336x336.png": "40734e8e0fbc8fe651c65d4b789082dc8d2ca833f59b9473bb17d54ecabfc2d8",
+   "tools/tier-b/images/phi3v-wide-672x336.png": "702955febf85bce110b16120cd3a71dfd568cabbce04f29b78561a1260df7efc",
+   "tools/tier-b/images/qwen3vl-square-96x96.png": "44d78692f255c974c41c2cef5f0a6c334a74f81f458ef1093fd779784d737741",
+   "tools/tier-b/images/qwen3vl-wide-200x40.png": "61f3af15456313c9bba74cc7ecbac541449bde33685a95a50ae14ff6bd6962e7",
+   "tools/tier-b/phi3v-4b-instruct.json": "faeae7ad6288656032a549ea93b53e7a12775d0550721740db15b26e864903f1",
+   "tools/tier-b/qwen3vl-2b-instruct.json": "5ebfaf7a2130e7a8e016c260a6be20831f986579b6f1bcc532240e188f898c8a"
+ },
  "normalization": {
-  "description": "every absolute local path in the committed copies is rewritten to its form relative to the repository directory; no local username appears in the committed tree",
+  "description": "every absolute local path in the committed copies is rewritten to its form relative to the repository directory; no local username appears in the committed raw tree",
   "rules": [
    [
-    "/Users/per/project/jmlx/",
+    "/Users/<user>/project/jmlx/",
     ""
    ],
    [
-    "/Users/per/project/jmlx",
+    "/Users/<user>/project/jmlx",
     "."
    ],
    [
-    "/Users/per/wp3-scratch",
+    "/Users/<user>/wp3-scratch",
     "../../wp3-scratch"
    ],
    [
-    "/Users/per/wp4-scratch",
+    "/Users/<user>/wp4-scratch",
     "../../wp4-scratch"
    ],
    [
-    "/Users/per/jmlx-wp4-oldpin",
+    "/Users/<user>/jmlx-wp4-oldpin",
     "../../jmlx-wp4-oldpin"
    ],
    [
-    "/Users/per/.sdkman",
+    "/Users/<user>/.sdkman",
     "../../.sdkman"
    ],
    [
-    "/Users/per/.gradle",
+    "/Users/<user>/.gradle",
     "../../.gradle"
    ],
    [
-    "/Users/per/.codex",
+    "/Users/<user>/.codex",
     "../../.codex"
    ]
   ],
   "replacements": {
-   "/Users/per/project/jmlx/": 1951,
-   "/Users/per/project/jmlx": 121,
-   "/Users/per/wp3-scratch": 428,
-   "/Users/per/wp4-scratch": 67,
-   "/Users/per/jmlx-wp4-oldpin": 148,
-   "/Users/per/.sdkman": 629,
-   "/Users/per/.gradle": 587,
-   "/Users/per/.codex": 6
+   "/Users/<user>/project/jmlx/": 1951,
+   "/Users/<user>/project/jmlx": 121,
+   "/Users/<user>/wp3-scratch": 428,
+   "/Users/<user>/wp4-scratch": 67,
+   "/Users/<user>/jmlx-wp4-oldpin": 148,
+   "/Users/<user>/.sdkman": 629,
+   "/Users/<user>/.gradle": 587,
+   "/Users/<user>/.codex": 6
   },
   "invariant": "zero occurrences of the local username path prefix in every committed raw file (checked at copy time; re-checked by the raw-to-summary verifier)",
-  "retained": "/Users/ghrunner/* in raw/wp3/hostrec/a3-block/rsswatch.log (a process-table line naming the self-hosted Actions runner's own binary); that prefix is already public on origin/main (tools/qwen35-reference/evidence/), and it is a process path, not a local file reference"
+  "retained": "/Users/ghrunner/* in raw/wp3/hostrec/a3-block/rsswatch.log (103 process-table lines naming the self-hosted Actions runner's own binary); that prefix is already public on origin/main (tools/qwen35-reference/evidence/), and it is a process path, not a local file reference"
  },
  "slim_session_rule": "raw/wp3/sessions/*/session.json is the original record with each workers[] entry's requests array replaced by {n_requests, report, report_sha256}: report is the repository-relative path of the committed full worker report, and report_sha256 is that report's pre-normalization digest from the wp3 manifest. The full worker reports are committed unmodified except path normalization, so nothing measured is lost: the session metadata and summary block are byte-for-byte the original values, and every worker's requests are in the referenced report.",
  "committed_files": {

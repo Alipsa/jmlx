@@ -394,7 +394,7 @@ the measured host and settings only:
 
 - jmlx's **controlled** single-prefill/127-step generation is 1.08–1.59× the
   wall time of the `mlx_lm` Python reference (same host, same pinned MLX
-  runtime for both sides, TF32=1, primed-per-request, 128 tokens): 1.1318–1.5863
+  runtime for both sides, TF32=1, primed-per-request, 128 tokens): 1.1278–1.5863
   over the settled dense/MoE cells and 1.0841 for the settled 4-bit cell; the
   4-bit 2048-length cells are io_affected (page-cache-limited) and the
   4-bit/512 cell is unstable, so no decode-speed statement should be made for
@@ -463,8 +463,8 @@ is implemented in 8.2** (optimization is Phase 9.1):
   Tier-B input pins); the pre-normalization digests are
   `req/plans/phase8-2-wp3-raw-digests.json` (458 files) and
   `req/plans/phase8-2-wp4-raw-digests.json` (181 files). No file in the raw
-  trees contains a username or absolute local path other than one retained
-  `rsswatch.log` line naming the GitHub-hosted runner user (`ghrunner`),
+  trees contains a local username or absolute local path except 103
+  `rsswatch.log` lines naming the self-hosted Actions runner user (`ghrunner`),
   recorded in the evidence index.
 - Summary: `req/benchmarks/phase8-2/summary.json` at full double precision.
 - Verifier:

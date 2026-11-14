@@ -11,10 +11,13 @@ import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -130,9 +133,11 @@ final class Phase82SummaryVerifierTest {
     return read(repoRoot().resolve(EVIDENCE + "/evidence-index.json"));
   }
 
-  private static void assertSame(double expected, double actual, String context) {
+  private static void assertBitEqual(double expected, double actual, String context) {
     assertEquals(
-        expected, actual, 0.0, context + " (expected " + expected + ", got " + actual + ")");
+        Double.doubleToLongBits(expected),
+        Double.doubleToLongBits(actual),
+        context + " (expected " + expected + ", got " + actual + ")");
   }
 
   private static double median(List<Double> values) {
@@ -179,7 +184,7 @@ final class Phase82SummaryVerifierTest {
         published.path("max").asDouble(),
         0.0,
         context + ".max");
-    assertSame(median(values), published.path("median").asDouble(), context + ".median");
+    assertBitEqual(median(values), published.path("median").asDouble(), context + ".median");
   }
 
   // ---------------------------------------------------------------- raw tree integrity
@@ -207,9 +212,7 @@ final class Phase82SummaryVerifierTest {
             onDisk.contains(e.getKey()), part + ": index lists a missing file " + e.getKey());
         byte[] bytes = Files.readAllBytes(file);
         assertEquals(
-            e.getValue().asString(),
-            BaselineBenchmark.sha256File(file),
-            part + " digest mismatch: " + e.getKey());
+            e.getValue().asString(), sha256(bytes), part + " digest mismatch: " + e.getKey());
         for (int i = 0; i + marker.length <= bytes.length; i++) {
           boolean hit = true;
           for (int j = 0; j < marker.length; j++) {
@@ -247,6 +250,23 @@ final class Phase82SummaryVerifierTest {
     }
   }
 
+  private static String sha256(byte[] bytes) {
+    try {
+      return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("SHA-256 unavailable", e);
+    }
+  }
+
+  private static void assertFalseBoolean(JsonNode value, String context) {
+    assertTrue(value.isBoolean(), context + " must be a boolean");
+    assertFalse(value.booleanValue(), context);
+  }
+
+  private static void assertNonEmptyObject(JsonNode value, String context) {
+    assertTrue(value.isObject() && !value.isEmpty(), context + " must be a nonempty object");
+  }
+
   // ---------------------------------------------------------------- summary head
 
   @Test
@@ -257,7 +277,7 @@ final class Phase82SummaryVerifierTest {
     JsonNode code = s.path("measured_code").path("wp3");
     assertEquals(WP3_CODE_SHA, code.path("sha").asString());
     assertEquals(WP3_BRANCH, code.path("branch").asString());
-    assertFalse(code.path("dirty").asBoolean());
+    assertFalseBoolean(code.path("dirty"), "summary wp3 dirty");
     JsonNode wp4 = s.path("measured_code").path("wp4");
     assertEquals(WP4_OLD_TREE, wp4.path("old_tree").asString());
     for (Map.Entry<String, String> e : WP4_NEW_TREES.entrySet()) {
@@ -457,9 +477,9 @@ final class Phase82SummaryVerifierTest {
         }
         BaselineStatistics.Quantiles q = BaselineStatistics.quantiles(pairMeds);
         // The settled-cell quantiles are the [p10, median, p90] array (the summary's convention).
-        assertSame(q.p10(), published.get(0).asDouble(), rt + " " + m + " p10");
-        assertSame(q.median(), published.get(1).asDouble(), rt + " " + m + " median");
-        assertSame(q.p90(), published.get(2).asDouble(), rt + " " + m + " p90");
+        assertBitEqual(q.p10(), published.get(0).asDouble(), rt + " " + m + " p10");
+        assertBitEqual(q.median(), published.get(1).asDouble(), rt + " " + m + " median");
+        assertBitEqual(q.p90(), published.get(2).asDouble(), rt + " " + m + " p90");
       }
     }
     for (String m : METRICS) {
@@ -478,15 +498,37 @@ final class Phase82SummaryVerifierTest {
             values.get("python/" + m).get(i).stream().filter(Objects::nonNull).toList();
         ratios.add(median(javaPair) / median(pythonPair));
       }
-      assertSame(median(ratios), published.asDouble(), "ratio " + m);
+      assertBitEqual(median(ratios), published.asDouble(), "ratio " + m);
     }
+  }
+
+  private static void assertGrid(JsonNode first, JsonNode second, String context) {
+    Set<String> grid = new HashSet<>();
+    for (JsonNode group : new JsonNode[] {first, second}) {
+      assertTrue(group.isArray(), context + " cell group missing");
+      for (JsonNode cell : group) {
+        String caseName = cell.path("case").asString();
+        int length = cell.path("prompt_length").asInt();
+        assertTrue(List.of(CASES).contains(caseName), context + " unexpected case " + caseName);
+        assertTrue(
+            length == 32 || length == 512 || length == 2048,
+            context + " unexpected length " + length);
+        assertTrue(grid.add(caseName + "/" + length), context + " duplicate cell");
+      }
+    }
+    assertEquals(CASES.length * LENGTHS.length, grid.size(), context + " grid coverage");
   }
 
   @Test
   void wp3HeadlineCellsRecomputeFromRaw() throws URISyntaxException, IOException {
     JsonNode wp3 = summary().path("wp3_text_baseline");
-    Map<String, SessionRef> dirs = wp3SessionDirs();
     JsonNode controlled = wp3.path("controlled");
+    assertEquals(7, controlled.path("settled").size(), "controlled settled cells");
+    assertEquals(2, controlled.path("unstable").size(), "controlled unstable cells");
+    assertGrid(controlled.path("settled"), controlled.path("unstable"), "controlled");
+    assertEquals(8, wp3.path("stock").path("settled").size(), "stock settled cells");
+    assertGrid(wp3.path("stock").path("settled"), wp3.path("stock").path("blocked"), "stock");
+    Map<String, SessionRef> dirs = wp3SessionDirs();
     for (JsonNode cell : controlled.path("settled")) {
       verifySettledCell(cell, "controlled", dirs);
     }
@@ -518,8 +560,10 @@ final class Phase82SummaryVerifierTest {
             pairMeds.add(median(vals));
           }
           BaselineStatistics.Quantiles q = BaselineStatistics.quantiles(pairMeds);
-          assertSame(q.p10(), cell.path(rt).path(m).path("p10").asDouble(), rt + " " + m + " p10");
-          assertSame(q.p90(), cell.path(rt).path(m).path("p90").asDouble(), rt + " " + m + " p90");
+          assertBitEqual(
+              q.p10(), cell.path(rt).path(m).path("p10").asDouble(), rt + " " + m + " p10");
+          assertBitEqual(
+              q.p90(), cell.path(rt).path(m).path("p90").asDouble(), rt + " " + m + " p90");
         }
       }
       assertTrue(cell.path("ratio").isMissingNode(), "unstable cells carry no ratio");
@@ -549,7 +593,7 @@ final class Phase82SummaryVerifierTest {
               length);
       assertEquals(e.path("n_measured").asInt(), w.fullGeneration().size());
       assertEquals(20, w.fullGeneration().size());
-      assertSame(
+      assertBitEqual(
           median(w.fullGeneration()),
           e.path("validated_full_generation_s_median").asDouble(),
           "excluded "
@@ -557,7 +601,7 @@ final class Phase82SummaryVerifierTest {
               + " pair "
               + e.path("pair").asInt()
               + " fg median");
-      assertSame(
+      assertBitEqual(
           median(w.tps()),
           e.path("validated_streaming_decode_tps_median").asDouble(),
           "excluded tps median");
@@ -589,7 +633,7 @@ final class Phase82SummaryVerifierTest {
         List<Double> pv = m.equals("full_generation_s") ? py.fullGeneration() : py.tps();
         ratios.add(median(jv) / median(pv));
       }
-      assertSame(
+      assertBitEqual(
           median(ratios),
           cell.path("with_excluded_ratio").path(m).asDouble(),
           "with_excluded_ratio " + m);
@@ -674,11 +718,11 @@ final class Phase82SummaryVerifierTest {
       }
       assertEquals(recomputed.keySet(), publishedKeys, name + " compared-cell set");
       for (Map.Entry<String, int[]> e : recomputed.entrySet()) {
-        assertSame(
+        assertBitEqual(
             (double) e.getValue()[0],
             published.path(e.getKey()).path("identical").asDouble(),
             name + " " + e.getKey() + " identical");
-        assertSame(
+        assertBitEqual(
             (double) e.getValue()[1],
             published.path(e.getKey()).path("total").asDouble(),
             name + " " + e.getKey() + " total");
@@ -752,14 +796,15 @@ final class Phase82SummaryVerifierTest {
         residualCpu.add((t.path("request_cpu_s").asDouble() - pySum(windowCpu)) * 1000);
       }
       JsonNode pub = cell.path("tracing");
-      assertSame(
+      assertBitEqual(
           median(wall), pub.path("wall_ms").asDouble(), caseName + "/" + length + " wall_ms");
-      assertSame(median(cpu), pub.path("cpu_ms").asDouble(), caseName + "/" + length + " cpu_ms");
-      assertSame(
+      assertBitEqual(
+          median(cpu), pub.path("cpu_ms").asDouble(), caseName + "/" + length + " cpu_ms");
+      assertBitEqual(
           median(residualWall),
           pub.path("residual_wall_ms").asDouble(),
           caseName + "/" + length + " residual_wall_ms");
-      assertSame(
+      assertBitEqual(
           median(residualCpu),
           pub.path("residual_cpu_ms").asDouble(),
           caseName + "/" + length + " residual_cpu_ms");
@@ -776,7 +821,7 @@ final class Phase82SummaryVerifierTest {
             }
           }
         }
-        assertSame(
+        assertBitEqual(
             median(vals),
             pub.path(phase.getKey()).asDouble(),
             caseName + "/" + length + " " + phase.getKey());
@@ -790,7 +835,7 @@ final class Phase82SummaryVerifierTest {
             }
           }
         }
-        assertSame(
+        assertBitEqual(
             median(vals),
             pub.path("step_" + phase + "_us").asDouble(),
             caseName + "/" + length + " step_" + phase + "_us");
@@ -871,10 +916,8 @@ final class Phase82SummaryVerifierTest {
   }
 
   /**
-   * The per-shape call counts a budget's bound needs: the per-position (single step window) maximum
-   * for the step budget, the per-request maxima for the prefill and request-total budgets. The step
-   * windows are uniform across positions and requests (the count-semantics check asserts it), so
-   * the maximum is the recorded per-position count, taken over every window rather than divided.
+   * The per-shape call counts a budget's bound needs: the maximum sum across all four step phases
+   * at one request position, and the per-request maxima for prefill and request-total budgets.
    */
   private static final class ShapeCounts {
     final Map<String, Long> stepMaxPerPosition = new HashMap<>();
@@ -890,6 +933,7 @@ final class Phase82SummaryVerifierTest {
         continue;
       }
       Map<String, Long> reqPrefill = new HashMap<>();
+      Map<Long, Map<String, Long>> stepByPosition = new HashMap<>();
       Map<String, Long> reqTotal = new HashMap<>();
       for (JsonNode window : req.path("binding_counts").path("phases")) {
         String phase = window.path("phase").asString();
@@ -903,9 +947,16 @@ final class Phase82SummaryVerifierTest {
           if (phase.startsWith("prefill-")) {
             reqPrefill.merge(key, c.getValue().asLong(), Long::sum);
           } else if (position > 0 && STEP_PHASES.contains(phase)) {
-            out.stepMaxPerPosition.merge(key, c.getValue().asLong(), Math::max);
+            stepByPosition
+                .computeIfAbsent(position, ignored -> new HashMap<>())
+                .merge(key, c.getValue().asLong(), Long::sum);
           }
           reqTotal.merge(key, c.getValue().asLong(), Long::sum);
+        }
+      }
+      for (Map<String, Long> positionCounts : stepByPosition.values()) {
+        for (Map.Entry<String, Long> e : positionCounts.entrySet()) {
+          out.stepMaxPerPosition.merge(e.getKey(), e.getValue(), Long::max);
         }
       }
       for (Map.Entry<String, Long> e : reqPrefill.entrySet()) {
@@ -963,7 +1014,8 @@ final class Phase82SummaryVerifierTest {
         ObjectNode est = FfmTransitionEstimate.estimate(report, cal);
         assertEquals(20, est.path("measured_requests").asInt());
         JsonNode totals = est.path("totals");
-        assertSame(1.0, totals.path("coverage").asDouble(), caseName + "/" + length + " coverage");
+        assertBitEqual(
+            1.0, totals.path("coverage").asDouble(), caseName + "/" + length + " coverage");
         assertEquals(0, totals.path("unclassified_calls").asLong());
         assertEquals(0, est.path("uncovered").size(), caseName + "/" + length + " uncovered");
         double step = est.path("per_decode_step").path("median_ns").asDouble();
@@ -975,9 +1027,9 @@ final class Phase82SummaryVerifierTest {
           prefillMedian = prefill;
           totalMedian = total;
         } else {
-          assertSame(stepMedian, step, caseName + " per_decode_step cross-length identity");
-          assertSame(prefillMedian, prefill, caseName + " prefill cross-length identity");
-          assertSame(totalMedian, total, caseName + " request_total cross-length identity");
+          assertBitEqual(stepMedian, step, caseName + " per_decode_step cross-length identity");
+          assertBitEqual(prefillMedian, prefill, caseName + " prefill cross-length identity");
+          assertBitEqual(totalMedian, total, caseName + " request_total cross-length identity");
         }
         // The published budget medians were computed from the unrounded calibration; the committed
         // record stores per-call medians, so the recomputation must land within the per-call
@@ -1057,11 +1109,21 @@ final class Phase82SummaryVerifierTest {
     JsonNode wp4 = s.path("wp4_vlm_first_use");
     JsonNode sessions = wp4.path("sessions");
     assertEquals(2, sessions.size());
+    Set<String> sessionNames = new HashSet<>();
     for (JsonNode sess : sessions) {
       String name = sess.path("session").asString();
       assertTrue(WP4_NEW_TREES.containsKey(name), "unexpected wp4 session " + name);
+      assertTrue(sessionNames.add(name), "duplicate wp4 session " + name);
       Path base = repoRoot().resolve(RAW + "/wp4/sessions/" + name);
       JsonNode d = read(base.resolve("session-report.json"));
+      for (String field : new String[] {"schema", "utc_start", "utc_end"}) {
+        assertTrue(
+            d.path(field).isTextual() && !d.path(field).asString().isEmpty(),
+            name + " raw " + field + " missing");
+        assertTrue(
+            sess.path(field).isTextual() && !sess.path(field).asString().isEmpty(),
+            name + " summary " + field + " missing");
+      }
       assertEquals(d.path("schema").asString(), sess.path("schema").asString());
       assertEquals(d.path("utc_start").asString(), sess.path("utc_start").asString());
       assertEquals(d.path("utc_end").asString(), sess.path("utc_end").asString());
@@ -1076,18 +1138,32 @@ final class Phase82SummaryVerifierTest {
       assertEquals("0", sess.path("precision").path("value").asString(), "TF32 must be off");
       // Trees: the measured tree shas, cleanliness and the summary's transcription of them.
       assertEquals(2, d.path("trees").size());
-      String oldWorkerSha = null;
+      assertNonEmptyObject(sess.path("trees"), name + " summary trees");
+      assertEquals(2, sess.path("trees").size(), name + " summary tree count");
+      Map<String, String> workerShas = new HashMap<>();
       for (JsonNode t : d.path("trees")) {
         String treeName = t.path("name").asString();
         assertEquals(t.path("tree_sha").asString(), t.path("expected_tree_sha").asString());
-        assertFalse(t.path("tracked_dirty").asBoolean(), treeName + " tracked_dirty");
+        assertFalseBoolean(t.path("tracked_dirty"), treeName + " tracked_dirty");
         JsonNode pub = sess.path("trees").path(treeName);
         assertEquals(t.path("tree_sha").asString(), pub.path("tree_sha").asString());
         assertEquals(
             t.path("worker_source_sha256").asString(), pub.path("worker_source_sha256").asString());
+        assertTrue(pub.isObject(), name + " missing summary tree " + treeName);
         JsonNode pin = t.path("native_pin");
         JsonNode pubPin = pub.path("native_pin");
+        assertNonEmptyObject(pin, name + " raw native_pin");
+        assertNonEmptyObject(pubPin, name + " summary native_pin");
+        assertEquals(
+            Set.of("mlxMetalVersion", "mlxcCommit", "library_path"),
+            fieldNames(pin),
+            name + " native pin fields");
+        assertEquals(pin.size(), pubPin.size(), name + " native pin field count");
+        workerShas.put(treeName, t.path("worker_source_sha256").asString());
         for (Map.Entry<String, JsonNode> f : pin.properties()) {
+          assertTrue(
+              f.getValue().isTextual() && !f.getValue().asString().isEmpty(),
+              treeName + " native_pin." + f.getKey() + " missing");
           assertEquals(
               f.getValue().asString(),
               pubPin.path(f.getKey()).asString(),
@@ -1095,21 +1171,24 @@ final class Phase82SummaryVerifierTest {
         }
         if ("old".equals(treeName)) {
           assertEquals(WP4_OLD_TREE, t.path("tree_sha").asString());
-          oldWorkerSha = t.path("worker_source_sha256").asString();
         } else if ("new".equals(treeName)) {
           assertEquals(WP4_NEW_TREES.get(name), t.path("tree_sha").asString());
-          assertEquals(
-              oldWorkerSha,
-              t.path("worker_source_sha256").asString(),
-              "the worker source is identical on both pins");
         } else {
           fail("unexpected tree " + treeName);
         }
       }
+      assertEquals(Set.of("old", "new"), workerShas.keySet(), name + " tree names");
+      assertEquals(
+          workerShas.get("old"),
+          workerShas.get("new"),
+          "the worker source is identical on both pins");
+      assertEquals(2, sess.path("workloads").size(), name + " workload count");
+      Set<String> workloads = new HashSet<>();
       for (JsonNode wl : sess.path("workloads")) {
-        String workload = wl.path("workload").asString();
+        assertTrue(workloads.add(wl.path("workload").asString()), name + " duplicate workload");
         verifyWp4Workload(base, name, d, wl);
       }
+      assertEquals(Set.of("phi3v-4b", "qwen3vl-2b"), workloads, name + " workloads");
     }
   }
 
@@ -1144,11 +1223,11 @@ final class Phase82SummaryVerifierTest {
     }
     JsonNode paired = wl.path("paired");
     for (int p = 0; p < 6; p++) {
-      assertSame(
+      assertBitEqual(
           oldFull.get(p),
           paired.path("warm_full_generation_medians").path("old").get(p).asDouble(),
           "paired old median p" + p);
-      assertSame(
+      assertBitEqual(
           newFull.get(p),
           paired.path("warm_full_generation_medians").path("new").get(p).asDouble(),
           "paired new median p" + p);
@@ -1160,23 +1239,31 @@ final class Phase82SummaryVerifierTest {
       ttftRatios.add(newTtft.get(p) / oldTtft.get(p));
     }
     for (int p = 0; p < 6; p++) {
-      assertSame(
+      assertBitEqual(
           fullRatios.get(p),
           paired.path("ratio_new_over_old").path("full_generation_s").get(p).asDouble(),
           "paired full ratio p" + p);
-      assertSame(
+      assertBitEqual(
           ttftRatios.get(p),
           paired.path("ratio_new_over_old").path("ttft_s").get(p).asDouble(),
           "paired ttft ratio p" + p);
     }
-    assertSame(
+    assertBitEqual(
         median(fullRatios),
         paired.path("ratio_new_over_old").path("full_generation_s_median").asDouble(),
         "paired full ratio median");
-    assertSame(
+    assertBitEqual(
         median(ttftRatios),
         paired.path("ratio_new_over_old").path("ttft_s_median").asDouble(),
         "paired ttft ratio median");
+  }
+
+  private static Set<String> fieldNames(JsonNode object) {
+    Set<String> names = new HashSet<>();
+    for (Map.Entry<String, JsonNode> field : object.properties()) {
+      names.add(field.getKey());
+    }
+    return names;
   }
 
   private static List<Double> doubles(JsonNode array) {
@@ -1211,10 +1298,19 @@ final class Phase82SummaryVerifierTest {
       warmTtft.addAll(doubles(mt));
       warmFull.addAll(doubles(mf));
       // Correctness: the pinned reference behavior held for every measured request.
-      for (Map.Entry<String, JsonNode> c : w.path("first_request").path("correct").properties()) {
+      JsonNode correct = w.path("first_request").path("correct");
+      assertNonEmptyObject(correct, tree + " first_request.correct");
+      assertEquals(
+          Set.of("ids_match", "finish_match", "prompt_positions_match"),
+          fieldNames(correct),
+          tree + " correctness fields");
+      for (Map.Entry<String, JsonNode> c : correct.properties()) {
         assertTrue(c.getValue().asBoolean(), tree + " first_request.correct." + c.getKey());
       }
-      for (JsonNode m : w.path("measured_ids_match")) {
+      JsonNode matches = w.path("measured_ids_match");
+      assertTrue(matches.isArray(), tree + " measured_ids_match missing");
+      assertEquals(measuredPerWorker, matches.size(), tree + " measured_ids_match count");
+      for (JsonNode m : matches) {
         assertTrue(m.asBoolean(), tree + " measured_ids_match");
       }
       JsonNode div = w.path("divergences");
@@ -1231,14 +1327,16 @@ final class Phase82SummaryVerifierTest {
     JsonNode warm = published.path("warm");
     assertEquals(6 * measuredPerWorker, warm.path("n").asInt());
     BaselineStatistics.Quantiles qt = BaselineStatistics.quantiles(warmTtft);
-    assertSame(qt.p10(), warm.path("ttft_s").get(0).asDouble(), tree + " warm ttft p10");
-    assertSame(qt.median(), warm.path("ttft_s").get(1).asDouble(), tree + " warm ttft median");
-    assertSame(qt.p90(), warm.path("ttft_s").get(2).asDouble(), tree + " warm ttft p90");
+    assertBitEqual(qt.p10(), warm.path("ttft_s").get(0).asDouble(), tree + " warm ttft p10");
+    assertBitEqual(qt.median(), warm.path("ttft_s").get(1).asDouble(), tree + " warm ttft median");
+    assertBitEqual(qt.p90(), warm.path("ttft_s").get(2).asDouble(), tree + " warm ttft p90");
     BaselineStatistics.Quantiles qf = BaselineStatistics.quantiles(warmFull);
-    assertSame(qf.p10(), warm.path("full_generation_s").get(0).asDouble(), tree + " warm full p10");
-    assertSame(
+    assertBitEqual(
+        qf.p10(), warm.path("full_generation_s").get(0).asDouble(), tree + " warm full p10");
+    assertBitEqual(
         qf.median(), warm.path("full_generation_s").get(1).asDouble(), tree + " warm full median");
-    assertSame(qf.p90(), warm.path("full_generation_s").get(2).asDouble(), tree + " warm full p90");
+    assertBitEqual(
+        qf.p90(), warm.path("full_generation_s").get(2).asDouble(), tree + " warm full p90");
     for (String phase : new String[] {"after_load", "after_first", "after_final"}) {
       long minPeak = Long.MAX_VALUE;
       long maxPeak = Long.MIN_VALUE;
@@ -1278,7 +1376,7 @@ final class Phase82SummaryVerifierTest {
       assertEquals(
           BaselineBenchmark.PINNED_MANIFEST_SHA256, id.path("manifest_sha256").asString(), p);
       assertEquals(WP3_CODE_SHA, id.path("code").path("sha").asString(), p);
-      assertFalse(id.path("code").path("dirty").asBoolean(), p);
+      assertFalseBoolean(id.path("code").path("dirty"), p + " dirty");
       assertEquals(WP3_BRANCH, id.path("code").path("branch").asString(), p);
       String[] parts = p.split("/");
       String expectedPrecision =
@@ -1290,6 +1388,7 @@ final class Phase82SummaryVerifierTest {
       }
     }
     assertEquals(WP3_WORKER_COUNT, wp3Workers);
+    assertEquals(6, idx.path("historical_wp4_inputs").size(), "historical WP4 input pins");
     int wp4Workers = 0;
     for (Map.Entry<String, JsonNode> e : idx.path("committed_files").path("wp4").properties()) {
       String p = e.getKey();
@@ -1305,13 +1404,15 @@ final class Phase82SummaryVerifierTest {
       String manifestPath = inputs.path("manifest_path").asString();
       assertEquals(
           inputs.path("manifest_sha256").asString(),
-          BaselineBenchmark.sha256File(root.resolve(manifestPath)),
-          "manifest on disk vs " + p);
-      for (JsonNode img : inputs.path("images")) {
+          idx.path("historical_wp4_inputs").path(manifestPath).asString(),
+          "historical manifest pin vs " + p);
+      JsonNode images = inputs.path("images");
+      assertTrue(images.isArray() && !images.isEmpty(), "images missing in " + p);
+      for (JsonNode img : images) {
         assertEquals(
             img.path("sha256").asString(),
-            BaselineBenchmark.sha256File(root.resolve(img.path("path").asString())),
-            "image on disk vs " + p);
+            idx.path("historical_wp4_inputs").path(img.path("path").asString()).asString(),
+            "historical image pin vs " + p);
       }
       assertEquals(JAVA_VERSION, w.path("java_version").asString(), p);
       assertEquals("0", w.path("precision").path("value").asString(), p);

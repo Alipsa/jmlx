@@ -349,7 +349,7 @@ published before `jmlx-models` itself.
    above (alternating pairs per cell, per-fork host observations, quiet host):
    jmlx's controlled single-prefill/127-step generation is 1.08–1.59× the wall
    time of the Python `mlx_lm` reference's matched generation on the settled
-   cells (1.1318–1.5863 dense/MoE, 1.0841 the settled 4-bit cell); the
+   cells (1.1278–1.5863 dense/MoE, 1.0841 the settled 4-bit cell); the
    stock-loop comparison (1.1375–1.8516×) is a timing observation only, because
    the two runtimes' greedy outputs diverge in five of nine cells. The
    4-bit/2048 cells are `io_affected` (page-cache-limited), the 4-bit/512

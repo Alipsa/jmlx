@@ -2,6 +2,7 @@ package se.alipsa.jmlx.models;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static se.alipsa.jmlx.models.SchedulerFixtures.checkpoint;
@@ -426,7 +427,7 @@ class SchedulerInferenceClientTest {
         assertThrows(
             BatchAdmissionRejectedException.class,
             () -> client.embedCall(List.of("another sentence")));
-        assertTrue(!retry.stage().toCompletableFuture().isDone());
+        assertFalse(retry.stage().toCompletableFuture().isDone());
       } finally {
         finishCohort.countDown();
       }

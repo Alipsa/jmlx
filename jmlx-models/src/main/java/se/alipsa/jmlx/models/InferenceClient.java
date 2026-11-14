@@ -28,7 +28,10 @@ public interface InferenceClient extends AutoCloseable {
     return chat(messages, config, delta -> {});
   }
 
-  /** Embeds validated texts in order, with explicit cancellation of queued and remaining work. */
+  /**
+   * Embeds texts in order, with cancellation of queued and remaining work. A null list or element,
+   * invalid encoder input, or more than 128 texts is an {@link IllegalArgumentException}.
+   */
   EmbeddingCall embedCall(List<String> texts);
 
   /**

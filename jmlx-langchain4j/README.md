@@ -75,9 +75,18 @@ failures are unwrapped instead of exposed as CompletionException. Blocking
 chat does not start a streaming delivery thread.
 
 Embedding batches have a maximum of 128 texts. Larger ingestion batches must
-be split by the caller. Every text is validated, including special tokens,
+be split by the caller. Null text lists/elements are IllegalArgumentException.
+Every text is validated against vocabulary/type-ID ranges, mask and CLS
+requirements and sequence capacity, including special tokens,
 before any native work. Valid texts run as separate worker operations so
-generation can run between them. The shared client's embedCall method returns
+generation can run between them. A batch keeps one scheduler admission permit
+and queue slot until its last text finishes; continuation never reacquires
+admission. Concurrent embedding batches are capped at max(1, maxQueuedRequests / 4),
+leaving generation headroom in queues with at least four slots. Tiny queues
+may have no waiting capacity left while a batch owns their only slot.
+Embedding latency depends on generation load: a large batch can wait behind
+many generation cohorts across its texts, even though it was admitted once.
+Size ingestion jobs with that latency trade-off in mind. The shared client's embedCall method returns
 an EmbeddingCall with cancel() and interruptible await(). Cancellation skips
 queued/remaining texts but cannot interrupt a native forward already running.
 The first use loads encoder weights on the worker; that load temporarily

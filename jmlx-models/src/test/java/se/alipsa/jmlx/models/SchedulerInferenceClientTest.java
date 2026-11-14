@@ -347,4 +347,38 @@ class SchedulerInferenceClientTest {
       assertEquals(1, client.embedCall(List.of("hello world")).await().vectors().size());
     }
   }
+
+  @Test
+  void nullEmbeddingTextsAndElementsAreValidationErrors() throws Exception {
+    Path directory = encoderDirectory();
+    try (SchedulerInferenceClient client = client(scheduler(), directory)) {
+      assertThrows(IllegalArgumentException.class, () -> client.embedCall(null));
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> client.embedCall(java.util.Arrays.asList("hello", null)));
+    }
+  }
+
+  @Test
+  void invalidTokenIdsAreRejectedForTheWholeBatchOnTheCaller() throws Exception {
+    Path directory = encoderDirectory();
+    Path tokenizer = directory.resolve("tokenizer.json");
+    Files.writeString(
+        tokenizer, Files.readString(tokenizer).replace("\"hello\": 4", "\"hello\": 99"));
+    try (SchedulerInferenceClient client = client(scheduler(), directory)) {
+      assertThrows(
+          IllegalArgumentException.class,
+          () -> client.embedCall(java.util.List.of("world", "hello")));
+      // The valid first text must not have loaded/evaluated the encoder before validation failed.
+      Files.delete(directory.resolve("model.safetensors"));
+      assertThrows(
+          ExecutionException.class,
+          () ->
+              client
+                  .embedCall(List.of("world"))
+                  .stage()
+                  .toCompletableFuture()
+                  .get(60, TimeUnit.SECONDS));
+    }
+  }
 }

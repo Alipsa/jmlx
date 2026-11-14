@@ -42,30 +42,36 @@ On the local Apple Silicon host with the staged runtime and Java 25:
 - Root ./gradlew check passed, including ordinary/default-precision tests,
   float32GoldenTest, threadProbeTest, formatting, lint, provenance guards and
   publication checks.
-- SchedulerOperationTest: 3 native tests, none skipped. Verifies same-worker
+- SchedulerOperationTest: 5 native tests, none skipped. Verifies same-worker
   ownership, shared admission, exceptional completion on close, recovery from
-  an operation failure, and active-memory release after evaluated BERT use.
-- SchedulerInferenceClientTest: 10 native tests, none skipped. Covers concurrent
+  an operation failure, active-memory release after evaluated BERT use, reserved
+  batch continuation with a generation-filled queue, and cancellation between texts.
+- SchedulerInferenceClientTest: 12 native tests, none skipped. Covers concurrent
   chat/embeddings, stable repeated embedding values and scratch memory,
   throwing callbacks, bounded slow-consumer overflow, aggregate delivery
   admission, sticky encoder-load failure, overlong positional and sentence-transformers
-  inputs, invalid-constructor cleanup, missing/null roles and embedding cancellation.
-- The adapter mapping suites: 12 Spring and 9 LangChain4j pure-Java tests, none skipped. Cover
+  inputs, invalid-constructor cleanup, missing/null roles, null embedding inputs,
+  complete caller-side ID validation and embedding cancellation.
+- The adapter mapping suites: 14 Spring and 9 LangChain4j pure-Java tests, none skipped. Cover
   ordered roles, supported options, explicit rejection, Unicode streaming,
   bounded demand, interruption/cancellation, unwrapped failures, cancellation/error
-  delivery, usage and ordered embedding results.
+  delivery, independent overflow wakeups, terminal-demand timeout, usage and ordered
+  embedding results. EncoderInputSpecTest separately validates vocabulary/type IDs,
+  masks and CLS requirements without native loading.
 - tools/release-smoke/run.sh ci --profile all passed against nine locally
   published Maven modules under a fresh consumer Gradle home. POM-only and
   Gradle-metadata resolution agreed on 45 runtime components. License/NOTICE,
   JPMS names, native payload, nine sources and nine Javadoc jars passed.
   Public-interface native tests verified both frameworks' chat, incremental
   streams, ordered normalized embeddings, virtual threads, cancellation,
-  and active-memory release on client close.
+  and active-memory release on client close. More than the aggregate delivery-slot
+  count of stalled Spring subscriptions fail on overflow without another request,
+  then a fresh stream starts; a stalled terminal response times out independently.
 - The separate ./gradlew -p buildSrc check passed.
 - tools/release-smoke/selftest.sh passed, including new adapter version
   preflight checks.
 
-Ubuntu ARM64, in an isolated source copy: adapter checks and the smoke runner
+Ubuntu ARM64, in an isolated source copy: adapter checks, EncoderInputSpecTest\nand the smoke runner
 selftest passed. Gradle provisioned Java 25; no native inference is claimed
 for Linux. Existing macOS build outputs were not reused in that copy.
 No Windows-specific behavior changed or was tested.
@@ -114,4 +120,30 @@ Sampled requests intentionally reuse the configured seed; float32 temperature
 underflow is rejected. A callback that never returns still holds its delivery
 slot and result, even after native cancellation; arbitrary user code cannot be
 safely terminated. Both adapter READMEs document this requirement and the need
-to dispose subscriptions waiting indefinitely for demand.
+to dispose subscriptions promptly. Spring demand waits have a configurable timeout.
+
+## Admission and stalled-demand follow-up
+
+Embedding batches are admitted once. One permit and queue slot remain
+reserved across all text steps; continuations never reacquire capacity.
+Concurrent batches are limited to max(1, maxQueuedRequests / 4), leaving
+generation queue headroom at ordinary queue sizes. Cancellation releases the
+reservation when the worker reaches its safe boundary. Every BERT static input
+check runs before native work, and null text lists/elements are validation
+errors. Batch latency under generation load is documented: each text can wait
+behind cohorts despite the admission guarantee.
+
+Spring's failure signal wakes a blocked demand wait before the result/drain
+completes. Overflow errors therefore reach stalled subscribers and return
+their slots without a further request. Every demand wait, including terminal
+delivery, also has a configurable positive timeout, default 30 seconds.
+Arbitrary user callbacks still cannot be forcibly terminated.
+
+The follow-up regressions passed locally: a real encoder batch continues
+when generation fills the queue and generation interleaves before the last
+text; cancellation skips remaining steps and returns the batch reservation.
+Pure adapter tests cover independent overflow signaling and terminal timeout.
+Native artifact smoke overflows more subscribers than the delivery capacity
+and verifies slot reuse, plus terminal timeout. Root checks in both precision
+modes and isolated Ubuntu ARM64 caller-validation/adapter checks passed.
+The BatchSchedulerConfig Javadoc's literal backslash-n was removed.

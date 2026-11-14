@@ -418,3 +418,16 @@ is consistently an error. Text delivery is event-driven and blocking chat
 does not allocate a delivery thread. Never-returning callbacks retain their
 bounded slot and must cooperate with application timeouts. Sampled requests
 reuse the configured seed deliberately.
+
+Embedding admission is reserved once per batch. Its permit and queue slot
+remain owned while text operations yield to generation, so a full generation
+queue cannot reject a later text. Concurrent batches are capped at
+max(1, maxQueuedRequests / 4). Caller validation reuses all of BERT's native
+input checks, and null lists/elements produce IllegalArgumentException.
+Embedding latency still depends on generation load across all text operations.
+
+InferenceCall.failureSignal is independent of consumer completion and can
+wake a framework demand wait during native overflow/cancellation. Its observers
+may run on the MLX worker: they must only signal monitors and must never invoke
+or block in user code. Spring uses this signal plus a configurable demand
+timeout (30 seconds by default, including terminal delivery).

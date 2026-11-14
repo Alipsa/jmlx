@@ -8,14 +8,25 @@ import se.alipsa.jmlx.memory.MLXScope;
 public final class TextEncoderModels {
   private TextEncoderModels() {}
 
-  static int inputLimit(Path directory) throws IOException {
-    var config = JsonFiles.read(directory.resolve("config.json"));
-    int positions = config.path("max_position_embeddings").asInt();
-    int hidden = config.path("hidden_size").asInt();
-    if (positions <= 0 || hidden <= 0) {
-      throw new IllegalArgumentException("BERT requires positive position and hidden capacities");
+  record InputSpec(int vocab, int types, int positions, int limit, Pooling pooling) {
+    void validate(se.alipsa.jmlx.tokenizer.TokenizerEncoding input, Pooling override) {
+      Pooling effective = override == null ? pooling : override;
+      BertModels.validateInput(
+          input, effective.mode() == Pooling.Mode.CLS, vocab, types, positions, limit);
     }
-    return BertModels.pipeline(directory, positions, hidden).limit();
+  }
+
+  static InputSpec inputSpec(Path directory) throws IOException {
+    var config = JsonFiles.read(directory.resolve("config.json"));
+    int positions = BertModels.positive(config, "max_position_embeddings");
+    int hidden = BertModels.positive(config, "hidden_size");
+    BertModels.Pipeline pipeline = BertModels.pipeline(directory, positions, hidden);
+    return new InputSpec(
+        BertModels.positive(config, "vocab_size"),
+        BertModels.positive(config, "type_vocab_size"),
+        positions,
+        pipeline.limit(),
+        pipeline.pooling());
   }
 
   /** Loads a supported BERT artifact into a caller-owned scope. */

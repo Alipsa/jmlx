@@ -23,6 +23,7 @@ final class StubInferenceClient implements InferenceClient {
   List<Map<String, Object>> messages;
   GenerationConfig policy;
   CompletableFuture<GenerationResult> pending;
+  CompletableFuture<Throwable> earlyFailure;
   Consumer<String> listener;
   RuntimeException failure;
 
@@ -53,21 +54,22 @@ final class StubInferenceClient implements InferenceClient {
       throw failure;
     }
     if (pending != null) {
-      return new InferenceCall(
-          pending,
-          () -> {
-            cancelled = true;
-            cancelledSignal.countDown();
-          });
+      return call(pending);
     }
     delta.accept("h");
     delta.accept("é");
-    return new InferenceCall(
-        CompletableFuture.completedFuture(result()),
+    return call(CompletableFuture.completedFuture(result()));
+  }
+
+  private InferenceCall call(java.util.concurrent.CompletionStage<GenerationResult> stage) {
+    Runnable cancel =
         () -> {
           cancelled = true;
           cancelledSignal.countDown();
-        });
+        };
+    return earlyFailure == null
+        ? new InferenceCall(stage, cancel)
+        : new InferenceCall(stage, cancel, earlyFailure);
   }
 
   static GenerationResult result() {

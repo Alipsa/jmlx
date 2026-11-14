@@ -148,6 +148,7 @@ final class AdapterSmoke {
       // A later request drains through the same worker; cancellation cannot poison it.
       langchain.chat(request);
       require(callbacks.get() == 1, "callback after streaming cancellation");
+      verifyStalledSpringDemand(client);
     }
     long after = settledActive();
     require(
@@ -155,6 +156,80 @@ final class AdapterSmoke {
         "adapter close retained native bytes: before=" + before + ", after=" + after);
     System.out.println(
         "adapter smoke OK: chat, streaming, embeddings, cancellation, virtual threads and close");
+  }
+
+  private static void verifyStalledSpringDemand(SchedulerInferenceClient client) throws Exception {
+    var spring = new se.alipsa.jmlx.springai.JmlxChatModel(client, java.time.Duration.ofSeconds(5));
+    Prompt longPrompt =
+        new Prompt(
+            "the fox and the hen",
+            org.springframework.ai.chat.prompt.ChatOptions.builder().maxTokens(256).build());
+    BatchSchedulerConfig limits = BatchSchedulerConfig.defaults();
+    int attempts = limits.maxBatchSize() + limits.maxQueuedRequests() + 1;
+    for (int i = 0; i < attempts; i++) {
+      CompletableFuture<Throwable> failed = new CompletableFuture<>();
+      reactor.core.publisher.BaseSubscriber<org.springframework.ai.chat.model.ChatResponse>
+          subscriber =
+              new reactor.core.publisher.BaseSubscriber<>() {
+                @Override
+                protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
+                  request(1);
+                }
+
+                @Override
+                protected void hookOnError(Throwable error) {
+                  failed.complete(error);
+                }
+              };
+      spring.stream(longPrompt).subscribe(subscriber);
+      try {
+        Throwable failure = failed.get(5, TimeUnit.SECONDS);
+        require(
+            failure.getMessage().contains("64 queued deltas"),
+            "stalled stream did not report native overflow: " + failure);
+      } finally {
+        subscriber.dispose();
+      }
+    }
+    // A one-token request has no overflow left to wake a stalled terminal response. Its demand
+    // timeout must also return the delivery slot without requiring another request or disposal.
+    var terminalModel =
+        new se.alipsa.jmlx.springai.JmlxChatModel(client, java.time.Duration.ofMillis(150));
+    Prompt shortPrompt =
+        new Prompt(
+            "the fox and the hen",
+            org.springframework.ai.chat.prompt.ChatOptions.builder().maxTokens(1).build());
+    var reference =
+        terminalModel.stream(shortPrompt).collectList().block(java.time.Duration.ofSeconds(5));
+    require(reference != null && reference.size() > 1, "short stream has no text/terminal split");
+    CompletableFuture<Throwable> terminalFailure = new CompletableFuture<>();
+    reactor.core.publisher.BaseSubscriber<org.springframework.ai.chat.model.ChatResponse>
+        subscriber =
+            new reactor.core.publisher.BaseSubscriber<>() {
+              @Override
+              protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
+                request(reference.size() - 1);
+              }
+
+              @Override
+              protected void hookOnError(Throwable error) {
+                terminalFailure.complete(error);
+              }
+            };
+    terminalModel.stream(shortPrompt).subscribe(subscriber);
+    try {
+      require(
+          terminalFailure.get(5, TimeUnit.SECONDS).getMessage().contains("demand timed out"),
+          "stalled terminal did not time out");
+    } finally {
+      subscriber.dispose();
+    }
+    require(
+        spring.stream(new Prompt("the fox and the hen"))
+                .collectList()
+                .block(java.time.Duration.ofSeconds(5))
+            != null,
+        "stalled consumers leaked delivery slots");
   }
 
   private static long settledActive() throws InterruptedException {

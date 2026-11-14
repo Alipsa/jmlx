@@ -40,9 +40,8 @@ public final class SchedulerInferenceClient implements InferenceClient {
   private final Path encoderDirectory;
   private final Pooling pooling;
   private final Semaphore deliveries;
-  private final Semaphore embeddingBatches;
   private final HfTokenizer encoderTokenizer;
-  private final int encoderLimit;
+  private final TextEncoderModels.InputSpec encoderSpec;
   // The model is accessed only by the scheduler worker; the sticky load failure is also
   // checked by callers so another failed load never blocks generation.
   private TextEncoderModel encoder;
@@ -77,10 +76,9 @@ public final class SchedulerInferenceClient implements InferenceClient {
       this.pooling = pooling;
       this.encoderTokenizer =
           encoderDirectory == null ? null : HfTokenizer.fromDirectory(encoderDirectory);
-      this.encoderLimit =
-          encoderDirectory == null ? 0 : TextEncoderModels.inputLimit(encoderDirectory);
+      this.encoderSpec =
+          encoderDirectory == null ? null : TextEncoderModels.inputSpec(encoderDirectory);
       this.deliveries = new Semaphore(scheduler.admissionCapacity());
-      this.embeddingBatches = new Semaphore(scheduler.admissionCapacity());
     } catch (IOException failure) {
       scheduler.close();
       throw new UncheckedIOException("cannot configure sentence encoder", failure);
@@ -152,13 +150,19 @@ public final class SchedulerInferenceClient implements InferenceClient {
     delivery.attach(handle);
     handle.stage().whenComplete(delivery::complete);
     Thread.ofVirtual().name("jmlx-text-delivery").start(delivery::drain);
-    return new InferenceCall(delivery.result.minimalCompletionStage(), delivery::cancel);
+    return new InferenceCall(
+        delivery.result.minimalCompletionStage(),
+        delivery::cancel,
+        delivery.failureSignal.minimalCompletionStage());
   }
 
   @Override
   public EmbeddingCall embedCall(List<String> texts) {
     if (encoderDirectory == null) {
       throw new IllegalStateException("no sentence encoder directory was configured");
+    }
+    if (texts == null || texts.stream().anyMatch(Objects::isNull)) {
+      throw new IllegalArgumentException("embedding texts and their elements must not be null");
     }
     List<String> inputs = List.copyOf(texts);
     if (inputs.size() > MAX_EMBEDDING_TEXTS) {
@@ -174,49 +178,33 @@ public final class SchedulerInferenceClient implements InferenceClient {
     int tokenCount = 0;
     for (String text : inputs) {
       TokenizerEncoding input = encoderTokenizer.encode(text, EncodingOptions.unbounded(true));
-      if (input.ids().size() > encoderLimit) {
+      if (input.ids().size() > encoderSpec.limit()) {
         throw new IllegalArgumentException(
-            "embedding text exceeds encoder capacity of " + encoderLimit + " tokens");
+            "embedding text exceeds encoder capacity of " + encoderSpec.limit() + " tokens");
       }
+      encoderSpec.validate(input, pooling);
       encoded.add(input);
       tokenCount = Math.addExact(tokenCount, input.ids().size());
     }
-    if (!embeddingBatches.tryAcquire()) {
-      throw new BatchAdmissionRejectedException("embedding batch capacity exhausted");
-    }
     AtomicBoolean cancelled = new AtomicBoolean();
     CompletableFuture<EmbeddingBatch> result = new CompletableFuture<>();
+    List<BatchGenerationScheduler.WorkerOperation<float[]>> steps = new ArrayList<>();
+    for (TokenizerEncoding input : encoded) {
+      steps.add(
+          root -> {
+            loadEncoder(root);
+            return pooling == null ? encoder.embed(input) : encoder.embed(input, pooling);
+          });
+    }
     int tokens = tokenCount;
-    Thread.ofVirtual()
-        .name("jmlx-embedding-batch")
-        .start(
-            () -> {
-              try {
-                List<float[]> vectors = new ArrayList<>();
-                for (TokenizerEncoding input : encoded) {
-                  if (cancelled.get()) {
-                    throw new CancellationException("embedding batch cancelled");
-                  }
-                  vectors.add(
-                      InferenceAwait.await(
-                          scheduler.execute(
-                              root -> {
-                                loadEncoder(root);
-                                return pooling == null
-                                    ? encoder.embed(input)
-                                    : encoder.embed(input, pooling);
-                              },
-                              cancelled::get),
-                          () -> cancelled.set(true)));
-                }
-                if (cancelled.get()) {
-                  throw new CancellationException("embedding batch cancelled");
-                }
+    scheduler
+        .executeSequence(steps, cancelled::get)
+        .whenComplete(
+            (vectors, failure) -> {
+              if (failure == null) {
                 result.complete(new EmbeddingBatch(vectors, tokens));
-              } catch (Throwable failure) {
+              } else {
                 result.completeExceptionally(unwrap(failure));
-              } finally {
-                embeddingBatches.release();
               }
             });
     return new EmbeddingCall(
@@ -271,6 +259,7 @@ public final class SchedulerInferenceClient implements InferenceClient {
     private final ArrayDeque<String> deltas = new ArrayDeque<>();
     private final AtomicReference<BatchRequestHandle> handle = new AtomicReference<>();
     private final CompletableFuture<GenerationResult> result = new CompletableFuture<>();
+    private final CompletableFuture<Throwable> failureSignal = new CompletableFuture<>();
     private final Consumer<String> consumer;
     private final Runnable finished;
     private boolean cancelled;
@@ -311,27 +300,44 @@ public final class SchedulerInferenceClient implements InferenceClient {
       }
     }
 
-    synchronized void complete(GenerationResult value, Throwable failure) {
-      sourceValue = value;
-      if (sourceFailure == null) {
-        sourceFailure = failure;
+    void complete(GenerationResult value, Throwable failure) {
+      Throwable aborted = failure == null ? null : unwrap(failure);
+      if (aborted == null && value != null && value.finishReason() == FinishReason.CANCELLED) {
+        aborted = new CancellationException("generation cancelled");
       }
-      sourceDone = true;
-      notifyAll();
+      synchronized (this) {
+        sourceValue = value;
+        if (sourceFailure == null) {
+          sourceFailure = aborted;
+        }
+        if (aborted != null) {
+          cancelled = true;
+        }
+        sourceDone = true;
+        notifyAll();
+      }
+      if (aborted != null) {
+        failureSignal.complete(aborted);
+      }
     }
 
     void cancel() {
+      Throwable failure;
       synchronized (this) {
         cancelled = true;
         if (sourceFailure == null) {
           sourceFailure = new CancellationException("generation cancelled");
         }
+        failure = sourceFailure;
         notifyAll();
       }
       BatchRequestHandle current = handle.get();
       if (current != null) {
         current.cancel();
       }
+      // Independent of the drain/result: a framework demand wait must wake even while its
+      // consumer callback is blocked. Observers may only signal their own monitors here.
+      failureSignal.complete(failure);
     }
 
     void drain() {

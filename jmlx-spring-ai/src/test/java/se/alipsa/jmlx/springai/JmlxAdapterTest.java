@@ -274,4 +274,101 @@ class JmlxAdapterTest {
         java.util.concurrent.CancellationException.class,
         () -> new JmlxChatModel(client).stream(new Prompt("hello")).collectList().block());
   }
+
+  @Test
+  void overflowSignalWakesDemandWithoutAnotherRequest() throws Exception {
+    StubInferenceClient client = new StubInferenceClient();
+    client.pending = new CompletableFuture<>();
+    client.earlyFailure = new CompletableFuture<>();
+    CompletableFuture<Throwable> error = new CompletableFuture<>();
+    java.util.concurrent.CountDownLatch first = new java.util.concurrent.CountDownLatch(1);
+    reactor.core.publisher.BaseSubscriber<org.springframework.ai.chat.model.ChatResponse>
+        subscriber =
+            new reactor.core.publisher.BaseSubscriber<>() {
+              @Override
+              protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
+                request(1);
+              }
+
+              @Override
+              protected void hookOnNext(org.springframework.ai.chat.model.ChatResponse value) {
+                first.countDown();
+              }
+
+              @Override
+              protected void hookOnError(Throwable failure) {
+                error.complete(failure);
+              }
+            };
+    new JmlxChatModel(client, java.time.Duration.ofSeconds(10))
+        .stream(new Prompt("hello")).subscribe(subscriber);
+    Thread producer = null;
+    try {
+      assertTrue(client.called.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      producer =
+          Thread.ofVirtual()
+              .start(
+                  () -> {
+                    try {
+                      client.listener.accept("h");
+                      client.listener.accept("blocked");
+                      client.pending.complete(StubInferenceClient.result());
+                    } catch (Throwable failure) {
+                      client.pending.completeExceptionally(failure);
+                    }
+                  });
+      assertTrue(first.await(5, java.util.concurrent.TimeUnit.SECONDS));
+      client.earlyFailure.complete(
+          new IllegalStateException("stream consumer exceeded 64 queued deltas"));
+      assertTrue(
+          error
+              .get(5, java.util.concurrent.TimeUnit.SECONDS)
+              .getMessage()
+              .contains("64 queued deltas"));
+      assertTrue(client.cancelledSignal.await(5, java.util.concurrent.TimeUnit.SECONDS));
+    } finally {
+      subscriber.dispose();
+      if (producer != null) {
+        producer.join(5000);
+      }
+    }
+  }
+
+  @Test
+  void stalledTerminalDemandTimesOutWithoutAnotherRequest() throws Exception {
+    StubInferenceClient client = new StubInferenceClient();
+    CompletableFuture<Throwable> error = new CompletableFuture<>();
+    java.util.List<String> chunks = new java.util.concurrent.CopyOnWriteArrayList<>();
+    reactor.core.publisher.BaseSubscriber<org.springframework.ai.chat.model.ChatResponse>
+        subscriber =
+            new reactor.core.publisher.BaseSubscriber<>() {
+              @Override
+              protected void hookOnSubscribe(org.reactivestreams.Subscription subscription) {
+                request(2);
+              }
+
+              @Override
+              protected void hookOnNext(org.springframework.ai.chat.model.ChatResponse value) {
+                chunks.add(value.getResult().getOutput().getText());
+              }
+
+              @Override
+              protected void hookOnError(Throwable failure) {
+                error.complete(failure);
+              }
+            };
+    new JmlxChatModel(client, java.time.Duration.ofMillis(150))
+        .stream(new Prompt("hello")).subscribe(subscriber);
+    try {
+      assertTrue(
+          error
+              .get(5, java.util.concurrent.TimeUnit.SECONDS)
+              .getMessage()
+              .contains("demand timed out"));
+      assertEquals(List.of("h", "é"), chunks);
+      assertTrue(client.cancelledSignal.await(5, java.util.concurrent.TimeUnit.SECONDS));
+    } finally {
+      subscriber.dispose();
+    }
+  }
 }

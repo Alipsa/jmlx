@@ -1298,3 +1298,17 @@ cancellation and interruptible await; encoder load failure is sticky. BERT's sen
 path pools natively and reads back [hidden], retaining the original full-state API and its
 references. Constructor failures close the transferred scheduler, including its guard.
 Both adapter READMEs state that sampled requests reuse the configured seed.
+
+Phase 8.3 follow-up: embedding sequences reserve one admission permit and queue slot
+through the whole batch; continuations requeue without readmission. Concurrent batches
+are capped at max(1, maxQueuedRequests / 4), leaving generation headroom for ordinary
+queue sizes. EncoderInputSpecTest covers pure-Java validation using BERT's full static
+input checks; null embedding texts/lists are IllegalArgumentException.
+
+Spring demand waits wake on InferenceCall.failureSignal independently of the blocked
+delivery callback. Observers of that signal may run on the MLX worker and must only
+signal monitors. Every Spring demand wait, including the terminal response, has a
+configurable 30-second default timeout. Artifact smoke repeatedly overflows more
+stalled subscribers than the delivery-slot count, then verifies a new stream works;
+it also checks terminal-demand timeout. Large embedding batches may wait behind many
+generation cohorts, so ingestion latency depends on generation load.

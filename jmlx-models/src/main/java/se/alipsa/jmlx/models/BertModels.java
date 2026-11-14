@@ -606,7 +606,7 @@ final class BertModels extends Module {
     return config.has("id2label") ? config.path("id2label").size() : 2;
   }
 
-  private static int positive(JsonNode config, String key) {
+  static int positive(JsonNode config, String key) {
     JsonNode value = config.path(key);
     if (!value.isIntegralNumber() || !value.canConvertToInt() || value.intValue() <= 0) {
       throw new IllegalArgumentException("BERT " + key + " must be a positive integer");

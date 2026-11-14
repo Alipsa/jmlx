@@ -128,4 +128,128 @@ class SchedulerOperationTest {
     }
     assertEquals(before, MLXMemory.activeBytes());
   }
+
+  @Test
+  void embeddingBatchRetainsAdmissionWhenGenerationFillsTheQueue() throws Exception {
+    CountDownLatch firstText = new CountDownLatch(1);
+    CountDownLatch continueBatch = new CountDownLatch(1);
+    java.util.List<String> trace = new java.util.concurrent.CopyOnWriteArrayList<>();
+    AtomicReference<TextEncoderModel> encoder = new AtomicReference<>();
+    var tokenizer =
+        se.alipsa.jmlx.tokenizer.HfTokenizer.fromDirectory(
+            java.nio.file.Path.of(
+                System.getProperty("jmlx.repository.root"),
+                "tools",
+                "release-smoke",
+                "fixtures",
+                "bert"));
+    var input =
+        tokenizer.encode("hello world", se.alipsa.jmlx.tokenizer.EncodingOptions.unbounded(true));
+    BatchGenerationScheduler scheduler = start("mistral", config(1, 4));
+    try {
+      final var batch =
+          scheduler.<float[]>executeSequence(
+              java.util.List.of(
+                  root -> {
+                    encoder.set(TextEncoderModels.load(root.newChild(), checkpoint("bert")));
+                    final float[] vector = encoder.get().embed(input);
+                    trace.add("embedding 0");
+                    firstText.countDown();
+                    if (!continueBatch.await(60, TimeUnit.SECONDS)) {
+                      throw new IllegalStateException("test timed out");
+                    }
+                    return vector;
+                  },
+                  root -> {
+                    trace.add("embedding 1");
+                    return encoder.get().embed(input);
+                  },
+                  root -> {
+                    trace.add("embedding 2");
+                    return encoder.get().embed(input);
+                  }),
+              CancellationToken.NONE);
+      assertTrue(firstText.await(60, TimeUnit.SECONDS));
+      // One batch is the configured encoder share (one quarter of four queue slots).
+      assertThrows(
+          BatchAdmissionRejectedException.class,
+          () -> scheduler.executeSequence(java.util.List.of(root -> true), CancellationToken.NONE));
+      java.util.List<BatchRequestHandle> generation = new java.util.ArrayList<>();
+      for (int i = 0; i < 3; i++) {
+        generation.add(
+            scheduler.submit(
+                greedy(new int[] {1, 3}, 1),
+                event -> {
+                  if (event.tokenId() != null) {
+                    trace.add("generation");
+                  }
+                }));
+      }
+      assertThrows(
+          BatchAdmissionRejectedException.class,
+          () -> scheduler.submit(greedy(new int[] {1, 3}, 1), event -> {}));
+      continueBatch.countDown();
+      var vectors = batch.toCompletableFuture().get(60, TimeUnit.SECONDS);
+      assertEquals(3, vectors.size());
+      org.junit.jupiter.api.Assertions.assertArrayEquals(vectors.get(0), vectors.get(2));
+      assertTrue(trace.indexOf("generation") < trace.indexOf("embedding 2"), trace.toString());
+      for (BatchRequestHandle handle : generation) {
+        await(handle);
+      }
+      // The single reservation was returned at completion; another batch can start immediately.
+      assertEquals(
+          java.util.List.of(42),
+          scheduler
+              .executeSequence(java.util.List.of(root -> 42), CancellationToken.NONE)
+              .toCompletableFuture()
+              .get(60, TimeUnit.SECONDS));
+    } finally {
+      continueBatch.countDown();
+      scheduler.close();
+    }
+  }
+
+  @Test
+  void cancellingRunningSequenceSkipsRemainingTextsAndReturnsItsReservation() throws Exception {
+    CountDownLatch started = new CountDownLatch(1);
+    CountDownLatch finish = new CountDownLatch(1);
+    java.util.concurrent.atomic.AtomicBoolean cancelled =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    java.util.concurrent.atomic.AtomicBoolean laterText =
+        new java.util.concurrent.atomic.AtomicBoolean();
+    BatchGenerationScheduler scheduler = start("mistral", config(1, 4));
+    try {
+      final var batch =
+          scheduler.executeSequence(
+              java.util.List.of(
+                  root -> {
+                    started.countDown();
+                    if (!finish.await(60, TimeUnit.SECONDS)) {
+                      throw new IllegalStateException("test timed out");
+                    }
+                    return 1;
+                  },
+                  root -> {
+                    laterText.set(true);
+                    return 2;
+                  }),
+              cancelled::get);
+      assertTrue(started.await(60, TimeUnit.SECONDS));
+      cancelled.set(true);
+      finish.countDown();
+      assertThrows(
+          java.util.concurrent.ExecutionException.class,
+          () -> batch.toCompletableFuture().get(60, TimeUnit.SECONDS));
+      assertFalse(laterText.get());
+      assertEquals(
+          java.util.List.of(7),
+          scheduler
+              .executeSequence(java.util.List.of(root -> 7), CancellationToken.NONE)
+              .toCompletableFuture()
+              .get(60, TimeUnit.SECONDS));
+    } finally {
+      finish.countDown();
+      scheduler.close();
+    }
+  }
 }

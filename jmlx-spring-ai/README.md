@@ -57,9 +57,13 @@ in both blocking and streaming calls, rather than a success with partial text. U
 and generated IDs, including a retained EOS. Cancellation signals the native
 request at a safe boundary. Deltas are delivered serially off the MLX worker,
 with a bounded 64-delta queue; a consumer that falls behind fails and cancels
-its generation. The delivery thread waits for downstream demand, so bounded-demand consumers
-do not fail at zero demand or accumulate an unbounded Reactor buffer. Dispose
-of unused subscriptions, including ones waiting for terminal demand.
+its generation. The delivery thread waits for downstream demand without an
+unbounded Reactor buffer. An independent failure signal wakes that wait on
+overflow or cancellation, so no further downstream request is needed to fail
+the stream and return its slot. Each demand wait, including for the terminal
+response, has a 30-second timeout by default. Configure another positive timeout
+with new JmlxChatModel(client, Duration). Timeout signals an error, disposes the
+subscription and cancels native work. Dispose unused subscriptions promptly.
 
 Run ./gradlew :jmlx-spring-ai:check to verify mapping and stream lifecycle
 without native code. tools/release-smoke/run.sh ci --profile all additionally
@@ -78,9 +82,18 @@ failures are unwrapped instead of exposed as CompletionException. Blocking
 chat does not start a streaming delivery thread.
 
 Embedding batches have a maximum of 128 texts. Larger ingestion batches must
-be split by the caller. Every text is validated, including special tokens,
+be split by the caller. Null text lists/elements are IllegalArgumentException.
+Every text is validated against vocabulary/type-ID ranges, mask and CLS
+requirements and sequence capacity, including special tokens,
 before any native work. Valid texts run as separate worker operations so
-generation can run between them. The shared client's embedCall method returns
+generation can run between them. A batch keeps one scheduler admission permit
+and queue slot until its last text finishes; continuation never reacquires
+admission. Concurrent embedding batches are capped at max(1, maxQueuedRequests / 4),
+leaving generation headroom in queues with at least four slots. Tiny queues
+may have no waiting capacity left while a batch owns their only slot.
+Embedding latency depends on generation load: a large batch can wait behind
+many generation cohorts across its texts, even though it was admitted once.
+Size ingestion jobs with that latency trade-off in mind. The shared client's embedCall method returns
 an EmbeddingCall with cancel() and interruptible await(). Cancellation skips
 queued/remaining texts but cannot interrupt a native forward already running.
 The first use loads encoder weights on the worker; that load temporarily
@@ -97,8 +110,9 @@ prompts and policies therefore produce repeatable samples. A positive
 temperature too small to represent as float32 is rejected; use explicit zero
 to select greedy generation.
 
-Callbacks must return. A callback that ignores application timeouts and never
-returns keeps its delivery thread, result and admission slot even after
+Arbitrary user callbacks must return. Spring's own downstream-demand wait is
+bounded and wakes on native failure; it cannot safely terminate user code
+that blocks inside an onNext/onError callback. Such a callback keeps its delivery thread, result and admission slot even after
 overflow cancels native generation. Java cannot safely stop arbitrary user
 code; enough permanently blocked consumers exhaust the bounded delivery
 capacity. Dispose subscriptions and make callbacks cooperate with timeouts.

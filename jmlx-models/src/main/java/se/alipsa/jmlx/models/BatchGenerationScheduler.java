@@ -311,6 +311,8 @@ public final class BatchGenerationScheduler implements AutoCloseable {
   private final Dispatcher dispatcher;
   private final Thread worker;
   private final Semaphore permits;
+  private final Semaphore sequencePermits;
+  private int reservedSequenceSlots;
   private final ReentrantLock lock = new ReentrantLock();
   private final Condition notEmpty = lock.newCondition();
   private final ArrayDeque<Req> waiting = new ArrayDeque<>();
@@ -333,6 +335,7 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     this.factory = factory;
     this.hooks = hooks;
     this.permits = new Semaphore(config.admissionPermits());
+    this.sequencePermits = new Semaphore(Math.max(1, config.maxQueuedRequests() / 4));
     this.dispatcher = new Dispatcher(config.admissionPermits());
     this.worker = new SchedulerThread(this, this::run, "jmlx-batch-worker");
   }
@@ -466,12 +469,12 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     lock.lock();
     try {
       requireAcceptingState();
-      if (waiting.size() + operations.size() >= config.maxQueuedRequests()) {
+      if (occupiedWaitingSlots() >= config.maxQueuedRequests()) {
         permits.release();
         throw new BatchAdmissionRejectedException(
-            "waiting queue is full ("
+            "waiting capacity is full ("
                 + config.maxQueuedRequests()
-                + " generation requests and encoder operations waiting)");
+                + " slots, including reserved embedding batches)");
       }
       waiting.addLast(new Req(request, listener, handle, cachePolicy));
       notEmpty.signalAll();
@@ -644,68 +647,139 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     T run(MLXScope root) throws Exception;
   }
 
-  private record Operation<T>(
-      WorkerOperation<T> body, CompletableFuture<T> result, CancellationToken cancellation) {}
+  private static final class Operation<T> {
+    final List<WorkerOperation<T>> steps;
+    final CompletableFuture<List<T>> result = new CompletableFuture<>();
+    final CancellationToken cancellation;
+    final boolean reserved;
+    final List<T> values = new ArrayList<>();
+    int nextStep;
 
-  // Package-private: only the shared inference client may schedule encoder work. Values returned
-  // here must be detached Java data, never a native handle or a worker-owned scope.
+    Operation(List<WorkerOperation<T>> steps, CancellationToken cancellation, boolean reserved) {
+      this.steps = steps;
+      this.cancellation = cancellation;
+      this.reserved = reserved;
+    }
+  }
+
+  // Called under the admission lock. A sequence holds its slot while running or queued.
+  private int occupiedWaitingSlots() {
+    int slots = waiting.size() + reservedSequenceSlots;
+    for (Operation<?> operation : operations) {
+      if (!operation.reserved) {
+        slots++;
+      }
+    }
+    return slots;
+  }
+
+  // Package-private: only detached Java data may leave these worker operations.
   <T> CompletionStage<T> execute(WorkerOperation<T> body) {
     return execute(body, CancellationToken.NONE);
   }
 
   <T> CompletionStage<T> execute(WorkerOperation<T> body, CancellationToken cancellation) {
-    Objects.requireNonNull(body, "body");
+    return executeSteps(List.of(Objects.requireNonNull(body, "body")), cancellation, false)
+        .thenApply(values -> values.getFirst());
+  }
+
+  // A batch is admitted once and retains its permit/queue slot across all text forwards.
+  <T> CompletionStage<List<T>> executeSequence(
+      List<WorkerOperation<T>> steps, CancellationToken cancellation) {
+    return executeSteps(List.copyOf(steps), cancellation, true);
+  }
+
+  private <T> CompletionStage<List<T>> executeSteps(
+      List<WorkerOperation<T>> steps, CancellationToken cancellation, boolean reserved) {
     Objects.requireNonNull(cancellation, "cancellation");
     lock.lock();
     try {
       requireAcceptingState();
-      if (waiting.size() + operations.size() >= config.maxQueuedRequests()
-          || !permits.tryAcquire()) {
+      if (steps.isEmpty()) {
+        return CompletableFuture.<List<T>>completedFuture(List.of()).minimalCompletionStage();
+      }
+      if (occupiedWaitingSlots() >= config.maxQueuedRequests()) {
+        throw new BatchAdmissionRejectedException("inference waiting capacity exhausted");
+      }
+      if (reserved && !sequencePermits.tryAcquire()) {
+        throw new BatchAdmissionRejectedException("embedding batch capacity exhausted");
+      }
+      if (!permits.tryAcquire()) {
+        if (reserved) {
+          sequencePermits.release();
+        }
         throw new BatchAdmissionRejectedException("inference admission capacity exhausted");
       }
-      CompletableFuture<T> result = new CompletableFuture<>();
-      operations.addLast(new Operation<>(body, result, cancellation));
+      Operation<T> operation = new Operation<>(steps, cancellation, reserved);
+      if (reserved) {
+        reservedSequenceSlots++;
+      }
+      operations.addLast(operation);
       notEmpty.signalAll();
-      return result.minimalCompletionStage();
+      return operation.result.minimalCompletionStage();
     } finally {
       lock.unlock();
     }
   }
 
   private <T> void runOperation(Operation<T> operation) {
-    T value = null;
     Throwable failure = null;
     try {
       requireAcceptingState();
-      if (operation.cancellation().isCancelled()) {
+      if (operation.cancellation.isCancelled()) {
         throw new java.util.concurrent.CancellationException("worker operation cancelled");
       }
-      value = operation.body().run(workerRoot);
+      operation.values.add(operation.steps.get(operation.nextStep++).run(workerRoot));
+      if (operation.cancellation.isCancelled()) {
+        throw new java.util.concurrent.CancellationException("worker operation cancelled");
+      }
+      if (operation.nextStep < operation.steps.size()) {
+        lock.lock();
+        try {
+          requireAcceptingState();
+          // Requeue without readmission; reservation and permit remain owned by this batch.
+          operations.addLast(operation);
+          notEmpty.signalAll();
+          return;
+        } finally {
+          lock.unlock();
+        }
+      }
     } catch (Throwable t) {
       failure = t;
     }
-    completeOperation(operation, value, failure);
+    completeOperation(operation, failure);
     if (failure instanceof Error error) {
       throw error;
     }
   }
 
-  private <T> void completeOperation(Operation<T> operation, T value, Throwable failure) {
+  private <T> void completeOperation(Operation<T> operation, Throwable failure) {
     Runnable completion =
         () -> {
-          // Release before publishing so a batch continuation can submit its next single-text
-          // operation without transiently exhausting its own admission permit.
-          permits.release();
+          // All steps have finished. Release the one batch reservation before publishing the
+          // result;
+          // no per-text continuation ever competes with another submit for this permit or slot.
+          lock.lock();
+          try {
+            if (operation.reserved) {
+              reservedSequenceSlots--;
+              sequencePermits.release();
+            }
+            permits.release();
+          } finally {
+            lock.unlock();
+          }
           if (failure == null) {
-            operation.result().complete(value);
+            operation.result.complete(
+                java.util.Collections.unmodifiableList(new ArrayList<>(operation.values)));
           } else {
-            operation.result().completeExceptionally(failure);
+            operation.result.completeExceptionally(failure);
           }
         };
     try {
       dispatcher.execute(completion);
     } catch (RejectedExecutionException rejected) {
-      // Same defensive fallback as generation dispatch: never strand a future or permit.
       completion.run();
     }
   }
@@ -722,7 +796,6 @@ public final class BatchGenerationScheduler implements AutoCloseable {
     for (Operation<?> operation : pending) {
       completeOperation(
           operation,
-          null,
           schedulerFailure == null
               ? new SchedulerClosedException("scheduler is closed")
               : new SchedulerFailedException(schedulerFailure.getCause()));

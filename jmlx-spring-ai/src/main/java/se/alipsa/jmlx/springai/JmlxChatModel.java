@@ -25,10 +25,23 @@ import se.alipsa.jmlx.models.SchedulerInferenceClient;
 /** Spring AI text chat and cold streaming views over a borrowed shared inference client. */
 public final class JmlxChatModel implements ChatModel {
   private final InferenceClient client;
+  private final long demandTimeoutNanos;
 
   /** Borrows a client; the application closes it after all adapter views are finished. */
   public JmlxChatModel(InferenceClient client) {
+    this(client, java.time.Duration.ofSeconds(30));
+  }
+
+  /**
+   * Borrows a client with a positive timeout for each downstream-demand wait, including terminal.
+   */
+  public JmlxChatModel(InferenceClient client, java.time.Duration demandTimeout) {
     this.client = Objects.requireNonNull(client, "client");
+    Objects.requireNonNull(demandTimeout, "demandTimeout");
+    if (demandTimeout.isZero() || demandTimeout.isNegative()) {
+      throw new IllegalArgumentException("demandTimeout must be positive");
+    }
+    this.demandTimeoutNanos = demandTimeout.toNanos();
   }
 
   @Override
@@ -41,7 +54,7 @@ public final class JmlxChatModel implements ChatModel {
   public Flux<ChatResponse> stream(Prompt prompt) {
     return Flux.create(
         sink -> {
-          Demand demand = new Demand(sink);
+          Demand demand = new Demand(sink, demandTimeoutNanos);
           java.util.concurrent.atomic.AtomicReference<InferenceCall> submitted =
               new java.util.concurrent.atomic.AtomicReference<>();
           sink.onRequest(count -> demand.wake());
@@ -72,6 +85,7 @@ public final class JmlxChatModel implements ChatModel {
                                   sink.next(response(delta, null));
                                 }
                               });
+                      call.failureSignal().thenAccept(demand::abort);
                       submitted.set(call);
                       if (sink.isCancelled()) {
                         call.cancel();
@@ -110,9 +124,17 @@ public final class JmlxChatModel implements ChatModel {
 
   private static final class Demand {
     private final FluxSink<ChatResponse> sink;
+    private final long timeoutNanos;
+    private Throwable failure;
 
-    Demand(FluxSink<ChatResponse> sink) {
+    Demand(FluxSink<ChatResponse> sink, long timeoutNanos) {
       this.sink = sink;
+      this.timeoutNanos = timeoutNanos;
+    }
+
+    synchronized void abort(Throwable cause) {
+      failure = cause;
+      notifyAll();
     }
 
     synchronized void wake() {
@@ -120,15 +142,31 @@ public final class JmlxChatModel implements ChatModel {
     }
 
     synchronized boolean await() {
-      while (sink.requestedFromDownstream() == 0 && !sink.isCancelled()) {
+      long start = System.nanoTime();
+      while (true) {
+        if (failure instanceof RuntimeException runtime) {
+          throw runtime;
+        }
+        if (failure != null) {
+          throw new IllegalStateException("generation failed while waiting for demand", failure);
+        }
+        if (sink.isCancelled()) {
+          return false;
+        }
+        if (sink.requestedFromDownstream() != 0) {
+          return true;
+        }
+        long remaining = timeoutNanos - (System.nanoTime() - start);
+        if (remaining <= 0) {
+          throw new IllegalStateException("stream downstream demand timed out");
+        }
         try {
-          wait();
+          java.util.concurrent.TimeUnit.NANOSECONDS.timedWait(this, remaining);
         } catch (InterruptedException interrupted) {
           Thread.currentThread().interrupt();
           throw new java.util.concurrent.CancellationException("stream delivery interrupted");
         }
       }
-      return !sink.isCancelled();
     }
   }
 

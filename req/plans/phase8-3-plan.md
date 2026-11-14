@@ -108,11 +108,37 @@ runtime failures. Blocking chat avoids the streaming delivery thread.
 Spring streaming waits on demand on the delivery thread, retaining the bounded
 64-delta queue and aggregate admission bound. Completion/disposal wakeups are
 event-driven. Arbitrary callbacks cannot safely be terminated: a callback that
-never returns retains its slot even after native cancellation. This documented
-constraint also applies to a subscription that never requests or disposes.
+never returns retains its slot even after native cancellation. Spring's own demand waits are bounded by a configurable timeout (30 seconds
+by default) and wake on an independent native failure signal; arbitrary user
+callbacks still must return.
 
 Constructor argument/configuration failure closes the transferred scheduler.
 The Spring automatic module name is se.alipsa.jmlx.springai before publication.
 Embedding metadata reports the configured encoder directory's basename.
 Sampled requests reuse the configured seed deliberately; a nonzero temperature
 that underflows float32 is rejected.
+
+## Follow-up — batch admission and stalled demand
+
+An embedding batch owns one permit and one queue slot from admission through
+its final text, error or cancellation. Its operation is requeued between texts
+without releasing/readmitting that reservation. The scheduler caps concurrent
+batches at max(1, maxQueuedRequests / 4), and their queued steps do not double
+count their reservation. A generation-filled queue therefore cannot reject a
+batch partway through. Tests fill the queue while real encoder work is in
+progress and require both continuation and generation interleaving.
+
+Caller validation uses BERT's complete static validator, not just its sequence
+limit. Null embedding lists/elements are IllegalArgumentException. Embedding
+latency under load remains a trade-off: each text may wait behind generation
+cohorts despite the admission guarantee.
+
+InferenceCall exposes an independent failure signal. Native overflow,
+cancellation or failure signals a framework monitor without waiting for the
+consumer callback or result completion. Signal observers must not run user
+code or block the MLX worker. Spring demand waits check that signal and have
+a configurable positive timeout, default 30 seconds, including terminal waits.
+A native artifact regression stalls more subscriptions than the slot count,
+requires overflow errors without new demand, and proves later streams still
+start; another checks terminal timeout. Arbitrary blocked user callbacks remain
+outside the framework's ability to terminate safely.

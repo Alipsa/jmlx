@@ -32,10 +32,9 @@ version decision; the explicit `.module` content difference did.
 - [ ] Secure physical minimum-host access or review a raised minimum; owner selection pending.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
-- [ ] Release upstream verified-bundle plugin support, bump catalog, test historical 8.1 fixture.
-  Source change committed locally in `Alipsa/nexus-release-plugin` as `47f7a36`; separate
-  push/PR approval is pending after automatic approval review rejected the push as an
-  unauthorized source export to that separate repository. No push or release occurred.
+- [x] Integrate released upstream plugin 2.6.0 and verify the clean historical 8.1 fixture.
+  [Compatibility evidence](phase8-4-plugin-2.6.0-compatibility.md) records the unpushed scratch
+  commit, expected published-tuple refusal, eligible-three dry-run and HTTPS upload fixture.
 - [ ] Revalidate pure-Java artifact reuse after that pin bump; finalize manifest.
 - [ ] Freeze candidate tag/SHA, verify signed bundle, both consumer profiles and minimum host.
 - [ ] Review concrete verified-bundle receipt, then explicitly authorize Central publication.

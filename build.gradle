@@ -39,7 +39,7 @@ tasks.named('dependencyUpdates').configure {
 // tools/release-all/README.md. Applying the plugin at the root registers the combined tasks
 // (releaseAllPlan, releaseAllSigningCheck, releaseAllGuard, bundleAll, releaseAll;
 // releaseAllPrepareMaven is registered too but never runs: jmlx has no static Maven
-// candidates). nexus-release-plugin 2.5.1 derives the candidate set, the per-module staging
+// candidates). nexus-release-plugin 2.6.0 derives the candidate set, the per-module staging
 // publication (with signing and the module's check wired in), and every output path from
 // combinedRelease.modules; jmlx only sets the module list, the committed Portal fixture and
 // the report/resume overrides below. The subprojects get the plugin through the maven-publish
@@ -100,14 +100,21 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
     def receiptVerifier = rootProject.file('tools/release-all/final_receipt.py').absolutePath
     def releaseRoot = rootProject.projectDir.absolutePath
     def releaseExec = services.get(org.gradle.process.ExecOperations)
-    tasks.named('releaseAll').configure {
+    tasks.named('releaseAll').configure { releaseTask ->
         resumeId = providers.gradleProperty('releaseAllResume').orElse('')
         if (existingBundle) {
-            if (!hasProperty('useExistingBundle')) {
+            if (!['useExistingBundle', 'expectedBundleSha256', 'expectedManifestSha256'].every {
+                releaseTask.hasProperty(it)
+            }) {
                 throw new GradleException('The pinned release plugin cannot upload an existing bundle. ' +
                         'Complete the separately reviewed upstream release and catalog pin bump first.')
             }
             useExistingBundle.set(true)
+            // These anchors come from the revalidated preliminary record, not mutable build files.
+            expectedBundleSha256.set(
+                    providers.gradleProperty('releaseAllExpectedBundleSha256').orElse(''))
+            expectedManifestSha256.set(
+                    providers.gradleProperty('releaseAllExpectedManifestSha256').orElse(''))
         }
         doFirst {
             if (!resumeId.getOrElse('')) {

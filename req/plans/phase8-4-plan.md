@@ -292,6 +292,10 @@ on receipt/source/test/hash mismatch, and uploaded ZIP bytes exactly equal the v
 The mock Portal must use HTTPS with a test certificate/truststore configured for the test
 process. Preserve root `build.gradle`'s HTTPS URL guard; do not relax it for integration tests.
 
+**Status (2026-11-15):** delivered through released plugin 2.6.0; see the
+[historical compatibility and integration evidence](../phase8-4-plugin-2.6.0-compatibility.md).
+The candidate artifact/tuple audit and actual signed-bundle gates remain open.
+
 **External prerequisite:** nexus-release-plugin 2.5.1 always depends on `bundleAll` for a new
 upload, and that task never reports up-to-date. Neither verified-ZIP submission nor this
 verification boundary can be implemented by shell arguments alone. Deliver a separate reviewed

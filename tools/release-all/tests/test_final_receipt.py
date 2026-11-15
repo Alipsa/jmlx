@@ -88,6 +88,13 @@ class FinalReceiptTest(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_plugin_digests_are_reviewed_record_anchors_after_full_verification(self):
+        self.assertEqual(F.verify(self.root, self.path, plugin_digests=True),
+                         (self.record["bundleSha256"], self.record["pluginReceipt"]["manifestHash"]))
+        self.bundle.write_bytes(b"changed")
+        with self.assertRaises(ValueError):
+            F.verify(self.root, self.path, plugin_digests=True)
+
     def test_final_valid_and_preliminary_rejected(self):
         F.verify(self.root, self.path)
         self.write("final.json", {"schema": "jmlx-preliminary-bundle-1"})

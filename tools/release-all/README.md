@@ -24,12 +24,14 @@ Signing and Portal credentials use the existing Gradle properties/environment co
 Reports must contain no credentials. Receipts/logs live under ignored `build/releaseAll/`
 or outside the checkout, since the source guard rejects untracked files too.
 
-**External dependency:** the pinned nexus-release-plugin 2.5.1 always rebuilds before upload.
-The tested upstream change is committed locally as `47f7a36` in `Alipsa/nexus-release-plugin`
-(based on `d942747026bbe8bb22fdd38c6f768264d96284e0`). It adds `releaseAll.useExistingBundle`, preserving
-source/version, saved ZIP/manifest receipt, availability and resume guards. A separate plugin
-review/release and catalog bump are required. This repository refuses verified upload while
-the pinned plugin lacks that property; no local substitution is allowed for a real release.
+The catalog pins nexus-release-plugin **2.6.0**, including the separately reviewed
+[existing-bundle upload API](https://github.com/Alipsa/nexus-release-plugin/pull/15).
+The wrapper obtains reviewed ZIP/manifest SHA-256 anchors only after full final-receipt
+verification and passes both to the plugin. The root upload action verifies the receipt
+again before submission. See the
+[historical 8.1 compatibility evidence](../../req/phase8-4-plugin-2.6.0-compatibility.md).
+Resume trusts the manifest copy retained in the deployment journal; those digest inputs
+are ignored for status-only recovery. Protect the journal against modification.
 
 ## Prepare, verify, then submit
 
@@ -97,9 +99,13 @@ abandonment after archiving evidence, retaining the candidate tag.
 
 ## Guards and regression checks
 
-`selftest.sh` runs stdlib unit tests plus real Gradle fixtures for exclusive repository routing
+`selftest.sh` requires OpenSSL and the JDK `keytool` for its local TLS fixture. It runs
+stdlib unit tests plus real Gradle fixtures for exclusive repository routing
 (POM and module metadata, conflicting Maven-local copies, missing sources, warm state) and
 producer task outcomes (executed/up-to-date/cached/skipped, configuration-cache reuse).
+Its published-plugin HTTPS fixture checks the real root upload block and shell digest bridge
+with dummy credentials and synthetic consumer evidence. It does not establish physical-host
+or signed-candidate compatibility.
 `verify_native_tests.py` and CI read `native_suites.py`; no second suite list is maintained.
 `release_inputs.py native <directory-or-jar> --bootstrap scripts/bootstrap-native.sh` checks
 ARM64 Mach-O `LC_BUILD_VERSION`, native pins, personal path leaks and exact legal text digests.

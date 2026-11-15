@@ -38,6 +38,14 @@ expect "explicit all profile" 0 body 'parse_args candidate --profile all; [ "$MO
 expect "pure profile" 0 body 'parse_args ci --profile pure-java; [ "$PROFILE" = pure-java ]'
 expect "equals-form profile" 0 body 'parse_args central --profile=pure-java; [ "$MODE" = central ] && [ "$PROFILE" = pure-java ]'
 expect "record on ci all" 0 body 'parse_args ci --record; [ "$RECORD" = true ]'
+expect "explicit historical Central selection" 0 body 'parse_args central --profile pure-java --release 8.1; [ "$RELEASE" = 8.1 ]'
+expect "release defaults to 8.4" 0 body 'parse_args candidate; [ "$RELEASE" = 8.4 ]'
+expect "bundle mode requires all identity inputs" 2 body 'parse_args candidate --bundle bundle.zip'
+expect "bundle mode rejects CI" 2 body 'parse_args ci --bundle bundle.zip --bundle-record record.json --bundle-record-sha256 abc'
+expect "historical release rejects candidate" 2 body 'parse_args candidate --profile pure-java --release 8.1'
+expect "historical release rejects full profile" 2 body 'parse_args central --release 8.1'
+expect "unknown release" 2 body 'parse_args central --release 8.2'
+expect "duplicate release" 2 body 'parse_args central --release 8.4 --release 8.4'
 
 # --- parse_args: rejections ---
 expect "missing mode" 2 body 'parse_args'
@@ -122,7 +130,7 @@ status=0
 JMLX_SMOKE_REPO_DIR="$repo" JMLX_SMOKE_TUPLE_FILE="$tmp/absent.properties" JMLX_SMOKE_PRODUCER_VERSIONS="$producers_release" \
   bash "$here/run.sh" candidate --profile pure-java >/dev/null 2>"$err" || status=$?
 if [ "$status" -eq 2 ] && [ -f "$repo/marker" ] && [ -f "$state_marker" ] \
-  && grep -q "released tuple file missing" "$err"; then
+  && grep -q "producer jmlx-jinja version .* != manifest" "$err"; then
   echo "ok: failing preflight exits 2 with its own message before touching the repository or consumer state"
 else
   echo "FAIL: preflight ran with side effects or the wrong exit (status $status; repo marker $([ -f "$repo/marker" ] && echo present || echo gone); state marker $([ -f "$state_marker" ] && echo present || echo gone); stderr: $(head -1 "$err"))"

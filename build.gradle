@@ -68,9 +68,8 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
         userName = credentialsUser.orNull
         password = credentialsPassword.orNull
         combinedRelease {
-            // All seven published modules are named: the four native-chain modules keep
-            // -SNAPSHOT versions until 8.4, so the plan excludes (and reports) them, and a
-            // future native cut only needs the version lines.
+            // All nine publishable modules participate. The reviewed 8.4 source manifest
+            // determines which new coordinates may be bundled; reused coordinates stay on Central.
             modules = [':jmlx-core', ':jmlx-ffi', ':jmlx-jinja', ':jmlx-models',
                     ':jmlx-native-macos-arm64', ':jmlx-tokenizer', ':jmlx-vision',
                     ':jmlx-spring-ai', ':jmlx-langchain4j']
@@ -89,8 +88,38 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
     tasks.named('releaseAllSigningCheck').configure {
         strict = !providers.gradleProperty('releaseAllSigningReport').isPresent()
     }
+    def existingBundle = providers.gradleProperty('releaseAllUseExistingBundle').getOrElse('false') == 'true'
+    def verifiedReceipt = providers.gradleProperty('releaseAllVerifiedReceipt').getOrElse('')
+    def resumeRequested = !providers.gradleProperty('releaseAllResume').getOrElse('').isEmpty()
+    gradle.taskGraph.whenReady { graph ->
+        if (graph.hasTask(':releaseAll') && !resumeRequested && (!existingBundle || verifiedReceipt.isEmpty())) {
+            throw new GradleException('Use releaseAll.sh --publish-verified with a final receipt; ' +
+                    'refusing the upload graph before checking, signing or bundling.')
+        }
+    }
+    def receiptVerifier = rootProject.file('tools/release-all/final_receipt.py').absolutePath
+    def releaseRoot = rootProject.projectDir.absolutePath
+    def releaseExec = services.get(org.gradle.process.ExecOperations)
     tasks.named('releaseAll').configure {
         resumeId = providers.gradleProperty('releaseAllResume').orElse('')
+        if (existingBundle) {
+            if (!hasProperty('useExistingBundle')) {
+                throw new GradleException('The pinned release plugin cannot upload an existing bundle. ' +
+                        'Complete the separately reviewed upstream release and catalog pin bump first.')
+            }
+            useExistingBundle.set(true)
+        }
+        doFirst {
+            if (!resumeId.getOrElse('')) {
+                if (!existingBundle || verifiedReceipt.isEmpty()) {
+                    throw new GradleException('Use releaseAll.sh --publish-verified with a final receipt; ' +
+                            'ordinary releaseAll must not rebuild and upload unchecked bytes.')
+                }
+                releaseExec.exec {
+                    commandLine 'python3', receiptVerifier, '--root', releaseRoot, '--verify', verifiedReceipt
+                }
+            }
+        }
     }
 }
 

@@ -35,7 +35,7 @@ coverage; the bootstrap script remains the source of truth for the pin values.
 | 1–5 | Native bootstrap, bindings, memory model, tensor ops, `nn`, autograd, checkpoint I/O, tokenizer, first models | — | none | delivered |
 | 6 | Complete local text-LLM inference | none | none | delivered |
 | 7 | Inference breadth: Qwen3, encoders, vision-language, Qwen3.8 | once, as milestone 7.5 (before Qwen3.8) | none | delivered (all milestones delivered; every gate in the Phase 7 done list below passed, hosted Tier-B arm execution being out of scope of that gate per the 2026-11-04 owner amendment in `phase8-1-plan.md` WP0 — the last passing gate, the 7.6 qwen35 self-hosted Tier-B run, in run 41841745005 on 2026-11-04) |
-| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | in progress (8.1 delivered 2026-11-05: `jmlx-jinja` 0.6.1, `jmlx-tokenizer` 0.1.1 and `jmlx-vision` 0.1.1 on Central after the `.module` recovery; 8.2 measurements delivered 2026-11-13 — `req/phase8-2-benchmark.md`; 8.3 implemented and locally verified; hosted CI/review pending; 8.4 not started) |
+| 8 | First releases and framework adapters | none (ships the 7.5 runtime) | first native release (milestone 8.4; the pure-Java modules are released earlier, in 8.1) | in progress (8.1 delivered 2026-11-05: `jmlx-jinja` 0.6.1, `jmlx-tokenizer` 0.1.1 and `jmlx-vision` 0.1.1 on Central after the `.module` recovery; 8.2 measurements delivered 2026-11-13 — `req/phase8-2-benchmark.md`; 8.3 merged in PR #94 on 2026-11-14; 8.4 tooling implemented and locally verified; upstream plugin release and physical minimum-host resource pending) |
 | 9 | Inference product: decode speed, prefix cache, HTTP server, Spring Boot/Quarkus, Groovy API, diffusion inference (9.6, scheduled by the 7.4 decision), Qwen-Image-2.1 image generation (9.7, decided in its own decision record), Z-Image Base and FLUX.2 Klein Base 4B image generation (9.8, decided in its own decision record) | 9.0 | 0.x release | not started |
 | 10 | Fundamental array, dtype and indexing parity | 10.0 | 0.x release | not started |
 | 11 | Numerical, random and specialized compute parity; audio inference (11.5, scheduled by the 7.4 decision) | 11.0 | 0.x release | not started |
@@ -374,15 +374,19 @@ published before `jmlx-models` itself.
    so that Phase 9.3's server reuses it. **Gate:** adapter-level tests pass against the
    release-smoke repository: chat, streaming and embeddings through each library's interfaces,
    with native memory released on close.
-   **Status (2026-11-14):** implemented and locally verified; hosted CI/review pending;
+   **Status (2026-11-14):** merged in [PR #94](https://github.com/Alipsa/jmlx/pull/94);
    [phase8-3-plan.md](plans/phase8-3-plan.md) defines the pinned version matrix,
-   shared scheduler/encoder ownership and artifact-smoke gate.\n   [Implementation report](phase8-3-implementation-report.md). The 8.2 dated
+   shared scheduler/encoder ownership and artifact-smoke gate.
+   [Implementation report](phase8-3-implementation-report.md). The 8.2 dated
    scope amendment accepts the evidence deliverable with its limitations and
    leaves the affected measurement gates unpassed.
 4. **8.4 First native release.** `jmlx-native-macos-arm64` 0.1.0, `jmlx-ffi` 0.5.0, `jmlx-core`
    0.5.0, `jmlx-models` 0.1.0 and the two adapters at 0.1.0, plus a new version of any pure-Java
    module that changed since 8.1. Run `tools/release-smoke/run.sh candidate` before publishing
-   and `run.sh central` after.
+   and `run.sh central` after. The [8.4 plan](plans/phase8-4-plan.md) defines the reuse
+   audit, shared release manifest, mixed-source smoke and combined publication gates;
+   [tooling implementation report](phase8-4-implementation-report.md) records local evidence;
+   the upstream plugin release and physical minimum-host gate remain open. No publication has occurred.
 
    **Amendment (2026-11-04, from [phase8-1-plan.md §1](plans/phase8-1-plan.md#1-goal-scope-and-exit-gate)):**
    8.4 restores unchanged pure-Java modules to their published 8.1 versions before POM
@@ -1050,7 +1054,9 @@ semantic tests; supported platform limits are published; and the release passes 
 - A bug-fix patch release is allowed at any time.
 
 Every release follows the existing manual procedure:
-- each module's `release.sh` in dependency order;
+- Phase 8.4 uses the combined verified-bundle flow in `tools/release-all/README.md`;
+  its reviewed candidate tag identifies the main commit being released. Per-module
+  `release.sh` scripts are not used for that tuple;
 - `jmlx-jinja/req/release-checklist.md` for jinja;
 - `tools/release-smoke/run.sh candidate` before publishing and `run.sh central` after;
 - the next `-SNAPSHOT` bump only once Central resolves.

@@ -33,7 +33,7 @@ bundles **omitted the Gradle module metadata file** (`.module`): the then-pinned
 nexus-release-plugin 2.2.0 bundles only JAR and POM files, while the generated POM advertises
 Gradle metadata. Without the `.module`, a fresh-cache consumer's javadoc/sources resolution falls
 back to POM classifiers and pulls in the dependencies' Javadoc jars, so the fresh-cache
-`run.sh central --profile pure-java` gate failed against the published artifacts. The 2.2.0
+`run.sh central --profile pure-java --release 8.1` gate failed against the published artifacts. The 2.2.0
 omission is structural (a hard filter in the bundle task), not a misconfiguration.
 
 Recovery decisions and facts:
@@ -121,7 +121,7 @@ verifies all of this against the published artifacts, and `selftest.sh` plus the
   only in the version coordinates (and tokenizer's jinja dependency version). The recovery
   bundle additionally carries the `.module` file (with signature and checksums) that the 2.2.0
   bundles omitted.
-- Fresh-cache Central smoke (`run.sh central --profile pure-java`) after the combined deployment,
+- Fresh-cache Central smoke (`run.sh central --profile pure-java --release 8.1`) after the combined deployment,
   with the deployment/portal/availability record (see `phase8-1-release-checklist.md`).
 - Tags `jmlx-jinja-v0.6.1`, `jmlx-tokenizer-v0.1.1`, `jmlx-vision-v0.1.1` at the verified release
   SHA (mapping recorded below after publication).
@@ -167,7 +167,7 @@ verifies all of this against the published artifacts, and `selftest.sh` plus the
 - Tag-to-SHA mapping: `jmlx-jinja-v0.6.1`, `jmlx-tokenizer-v0.1.1` and `jmlx-vision-v0.1.1` are
   all annotated tags at `9bc85042df50ed3f979cb8d3e7c8767917c71483`.
 - Central smoke report: the fresh-cache
-  `./tools/release-smoke/run.sh central --profile pure-java` run from the release SHA passed —
+  `./tools/release-smoke/run.sh central --profile pure-java --release 8.1` run from the release SHA passed —
   the committed `released-8.1.properties` tuple (0.6.1/0.1.1/0.1.1) resolved from Maven Central
   with the POM-only and module-metadata runtime classpaths agreeing (7 components), and the
   license, JPMS, vision NOTICE, sources and javadoc artifact checks all passed; direct repo1

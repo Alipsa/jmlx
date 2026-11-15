@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "baselineSha": "9bc85042df50ed3f979cb8d3e7c8767917c71483",
+  "audit": "req/phase8-4-release-checklist.md",
+  "modules": [
+    {"module": "jmlx-jinja", "version": "0.6.2", "source": "local"},
+    {"module": "jmlx-tokenizer", "version": "0.1.2", "source": "local"},
+    {"module": "jmlx-vision", "version": "0.1.2", "source": "local"},
+    {"module": "jmlx-native-macos-arm64", "version": "0.1.0", "source": "local"},
+    {"module": "jmlx-ffi", "version": "0.5.0", "source": "local"},
+    {"module": "jmlx-core", "version": "0.5.0", "source": "local"},
+    {"module": "jmlx-models", "version": "0.1.0", "source": "local"},
+    {"module": "jmlx-spring-ai", "version": "0.1.0", "source": "local"},
+    {"module": "jmlx-langchain4j", "version": "0.1.0", "source": "local"}
+  ]
+}

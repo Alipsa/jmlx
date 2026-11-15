@@ -1,30 +1,7 @@
-// Shared by app, pure-java and pom-check. The jmlx source is a parameter (-PjmlxRepoUrl): the
-// disposable smoke repository in CI / release-candidate mode, Maven Central for the final
-// release-mode run. exclusiveContent makes `se.alipsa` resolve ONLY from that source, and
-// everything else (Jackson, the only external runtime dependency) ONLY from Central. No
-// mavenLocal(), no substitution rules.
+// Shared by app, pure-java and pom-check. Release selection comes from the strict shared
+// manifest; exact-version repository filters split candidate-local and reused Central bytes.
 def jmlxRepoUrl = providers.gradleProperty('jmlxRepoUrl').orElse('https://repo.maven.apache.org/maven2/').get()
 def pomOnly = project.hasProperty('pomOnlyResolution')
-
-repositories {
-    exclusiveContent {
-        forRepository {
-            maven {
-                name = 'jmlx'
-                url = uri(jmlxRepoUrl)
-                if (pomOnly) {
-                    // Resolve through the POM, as a Maven consumer would, instead of the .module file.
-                    metadataSources {
-                        mavenPom()
-                        ignoreGradleMetadataRedirection()
-                    }
-                }
-            }
-        }
-        filter { includeGroup 'se.alipsa' }
-    }
-    mavenCentral { content { excludeGroup 'se.alipsa' } }
-}
 
 def jmlxMode = providers.gradleProperty('jmlxMode').orElse('ci').get()
 if (!(jmlxMode in ['ci', 'release'])) {
@@ -36,7 +13,7 @@ if (!(profile in ['all', 'pure-java'])) {
 }
 
 // The profile's selected modules are the ONLY coordinates this consumer resolves: the all profile
-// keeps the seven-module native graph, the pure profile resolves jinja/tokenizer/vision only, so
+// keeps the nine-module native graph, the pure profile resolves jinja/tokenizer/vision only, so
 // an unselected native version never needs to exist or be a release.
 def allModules = ['jmlx-models', 'jmlx-native-macos-arm64', 'jmlx-core', 'jmlx-ffi',
                   'jmlx-tokenizer', 'jmlx-jinja', 'jmlx-vision', 'jmlx-spring-ai', 'jmlx-langchain4j']
@@ -66,8 +43,29 @@ def propertyKey = { String module ->
 // whitespace, so a malformed hand edit could pass here while failing the preflight (or vice
 // versa); any whitespace in the value is a clear error in both.
 def tupleFile = new File(project.rootDir, 'released-8.1.properties')
+def release = providers.gradleProperty('smokeRelease').getOrElse('8.4')
+def sourceMode = providers.gradleProperty('smokeSourceMode').getOrElse('central')
+if (!(release in ['8.1', '8.4']) || !(sourceMode in ['ci', 'candidate', 'central'])) {
+    throw new GradleException('Unknown smoke release/source mode')
+}
+if (jmlxMode == 'release' && release == '8.1' && (profile != 'pure-java' || sourceMode != 'central')) {
+    throw new GradleException('Historical 8.1 selection is central pure-java only')
+}
+def releaseEntries = [:]
 def tupleVersions = null
-if (profile == 'pure-java' && jmlxMode == 'release') {
+if (jmlxMode == 'release' && release == '8.4') {
+    tupleFile = new File(project.rootDir, 'released-8.4.json')
+    def helper = new File(project.rootDir, '../release-all/release_inputs.py')
+    def selection = providers.exec {
+        commandLine 'python3', helper.absolutePath, 'select', tupleFile.absolutePath, '--profile', profile
+    }.standardOutput.asText.get()
+    selection.readLines().each { line ->
+        def fields = line.split('\t')
+        releaseEntries[fields[0]] = [version: fields[1], source: fields[2]]
+    }
+    tupleVersions = releaseEntries.collectEntries { name, entry -> [(name): entry.version] }
+}
+if (profile == 'pure-java' && jmlxMode == 'release' && release == '8.1') {
     if (!tupleFile.isFile()) {
         throw new GradleException("The pure-Java release run requires the committed tuple file ${tupleFile}")
     }
@@ -115,10 +113,10 @@ def versionOf = { String module ->
         def override = gradle.startParameter.projectProperties.get(key)
         if (override != null && override != fromTuple) {
             throw new GradleException(
-                "${key} override '${override}' disagrees with released-8.1.properties value '${fromTuple}'; " +
+                "${key} override '${override}' disagrees with ${tupleFile.name} value '${fromTuple}'; " +
                 "overrides may only repeat a file value exactly")
         }
-        def source = override != null ? 'released-8.1.properties (override repeats it)' : 'released-8.1.properties'
+        def source = override != null ? "${tupleFile.name} (override repeats it)" : tupleFile.name
         if (!pomOnly) {
             println "smoke version ${module}=${fromTuple} (${source})"
         }
@@ -136,3 +134,45 @@ ext.smokeProfile = profile
 ext.jmlxRepoUrl = jmlxRepoUrl
 ext.tupleFile = tupleFile
 ext.jmlxVersions = selectedModules.collectEntries { module -> [(module): versionOf(module)] }
+
+// Source filters are shared by POM-only and Gradle-metadata consumers. No Maven local fallback.
+repositories {
+    if (releaseEntries && sourceMode == 'candidate') {
+        ['central', 'local'].each { source ->
+            def selected = releaseEntries.findAll { name, entry -> entry.source == source }
+            if (selected) {
+                exclusiveContent {
+                    forRepository {
+                        maven {
+                            name = "jmlx-${source}"
+                            url = uri(source == 'central' ? 'https://repo.maven.apache.org/maven2/' : jmlxRepoUrl)
+                            if (pomOnly) {
+                                metadataSources { mavenPom(); ignoreGradleMetadataRedirection() }
+                            }
+                        }
+                    }
+                    filter {
+                        selected.each { name, entry -> includeVersion 'se.alipsa', name, entry.version }
+                    }
+                }
+            }
+        }
+    } else {
+        exclusiveContent {
+            forRepository {
+                maven {
+                    name = 'jmlx'
+                    url = uri(jmlxRepoUrl)
+                    if (pomOnly) {
+                        metadataSources { mavenPom(); ignoreGradleMetadataRedirection() }
+                    }
+                }
+            }
+            filter { includeGroup 'se.alipsa' }
+        }
+    }
+    mavenCentral { content { excludeGroup 'se.alipsa' } }
+}
+ext.smokeRelease = release
+ext.smokeSourceMode = sourceMode
+ext.releaseEntries = releaseEntries

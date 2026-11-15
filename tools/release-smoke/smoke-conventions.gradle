@@ -8,6 +8,14 @@
 // The consumer toolchain follows the profile: Java 21 for the pure profile (the release floor the
 // published artifacts must meet), Java 25 for the full profile (the checkout's own toolchain).
 java.toolchain.languageVersion = JavaLanguageVersion.of(smokeProfile == 'pure-java' ? 21 : 25)
+sourceSets.main.java.srcDir(rootProject.file('runtime/src/main/java'))
+def consumerRuntimeFile = layout.buildDirectory.file('reports/consumer-runtime.xml')
+tasks.withType(JavaExec).configureEach {
+    if (name == 'smoke') {
+        systemProperty 'smoke.runtime.evidence', consumerRuntimeFile.get().asFile.absolutePath
+        doFirst { delete consumerRuntimeFile }
+    }
+}
 
 // The profile's entry dependencies. In the pure profile jinja arrives ONLY transitively through
 // tokenizer's published `api` edge, proving that edge; in the full profile core, tokenizer, vision
@@ -72,6 +80,9 @@ ext.smokeVerificationInputs = { task ->
     task.inputs.property('profile', smokeProfile)
     task.inputs.property('versions', jmlxVersions.toString())
     task.inputs.property('repo', jmlxRepoUrl)
+    task.inputs.property('release', smokeRelease)
+    task.inputs.property('sourceMode', smokeSourceMode)
+    task.inputs.property('sources', releaseEntries.toString())
     if (tupleFile != null) {
         task.inputs.file(tupleFile)
     }
@@ -238,6 +249,22 @@ ext.smokeRegisterVerificationTasks = {
                     }
                 }
                 if (!names.contains('META-INF/NOTICE')) throw new GradleException("${nativeJar.name}: no META-INF/NOTICE")
+                def inventory = new groovy.json.JsonSlurper().parse(
+                        rootProject.file('../../req/native-license-inventory.json'))
+                def nativeJars = [nativeJar,
+                        javadocs.files.find { it.name.startsWith('jmlx-native-macos-arm64-') },
+                        sources.files.find { it.name.startsWith('jmlx-native-macos-arm64-') }]
+                nativeJars.each { jar ->
+                    if (jar == null) throw new GradleException('Native documentation artifact missing')
+                    inventory.packagedTexts.each { name, expected ->
+                        def bytes = entryBytes(jar, "META-INF/${name}")
+                        def digest = bytes == null ? null : java.security.MessageDigest.getInstance('SHA-256')
+                                .digest(bytes).encodeHex().toString()
+                        if (digest != expected) {
+                            throw new GradleException("${jar.name}: native notice text differs: ${name}")
+                        }
+                    }
+                }
             }
             if (javadocs.files.size() != expectedCount) {
                 throw new GradleException("javadoc jars: ${javadocs.files*.name}")

@@ -1,28 +1,12 @@
 #!/usr/bin/env bash
 # Runs the release smoke consumer against the selected jmlx modules.
-#
-#   run.sh ci                 publish the selected modules' current versions to a disposable
-#                             repository, then smoke them (fresh consumer home, exclusive repos)
-#   run.sh candidate          same, in release mode: the consumer expects released (non-SNAPSHOT)
-#                             versions; the candidate preflight rejects snapshot producers
-#   run.sh central            resolve everything from Maven Central, after the modules are published
-#
-#   --profile all             (default) the seven-module native consumer: Java 25, macOS ARM64, and
-#                             the publish step needs the staged native runtime
-#   --profile pure-java       the Java 21 headless consumer for jinja/tokenizer/vision:
-#                             cross-platform, publishes only those modules, no native runtime needed
-#
-#   --record                  (ci --profile all only) rewrite goldens/mistral-sampled.properties
-#
-# Every run uses a fresh GRADLE_USER_HOME, so no cached or mavenLocal jmlx artifact can be reused.
-# Version overrides are read from the JMLX_<MODULE>_VERSION environment variables and forwarded as
-# -P properties; in the pure profile's release mode an override may only repeat the committed
-# released-8.1.properties value. See README.md for JDK requirements and failure diagnosis.
-#
-# Sourcing this file (selftest.sh) defines parse_args, preflight_candidate and the path helpers and
-# returns before main runs. The JMLX_SMOKE_PRODUCER_VERSIONS (a <module>=<version> file),
-# JMLX_SMOKE_TUPLE_FILE and JMLX_SMOKE_REPO_DIR environment variables point the preflight at
-# disposable fixtures; they are test hooks, not production configuration.
+# Modes: ci publishes checkout snapshots locally; candidate verifies the 8.4 source manifest;
+# central resolves released artifacts without publishing. Profiles: all (nine modules, Java 25,
+# macOS ARM64) and pure-java (three modules, Java 21, headless). Historical 8.1 verification is
+# central --profile pure-java --release 8.1. Release modes need Python 3.11+.
+# --bundle ZIP --bundle-record JSON --bundle-record-sha256 HASH verifies an already signed ZIP
+# without invoking producer tasks. --record is restricted to ci --profile all.
+# Sourcing this file defines the legacy parser/preflight test helpers without executing main.
 set -euo pipefail
 
 die() { echo "error: $*" >&2; exit 2; }
@@ -42,7 +26,7 @@ smoke_paths() {
 # empty or conflicting arguments and any unused trailing argument, and --record outside
 # ci --profile all.
 parse_args() {
-  local mode="" profile="" profile_set=false record="false"
+  local mode="" profile="" profile_set=false record="false" release="" bundle="" bundle_record="" record_hash=""
   while [ $# -gt 0 ]; do
     case "$1" in
       ci|candidate|central)
@@ -67,6 +51,16 @@ parse_args() {
         [ "$record" = false ] || die "duplicate --record"
         record="true"
         ;;
+      --release|--bundle|--bundle-record|--bundle-record-sha256)
+        [ $# -ge 2 ] && [ -n "$2" ] || die "$1 needs a value"
+        case "$1" in
+          --release) [ -z "$release" ] || die 'duplicate --release'; release="$2" ;;
+          --bundle) [ -z "$bundle" ] || die 'duplicate --bundle'; bundle="$2" ;;
+          --bundle-record) [ -z "$bundle_record" ] || die 'duplicate --bundle-record'; bundle_record="$2" ;;
+          --bundle-record-sha256) [ -z "$record_hash" ] || die 'duplicate --bundle-record-sha256'; record_hash="$2" ;;
+        esac
+        shift
+        ;;
       *)
         die "unknown argument '$1' (usage: run.sh ci|candidate|central [--profile all|pure-java] [--record])"
         ;;
@@ -86,6 +80,21 @@ parse_args() {
   MODE="$mode"
   PROFILE="$profile"
   RECORD="$record"
+  RELEASE="${release:-8.4}"
+  case "$RELEASE" in 8.1|8.4) ;; *) die 'unknown release' ;; esac
+  if [ "$MODE" = ci ] && [ -n "$release$bundle$bundle_record$record_hash" ]; then
+    die 'release/bundle inputs are not accepted in CI mode'
+  fi
+  if [ "$RELEASE" = 8.1 ] && { [ "$MODE" != central ] || [ "$PROFILE" != pure-java ]; }; then
+    die '--release 8.1 is historical central --profile pure-java only'
+  fi
+  if [ -n "$bundle$bundle_record$record_hash" ]; then
+    [ "$MODE" = candidate ] && [ "$RELEASE" = 8.4 ] || die 'bundle inputs require candidate 8.4'
+    [ -n "$bundle" ] && [ -n "$bundle_record" ] && [ -n "$record_hash" ] || die 'all bundle inputs are required'
+  fi
+  BUNDLE="$bundle"
+  BUNDLE_RECORD="$bundle_record"
+  BUNDLE_RECORD_SHA256="$record_hash"
 }
 
 # producer_version <module> : the module's own version line, or the JMLX_SMOKE_PRODUCER_VERSIONS
@@ -189,12 +198,32 @@ fi
 
 smoke_paths
 parse_args "$@"
+if [ "$MODE" != ci ]; then
+  python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11+ is required for release smoke")'
+fi
+
+home=""
+bundle_temp=""
+cleanup_smoke() {
+  [ -z "$home" ] || rm -rf "$home"
+  [ -z "$bundle_temp" ] || rm -rf "$bundle_temp"
+}
+trap cleanup_smoke EXIT
 
 # Candidate mode checks the actual producer versions against what the consumer will resolve
 # immediately after argument parsing, before any side effect: a failing preflight exits with the
 # smoke repository and the consumer's state untouched.
 if [ "$MODE" = candidate ]; then
-  preflight_candidate
+  if [ -n "$BUNDLE" ]; then
+    python3 "$ROOT/tools/release-all/release_inputs.py" bundle "$BUNDLE" \
+      --record "$BUNDLE_RECORD" --record-sha256 "$BUNDLE_RECORD_SHA256" \
+      --manifest "$SMOKE_DIR/released-8.4.json" --root "$ROOT"
+  elif [ "$RELEASE" = 8.4 ]; then
+    python3 "$ROOT/tools/release-all/release_inputs.py" preflight \
+      "$SMOKE_DIR/released-8.4.json" --profile "$PROFILE" --root "$ROOT"
+  else
+    preflight_candidate
+  fi
 fi
 
 # The profile's selected modules, in publish order (jinja before tokenizer: the tokenizer's POM
@@ -205,6 +234,12 @@ if [ "$PROFILE" = pure-java ]; then
 else
   modules="jmlx-jinja jmlx-tokenizer jmlx-native-macos-arm64 jmlx-ffi jmlx-core jmlx-vision jmlx-models jmlx-spring-ai jmlx-langchain4j"
   consumer_task=":app:smoke"
+fi
+
+if [ "$MODE" != ci ] && [ "$RELEASE" = 8.4 ]; then
+  selection="$(python3 "$ROOT/tools/release-all/release_inputs.py" select \
+    "$SMOKE_DIR/released-8.4.json" --profile "$PROFILE")"
+  modules="$(printf '%s\n' "$selection" | awk -F '\t' '$3 == "local" {print $1}')"
 fi
 
 # Clean the consumer's project state after argument parsing and before any Gradle invocation:
@@ -231,10 +266,20 @@ fi
 args=()
 case "$MODE" in
   ci|candidate)
-    rm -rf "$REPO_DIR"
-    tasks=()
-    for m in $modules; do tasks+=(":$m:publishMavenPublicationToSmokeRepository"); done
-    (cd "$ROOT" && ./gradlew -q "${tasks[@]}")
+    if [ -n "$BUNDLE" ]; then
+      bundle_temp="$(mktemp -d)"
+      REPO_DIR="$bundle_temp/repository"
+      python3 "$ROOT/tools/release-all/release_inputs.py" bundle "$BUNDLE" \
+        --record "$BUNDLE_RECORD" --record-sha256 "$BUNDLE_RECORD_SHA256" \
+        --manifest "$SMOKE_DIR/released-8.4.json" --root "$ROOT" --extract "$REPO_DIR"
+    else
+      rm -rf "$REPO_DIR"
+      tasks=()
+      for m in $modules; do tasks+=(":$m:publishMavenPublicationToSmokeRepository"); done
+      if [ ${#tasks[@]} -gt 0 ]; then
+        (cd "$ROOT" && ./gradlew -q "${tasks[@]}")
+      fi
+    fi
     args+=("-PjmlxRepoUrl=file://$REPO_DIR")
     if [ "$MODE" = candidate ]; then
       args+=("-PjmlxMode=release")
@@ -247,6 +292,7 @@ case "$MODE" in
     ;;
 esac
 args+=("-PsmokeProfile=$PROFILE")
+args+=("-PsmokeRelease=$RELEASE" "-PsmokeSourceMode=$MODE")
 [ "$RECORD" = true ] && args+=("-PsmokeRecord=true")
 
 # Forward any version overrides (e.g. JMLX_MODELS_VERSION) as -P properties.
@@ -260,7 +306,6 @@ for pair in JMLX_SPRING_AI_VERSION:jmlxSpringAiVersion JMLX_LANGCHAIN4J_VERSION:
 done
 
 home="$(mktemp -d)"
-trap 'rm -rf "$home"' EXIT
 
 env -u JMLX_LIBRARY_PATH GRADLE_USER_HOME="$home" \
   "$gradle_bin" --project-dir "$SMOKE_DIR" --no-daemon --no-build-cache "${args[@]}" "$consumer_task"

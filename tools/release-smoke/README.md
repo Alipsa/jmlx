@@ -1,183 +1,92 @@
 # Release smoke
 
-An independent Gradle consumer that proves the published shape of the jmlx modules: it resolves
-the selected coordinates **only** from a single source (a disposable local repository in
-`ci`/`candidate` mode, Maven Central in `central` mode), runs the profile's smoke program against
-the resolved jars, and verifies the complete runtime graph, POM-only agreement, documentation
-artifacts, licenses, NOTICE provenance and JPMS names. It never uses `project(...)` dependencies,
-`mavenLocal`, composite builds or checkout classes.
+Independent Gradle consumers resolve published Maven artifacts through both POM-only and
+Gradle module metadata. They never use project dependencies, checkout classes, Maven local or
+composite substitution. Every run clears consumer state and uses a fresh Gradle home with the
+build cache disabled. Release commands need Python 3.11+ for shared manifest/evidence validation.
 
-## Profiles
-
-| Profile | Entry dependencies | Expected complete `se.alipsa` runtime graph | Runtime |
-| --- | --- | --- | --- |
-| `all` (default) | `jmlx-models` + runtime-only `jmlx-native-macos-arm64` | all seven coordinates | Java 25, native, macOS ARM64 |
-| `pure-java` | `jmlx-tokenizer` + `jmlx-vision` (jinja arrives transitively through tokenizer's published `api` edge) | jinja, tokenizer, vision only | Java 21, headless, cross-platform |
-
-`settings.gradle` selects the consumer projects per profile (`-PsmokeProfile`): the pure profile
-neither configures nor compiles the native `app`, so a machine or CI job without a Java 25 toolchain
-can still run it. `pom-check` (POM-only resolution) is shared and gets the same selected
-dependencies and a compatible toolchain (21 pure / 25 full).
-
-## Modes
+| Profile | Expected jmlx graph | Consumer |
+| --- | --- | --- |
+| `all` (default) | nine modules, including both framework adapters | Java 25, native macOS ARM64 |
+| `pure-java` | jinja/tokenizer/vision, jinja transitive through tokenizer | Java 21, headless, cross-platform |
 
 ```sh
-./tools/release-smoke/run.sh ci                 # publish the selected modules' current versions to a
-                                                # disposable repo (build/smoke-repo), then smoke them
-./tools/release-smoke/run.sh candidate          # same, in release mode: the consumer expects released
-                                                # (non-SNAPSHOT) versions; the candidate preflight checks the
-                                                # actual producer versions before anything is published
-./tools/release-smoke/run.sh central            # resolve everything from Maven Central (never publishes)
+bash tools/release-smoke/run.sh ci --profile all
+bash tools/release-smoke/run.sh ci --profile pure-java
+bash tools/release-smoke/run.sh candidate --profile all
+bash tools/release-smoke/run.sh candidate --profile pure-java
+bash tools/release-smoke/run.sh central --profile all
+bash tools/release-smoke/run.sh central --profile pure-java
+bash tools/release-smoke/run.sh central --profile pure-java --release 8.1
 ```
 
-Every run uses a **fresh `GRADLE_USER_HOME`**, `--no-daemon --no-build-cache`, the checkout's
-wrapper distribution and `env -u JMLX_LIBRARY_PATH`, so no cached, locally installed or
-path-overridden jmlx artifact can be reused. `--record` (rewrite `goldens/mistral-sampled.properties`)
-is `ci --profile all` only; it is rejected for every pure-Java run and for `candidate`/`central`.
+`ci` publishes the selected checkout modules to disposable `build/smoke-repo`; its defaults
+in `gradle.properties` follow producer versions. Existing `JMLX_<MODULE>_VERSION` overrides are
+forwarded to Gradle. `--record` is permitted only for `ci --profile all` and rewrites the seeded
+Mistral golden. Never record a new golden merely to accommodate native precision differences.
 
-`run.sh` parses all arguments before any side effect, clears the consumer's project state
-(`.gradle`, `build`, each subproject's `build`) before any Gradle invocation, and invokes exactly
-`:app:smoke` or `:pure-java:smoke` by full project path.
+Release modes default to the committed `released-8.4.json`. Both profiles select their subset
+of that same version/source manifest; snapshots and disagreeing overrides are rejected.
+`candidate` checks actual producer versions and Central availability before cleanup/publication,
+then publishes **only local entries**, resolving reused entries exclusively from real Central.
+Exact-version exclusive repository filters are identical for POM and module-metadata consumers;
+unknown jmlx coordinates cannot fall back to a generic repository. `central` publishes nothing
+and resolves every selected coordinate from Central, preserving the manifest after development
+bumps. The 8.4 tuple remains provisional until the release-readiness audit closes.
 
-## Version selection
+`--release 8.1` is historical Central verification of `released-8.1.properties`, accepted only
+with `central --profile pure-java`. A missing/malformed entry or disagreeing override fails;
+there is no SNAPSHOT-stripping fallback. Old 8.1 runbooks must use this explicit selection.
 
-- `ci`: the `gradle.properties` defaults, overridable per module.
-- `release` (candidate and central), profile `all`: the `gradle.properties` defaults with
-  `-SNAPSHOT` stripped, overridable per module.
-- `release`, profile `pure-java`: the committed **`released-8.1.properties`** tuple is the sole
-  version source for both the local candidate run and the Central run. The `gradle.properties`
-  defaults are ignored entirely (no snapshot-suffix fallback), an explicit override may only repeat
-  a file value exactly, and a missing entry or a snapshot value fails before any resolution.
-  Development snapshot bumps must not change this file; release and recovery PRs update it. The
-  file is tightly formatted — `key=value` lines with no whitespace in the value — and the shell
-  preflight and the Gradle reader both reject any whitespace in a value, so the two parsers cannot
-  disagree on what a valid entry is. Its line endings are pinned to LF in `.gitattributes`, and
-  both readers reject a CRLF-rewritten file, so a `core.autocrlf=true` checkout cannot split them.
+## Verify the signed bundle itself
 
-Version overrides are the `JMLX_<MODULE>_VERSION` environment variables (e.g.
-`JMLX_TOKENIZER_VERSION=0.1.0`), forwarded to the consumer as `-P` properties. The version sources
-are printed during configuration.
+After combined `--bundle-only` writes the preliminary identity record:
 
-In `candidate` mode the preflight runs immediately after argument parsing, **before any side
-effect** (consumer-state cleanup, Gradle invocation, smoke-repository deletion, publication):
-the pure profile requires all three tuple entries to equal the producers' own versions, and the
-producers themselves must be release versions — a `-SNAPSHOT` producer fails the preflight, not
-the consumer stage — and overrides must repeat the file value; the full profile requires every
-producer to equal the consumer's effective expected version (default or override, stripped) and
-to not be a snapshot, so removing `-SNAPSHOT` from a consumer default never disguises snapshot
-producer output.
+```sh
+bash tools/release-smoke/run.sh candidate --profile all \
+  --bundle <signed-bundle.zip> --bundle-record <preliminary.json> \
+  --bundle-record-sha256 <expected-sha256>
+```
 
-## JDK requirements
+The same inputs work with `pure-java`. This mode verifies record/ZIP/manifest digests, candidate
+annotated tag object and HEAD, safe ZIP paths, exact new coordinates and signed artifact presence
+before cleanup. It unpacks into a disposable Maven repository and **never publishes or invokes
+producer tasks**. Wrapper distribution discovery still requires a full candidate checkout.
+Reused entries resolve exclusively from actual Central. The bundle repository is removed on exit.
+`tools/release-all/bundle_smoke.py` wraps this interface to create final-receipt-compatible
+reports/logs with environment identity; see [the combined runbook](../release-all/README.md).
 
-- **Producer (publish step):** the checkout's build JDK. The full profile's `candidate`/`ci`
-  publish step also needs the staged native runtime for `jmlx-native-macos-arm64`
-  (`scripts/bootstrap-native.sh`); the pure profile's publish step does not.
-- **Consumer, profile `all`:** a Java 25 toolchain (plus the pinned wrapper distribution).
-- **Consumer, profile `pure-java`:** a Java 21 toolchain only; the consumer JVM is asserted to be
-  Java 21 and headless by the smoke program itself.
+The locally signed ZIP and preliminary record reach the physical minimum-host workflow via
+separate assets of a temporary draft Release, with both expected hashes passed independently.
+The local Ubuntu ARM64 run uses a real scratch clone, `/projects` bind mount transport and
+fresh Linux Gradle home. Both verify all input digests before extraction. No producer bootstrap
+or model download is needed: inference uses the committed tiny Mistral/BERT fixtures.
 
-CI: the Linux Java job supplies both JDKs through the job's inherited `GRADLE_OPTS`
-(`-Dorg.gradle.java.installations.fromEnv=JAVA_HOME_21_X64,JAVA_HOME_25_X64` with
-`-Dorg.gradle.java.installations.auto-download=false`); the consumer invocation inherits them.
-The macOS native job runs the full profile with its Java 25. Locally, Gradle auto-detects JDKs in
-standard OS locations with a fresh home (or downloads a missing toolchain through the configured
-Foojay resolver); GitHub's `setup-java` installations lie outside the auto-detected locations,
-which is why the Linux job uses the explicit `fromEnv` configuration.
+## Assertions and fixtures
 
-## What the smoke verifies
+Both profiles check exact selected versions, no unresolved or SNAPSHOT release dependencies,
+POM/metadata runtime-graph agreement, main/sources/Javadoc artifacts, licenses/NOTICE and JPMS
+names. The native profile additionally checks the packaged payload/pins, disposable extraction,
+seeded two-request shared cohort, public Spring AI/LangChain4j chat/stream/embedding behavior,
+virtual threads, cancellation, stalled-demand bounds and memory release. Native main/sources/
+Javadoc jars must carry the exact reviewed third-party notice texts.
 
-Both profiles: exact selected versions, no unexpected `se.alipsa` components, module artifacts
-rather than project/file substitutes, the identical complete runtime coordinate set under Gradle
-metadata and POM-only resolution, no snapshot dependency in either release-mode graph, main/
-sources/Javadoc jars for every selected module, `META-INF/LICENSE` in every runtime jar, the
-three vision jars' `META-INF/NOTICE` (pinned Pillow and PyTorch source references and license
-texts), and the published JPMS names (jinja's module descriptor `se.alipsa.jmlx.jinja`,
-tokenizer's and vision's `Automatic-Module-Name`).
+The pure profile verifies Java 21/headless execution, public Jinja rendering, tokenizer
+encode/decode/chat/incremental Unicode facts, Pillow-recorded resize bytes and analytic
+normalization. It never configures the native app or requires a native runtime.
 
-- **`all` (`:app:smoke`):** the native payload in `jmlx-native-macos-arm64` (dylibs,
-  `mlx.metallib`, pin file), fresh extraction from the packaged jar into a disposable cache, jar
-  provenance for every probed class, the seeded two-request batched generation against the
-  committed golden, and the `cohortSizes() == [2]` gate.
-- **`pure-java` (`:pure-java:smoke`):** no native-chain class is even loadable; the written
-  coordinate report holds exactly jinja/tokenizer/vision; every probed class comes from a resolved
-  jar of the expected version. Then the public-API assertions: a jinja message loop with non-ASCII
-  output; the hand-written byte-level BPE tokenizer's exact encode/decode facts, the exact rendered
-  chat prompt (fixed clock) and its exact token ids, and incremental decoding where a Unicode
-  character spans byte tokens; one committed image-oracle resize case decoded and resized
-  byte-exactly against the Pillow-recorded bytes (Pillow codes 1/2/3 mapped explicitly, others
-  rejected), with the fixture's digests re-verified against the pinned image-oracle sources; and an
-  analytic `normalize` with exact float32 values.
+- `fixtures/PROVENANCE.md`: hand-written tokenizer paired with synthetic Mistral.
+- `fixtures/bert/PROVENANCE.md`: sentence encoder tokenizer and committed BERT checkpoint.
+- `fixtures/pure-java/PROVENANCE.md`: hand-computed tokenizer and digest-pinned image-oracle case.
+- `goldens/mistral-sampled.properties`: seeded full-profile generation reference.
 
-## Fixtures
+Run `bash tools/release-smoke/selftest.sh` for parser/preflight regressions and
+`bash tools/release-all/selftest.sh` for manifest/native validation and real Gradle repository/
+collector regressions. Portable CI runs both. Native CI separately asserts the required suites
+using the shared release inventory; a skipped native suite is a failure there.
 
-- `fixtures/`: the full profile's hand-written smoke tokenizer paired with the committed synthetic
-  Mistral checkpoint (`fixtures/PROVENANCE.md`).
-- `fixtures/pure-java/`: the pure profile's fixture set — one image-oracle resize case (PNG,
-  case spec, expected bytes) plus the hand-written byte-level BPE tokenizer and its chat template.
-  Every digest is recorded in `digests.txt`; the provenance, the cross-verification against the
-  pinned HF tokenizers/transformers/Pillow references and the extraction instructions are in
-  `fixtures/pure-java/PROVENANCE.md`. No Hub credentials, model downloads or remote code are
-  required.
-- `goldens/mistral-sampled.properties`: the full profile's seeded sampling golden
-  (`--record` rewrites it, `ci --profile all` only).
-
-## Regression tests
-
-`selftest.sh` exercises `run.sh`'s argument parsing and candidate preflight in subshells against
-disposable fixtures (the `JMLX_SMOKE_TUPLE_FILE`, `JMLX_SMOKE_PRODUCER_VERSIONS` and
-`JMLX_SMOKE_REPO_DIR` test hooks), asserting exit codes and that a failing preflight leaves the
-smoke repository untouched. It is a step of the Linux Java CI job.
-
-## Failure diagnosis
-
-- `no usable Gradle <version> distribution under <dists_dir>`: run `./gradlew --version` once
-  from the checkout with its default `GRADLE_USER_HOME` so the wrapper downloads the distribution
-  the consumer must use.
-- `Could not find se.alipsa:<module>:<version>`: the selected source (disposable repo or Central)
-  lacks that exact coordinate. In `ci`/`candidate` the publish step ran for the selected modules
-  only — unselected modules deliberately may be missing; in `central` the module has not been
-  published (yet) or the tuple names a version that was never released. A `-SNAPSHOT` producer
-  never reaches resolution in `candidate` mode: the preflight rejects it first.
-- `Release mode forbids SNAPSHOTs` / `... is a snapshot`: a selected producer (or a transitive
-  dependency) is still a snapshot while the consumer is in release mode.
-- `producer <module> version X does not match tuple value Y` / `producer <module> is a snapshot:
-  X` (preflight): the module's own `version =` line and the consumer's default/override/tuple
-  disagree; fix the version pair in the same PR.
-- `released-8.1.properties entry <key> contains whitespace: '<value>'` (preflight; the Gradle
-  reader reports the same error in release mode): the tuple file is tightly formatted — rewrite
-  the line as `key=value` with no whitespace. A value that prints as `$'…\r'` is a
-  CRLF-rewritten file (see below).
-- `released-8.1.properties must use LF line endings` (Gradle, release mode): a
-  `core.autocrlf=true` checkout rewrote the committed LF file to CRLF — restore it from the
-  repository (`.gitattributes` pins it to LF) and commit the restoration.
-- `A project dependency leaked into the consumer graph`: the consumer build lost its isolation —
-  check that no `project(...)` dependency or composite build was introduced.
-- `Module-metadata and POM-only runtime classpaths differ`: a published POM and its Gradle
-  metadata disagree on the runtime graph; inspect the module's `api`/`implementation`/`runtimeOnly`
-  declaration.
-- `class <X> came from the checkout: <path>`: the consumer loaded a class from a jar inside the
-  checkout instead of a published artifact. A jar in the run's disposable smoke repository's own
-  coordinate directory (`build/smoke-repo/se/alipsa/<module>/<version>/` by default) is expected:
-  Gradle resolves release artifacts from a local `file://` repository in place, without a
-  dependency-cache copy, so the repository's own jar is the code source in `ci`/`candidate` mode.
-  Any other path under the checkout (`build/libs`, `build/classes`, …) is a real leak — the
-  consumer build lost its isolation.
-- `consumer JVM must be Java 21` (pure profile): the Java 21 toolchain was not discovered — see
-  the JDK requirements above.
-
-## Phase 8.3 adapter coverage
-
-The all profile now publishes/resolves nine modules, including
-jmlx-spring-ai and jmlx-langchain4j. The pure-Java profile is unchanged.
-AdapterSmoke uses both frameworks' actual chat, streaming and embedding
-interfaces from Maven jars, concurrent virtual-thread callers, incremental
-text decoding, ordered normalized BERT embeddings, streaming cancellation
-and native memory release after client close. The synthetic BERT checkpoint
-comes from the committed HF reference tree and its hand-written tokenizer is
-documented in fixtures/bert/PROVENANCE.md.
-
-The new override properties are jmlxSpringAiVersion and
-jmlxLangchain4jVersion; run.sh forwards JMLX_SPRING_AI_VERSION and
-JMLX_LANGCHAIN4J_VERSION. Both are checked by candidate preflight before side
-effects. Snapshot publication remains local to the disposable smoke repository.
-Actual Central publication and mixed-source candidate resolution remain 8.4.
+Toolchains: the producer uses the checkout's build JDK; pure consumers execute on Java 21 and
+full consumers on Java 25. A fresh home does not inherit downloaded JDKs or user Gradle settings.
+Retain `GRADLE_OPTS` toolchain discovery settings (CI uses `org.gradle.java.installations.fromEnv`
+with auto-download disabled) or allow the configured Foojay resolver to download missing JDKs.
+The wrapper distribution is located/downloaded before launching the isolated consumer.

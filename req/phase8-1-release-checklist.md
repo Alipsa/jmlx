@@ -55,7 +55,7 @@ Publication is one run of `./releaseAll.sh` from the verified release SHA on a c
    plugin), staging, bundle validation and the single upload. The `releaseAll` task polls to
    `PUBLISHED` plus repo1 HEAD 200 for every selected component's POM and main JAR before
    logging "published and available"; that is **not** the binding gate.
-5. `./tools/release-smoke/run.sh central --profile pure-java` — the binding fresh-cache gate.
+5. `./tools/release-smoke/run.sh central --profile pure-java --release 8.1` — the binding fresh-cache gate.
 
 A script's success is not proof of availability. The pinned nexus-release-plugin 2.5.1 submits
 `publishingType=AUTOMATIC`, and its `releaseAll` task only logs "published and available" after
@@ -126,7 +126,7 @@ Verification before publication (all from the clean recovery merge commit):
    submission: `./releaseAll.sh --resume <deployment-id>` (the ID is journaled in
    `build/releaseAll/deployment.json` and visible on the Portal). **Never overwrite an immutable
    released coordinate** and never re-upload a bundle whose coordinates are already live.
-3. Rerun `./tools/release-smoke/run.sh central --profile pure-java` (fresh cache). Preserve the
+3. Rerun `./tools/release-smoke/run.sh central --profile pure-java --release 8.1` (fresh cache). Preserve the
    failed-resolution report if availability remains incomplete after bounded retries; a
    successful upload is not a successful Central resolution.
 4. Create annotated tags pointing at the verified release SHA:
@@ -201,7 +201,7 @@ carries the requirement and the reused/new version tuple to it.
   `bundle-receipt.json` with the bundle SHA-256, `deployment.json` with the deployment ID) and the
   `releaseAll` task's "published and available" log line; the `report.txt` selected/excluded
   listing is the per-run eligibility evidence.
-- Central: the fresh-cache `run.sh central --profile pure-java` log, the deployment ID, terminal
+- Central: the fresh-cache `run.sh central --profile pure-java --release 8.1` log, the deployment ID, terminal
   portal state and Central resolution evidence.
 - jinja verification: `jmlx-jinja`'s `releaseVerification` outputs on the release commit.
 - Tags: the tag-to-SHA mapping recorded in `req/phase8-1-release-notes.md`.

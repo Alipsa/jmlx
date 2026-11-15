@@ -32,6 +32,9 @@ MLX_METAL_WHEEL_SHA256="514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345a
 MLX_C_REPO="https://github.com/ml-explore/mlx-c.git"
 MLX_C_COMMIT="a26f2d584a14ec619ae8db9a09be03becd47598a"
 
+# The wheel's dylibs require 26.2. Do not inherit the release machine's OS version.
+MACOS_DEPLOYMENT_TARGET="26.2"
+
 JEXTRACT_PAGE="https://jdk.java.net/jextract/"
 # Trust-on-first-use: jextract's own .sha256 comes from the same origin as the
 # artifact, so verifying against it proves the download wasn't corrupted, not
@@ -187,6 +190,9 @@ log "Configuring mlx-c (MLX_C_USE_SYSTEM_MLX=ON, BUILD_SHARED_LIBS=ON)"
 # which would make the fast-path assertion below fail on every run after the
 # first even though the fast path is (still) in effect.
 cmake --fresh -S "$MLXC_DIR" -B "$BUILD_DIR" \
+  -DCMAKE_OSX_DEPLOYMENT_TARGET="$MACOS_DEPLOYMENT_TARGET" \
+  "-DCMAKE_C_FLAGS=-ffile-prefix-map=$REPO_ROOT/=./ -fmacro-prefix-map=$REPO_ROOT/=./" \
+  "-DCMAKE_CXX_FLAGS=-ffile-prefix-map=$REPO_ROOT/=./ -fmacro-prefix-map=$REPO_ROOT/=./" \
   -DMLX_C_USE_SYSTEM_MLX=ON \
   -DBUILD_SHARED_LIBS=ON \
   -DMLX_C_BUILD_EXAMPLES=OFF \
@@ -207,7 +213,7 @@ grep -qi "Found MLX" "$CONFIGURE_LOG" || die "cmake configure log does not repor
 log "Fast path confirmed: no _deps/mlx-src, MLX found under the wheel prefix"
 
 log "Building mlxc"
-cmake --build "$BUILD_DIR" -j"$(sysctl -n hw.ncpu)"
+cmake --build "$BUILD_DIR" --clean-first -j"$(sysctl -n hw.ncpu)"
 
 # native-pin.properties is the completion marker consumed by packaging. Invalidate a prior
 # successful run before cmake --install can replace libmlxc.dylib, so interruption at any later

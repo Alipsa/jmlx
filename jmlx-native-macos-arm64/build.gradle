@@ -109,6 +109,17 @@ tasks.named('jar') {
     // LICENSE/NOTICE are added to every published jar by the root build.gradle convention.
 }
 
+tasks.withType(Jar).configureEach {
+    from('LICENSE-APACHE-2.0') { into 'META-INF' }
+    from('THIRD-PARTY-NOTICES') { into 'META-INF' }
+}
+tasks.named('sourcesJar', Jar) {
+    from(['LICENSE', 'NOTICE']) { into 'META-INF' }
+}
+tasks.named('javadocJar', Jar) {
+    from(['LICENSE', 'NOTICE']) { into 'META-INF' }
+}
+
 // Task 2's doLast only checks immediately after copying; this re-verifies the actual published
 // artifact (the built jar) has exactly the right entries on every check, independent of how the
 // resources got there.
@@ -150,6 +161,17 @@ tasks.register('verifyPackagedNativeResources') {
 }
 
 tasks.named('check') { dependsOn tasks.named('verifyPackagedNativeResources') }
+
+// Explicit release verification: ordinary unstaged contributor builds retain no Python prerequisite.
+tasks.register('verifyNativeReleasePayload', Exec) {
+    group = 'verification'
+    description = 'Checks packaged dylib deployment targets, source paths, pins and license texts.'
+    dependsOn tasks.named('jar')
+    commandLine 'python3', rootProject.file('tools/release-all/release_inputs.py'), 'native',
+            tasks.named('jar').get().archiveFile.get().asFile,
+            '--bootstrap', rootProject.file('scripts/bootstrap-native.sh'),
+            '--forbid', System.getProperty('user.home'), '--forbid', rootProject.projectDir
+}
 
 publishing {
     publications {
@@ -202,6 +224,9 @@ publishing {
 // unlike a failed build, can never be taken back. Publishing must therefore use its own hard,
 // unconditional gate rather than inheriting build-time leniency.
 tasks.withType(org.gradle.api.publish.maven.tasks.AbstractPublishToMaven).configureEach {
+    if (!project.version.toString().endsWith('-SNAPSHOT')) {
+        dependsOn tasks.named('verifyNativeReleasePayload')
+    }
     doFirst {
         if (!hasValidatedStagedNativeFiles()) {
             throw new GradleException(

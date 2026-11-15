@@ -1,0 +1,148 @@
+name: Verify exact native release candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_tag:
+        description: Annotated jmlx-phase8.4-rc.N tag
+        required: true
+      candidate_sha:
+        description: Peeled candidate commit SHA
+        required: true
+      release_id:
+        description: Temporary draft Release ID (never publish this draft)
+        required: true
+      bundle_asset_id:
+        description: Signed ZIP asset ID
+        required: true
+      bundle_sha256:
+        description: Expected signed ZIP SHA-256
+        required: true
+      record_asset_id:
+        description: Preliminary bundle record asset ID
+        required: true
+      record_sha256:
+        description: Expected preliminary record SHA-256
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  transfer:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Draft asset access; this job never extracts or executes the bundle.
+    steps:
+      - name: Download and verify both draft assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ inputs.release_id }}
+          ZIP_ID: ${{ inputs.bundle_asset_id }}
+          RECORD_ID: ${{ inputs.record_asset_id }}
+          ZIP_SHA: ${{ inputs.bundle_sha256 }}
+          RECORD_SHA: ${{ inputs.record_sha256 }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+          CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for id in "$RELEASE_ID" "$ZIP_ID" "$RECORD_ID"; do
+            [[ "$id" =~ ^[0-9]+$ ]] || exit 2
+          done
+          [[ "$ZIP_SHA" =~ ^[0-9a-f]{64}$ && "$RECORD_SHA" =~ ^[0-9a-f]{64}$ ]] || exit 2
+          mkdir candidate
+          gh api "repos/$GITHUB_REPOSITORY/releases/$RELEASE_ID" > candidate/release.json
+          gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/releases/assets/$ZIP_ID" > candidate/bundle.zip
+          gh api -H 'Accept: application/octet-stream' "repos/$GITHUB_REPOSITORY/releases/assets/$RECORD_ID" > candidate/preliminary.json
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          release = json.loads(Path('candidate/release.json').read_text())
+          assert release['draft'] is True and release['tag_name'] == os.environ['CANDIDATE_TAG']
+          assert {int(os.environ['ZIP_ID']), int(os.environ['RECORD_ID'])} <= {a['id'] for a in release['assets']}
+          for name, key in [('bundle.zip', 'ZIP_SHA'), ('preliminary.json', 'RECORD_SHA')]:
+              with (Path('candidate') / name).open('rb') as stream:
+                  assert hashlib.file_digest(stream, 'sha256').hexdigest() == os.environ[key]
+          record = json.loads(Path('candidate/preliminary.json').read_text())
+          assert record['schema'] == 'jmlx-preliminary-bundle-1'
+          assert record['tag']['name'] == os.environ['CANDIDATE_TAG']
+          assert record['tag']['sha'] == os.environ['CANDIDATE_SHA']
+          assert record['bundleSha256'] == os.environ['ZIP_SHA']
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-candidate-transfer
+          path: candidate/
+          retention-days: 30
+
+  minimum_host:
+    needs: transfer
+    # Provision this dedicated physical host in WP0; never substitute a moving hosted label.
+    runs-on: [self-hosted, macOS, ARM64, jmlx-release-minimum]
+    permissions:
+      contents: read
+    env:
+      GRADLE_USER_HOME: ${{ runner.temp }}/jmlx-release-gradle-${{ github.run_id }}-${{ github.run_attempt }}
+      CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+      CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+      RECORD_SHA: ${{ inputs.record_sha256 }}
+      ZIP_SHA: ${{ inputs.bundle_sha256 }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.candidate_tag }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Fetch and verify annotated candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(id -u)" != 0
+          [[ "$CANDIDATE_TAG" =~ ^jmlx-phase8\.4-rc\.[1-9][0-9]*$ ]] || exit 2
+          git fetch --no-tags origin "refs/tags/$CANDIDATE_TAG:refs/tags/$CANDIDATE_TAG"
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          test "$(git cat-file -t "refs/tags/$CANDIDATE_TAG")" = tag
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-candidate-transfer
+          path: build/releaseAll/candidate-input
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: |
+            21
+            25
+      - name: Verify physical minimum-host execution of the exact ZIP
+        env:
+          GRADLE_OPTS: >-
+            -Dorg.gradle.java.installations.fromEnv=JAVA_HOME_21_ARM64,JAVA_HOME_25_ARM64
+            -Dorg.gradle.java.installations.auto-download=false
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, os
+          from pathlib import Path
+          for name, key in [('bundle.zip', 'ZIP_SHA'), ('preliminary.json', 'RECORD_SHA')]:
+              with (Path('build/releaseAll/candidate-input') / name).open('rb') as stream:
+                  assert hashlib.file_digest(stream, 'sha256').hexdigest() == os.environ[key]
+          PY
+          python3 tools/release-all/bundle_smoke.py --root "$PWD" \
+            --bundle build/releaseAll/candidate-input/bundle.zip \
+            --preliminary build/releaseAll/candidate-input/preliminary.json \
+            --preliminary-sha256 "$RECORD_SHA" --kind minimum-host \
+            --output build/releaseAll/minimum-host.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: minimum-host-evidence
+          path: |
+            build/releaseAll/minimum-host.json
+            build/releaseAll/minimum-host.log
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Remove job-local Gradle state
+        if: always()
+        shell: bash
+        run: rm -rf "$GRADLE_USER_HOME"

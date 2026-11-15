@@ -8,6 +8,11 @@
 # reader, which must agree byte for byte; pin LF so a core.autocrlf=true checkout cannot
 # rewrite it to CRLF and split the two parsers.
 tools/release-smoke/released-8.1.properties text eol=lf
+tools/release-smoke/released-8.4.json text eol=lf
+req/native-license-inventory.json text eol=lf
+jmlx-native-macos-arm64/NOTICE text eol=lf
+jmlx-native-macos-arm64/THIRD-PARTY-NOTICES text eol=lf
+jmlx-native-macos-arm64/LICENSE-APACHE-2.0 text eol=lf
 
 # These are Windows script files and should use crlf
 *.bat           text eol=crlf

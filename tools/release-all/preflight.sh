@@ -8,13 +8,25 @@ release_tools_preflight() {
   for tool in java groovy git; do
     command -v "$tool" >/dev/null || { echo "Required tool missing: $tool" >&2; return 1; }
   done
-  # The Gradle daemon runs on the java on PATH. The releaseAll workflow only executes the
-  # pure-Java modules' tasks (Java 21 toolchain), so 21+ is sufficient; the native-chain
-  # modules are configured but not built.
+  # The launcher may be Java 21; native verification executes with a Java 25 toolchain.
   local java_version
   java_version=$(java -version 2>&1)
   if [[ ! "$java_version" =~ version\ \"([0-9]+) ]]; then
     echo 'Java 21+ is required' >&2; return 1
   fi
   (( BASH_REMATCH[1] >= 21 )) || { echo 'Java 21+ is required' >&2; return 1; }
+  [ "${1:-}" = resume ] && return 0
+  [[ "$(uname -s)" == Darwin && "$(uname -m)" == arm64 ]] || {
+    echo 'The Phase 8.4 native release requires macOS ARM64' >&2; return 1;
+  }
+  command -v python3 >/dev/null || { echo 'Python 3 is required for release evidence' >&2; return 1; }
+  local release_jdk="${JMLX_RELEASE_JAVA_HOME:-${JAVA_HOME:-}}"
+  # Keep selection explicit: Java 21 on PATH is not evidence that Java 25 tests can execute.
+  [[ -x "$release_jdk/bin/java" ]] || { echo 'Set JMLX_RELEASE_JAVA_HOME to a Java 25 installation' >&2; return 1; }
+  java_version=$("$release_jdk/bin/java" -version 2>&1)
+  [[ "$java_version" =~ version\ \"25[.\"] ]] || { echo 'JMLX_RELEASE_JAVA_HOME must provide Java 25' >&2; return 1; }
+  RELEASE_JAVA_HOME="$release_jdk"
+  python3 "$RELEASE_ROOT/tools/release-all/release_inputs.py" native \
+    "$RELEASE_ROOT/native/install/lib" --bootstrap "$RELEASE_ROOT/scripts/bootstrap-native.sh" \
+    --forbid "$HOME" --forbid "$RELEASE_ROOT" >/dev/null
 }

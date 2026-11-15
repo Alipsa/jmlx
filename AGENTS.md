@@ -36,7 +36,7 @@ release) is built in milestones, each with its own plan under `req/plans/`:
 the Phase 6 state and lists the remaining release steps. The pure-Java 8.1 tuple is
 on Central; native modules and adapters have not been published.
 
-Requires macOS on Apple Silicon, macOS 26+, and a Java 25 toolchain. The native bootstrap also needs
+Requires macOS on Apple Silicon, macOS 26.2+, and a Java 25 toolchain. The native bootstrap also needs
 the Xcode Command Line Tools (`git`, `cc`, `otool`) and `cmake` (`brew install cmake`); see
 `README.md`.
 
@@ -270,6 +270,14 @@ so `jmlx-ffi:check` and any ffi release build the native jar. Release each chain
 ones it depends on are still checked out at their released version; only after every release in a
 chain should its modules be bumped back to their next `-SNAPSHOT` versions.
 
+**Phase 8.4 release implementation:** use [the 8.4 runbook](tools/release-all/README.md) and
+[readiness checklist](req/phase8-4-release-checklist.md). Both release-smoke profiles default to
+`released-8.4.json`; historical 8.1 Central commands require `--release 8.1`. A signed bundle's
+preliminary identity record precedes remote testing; only the final verified-bundle receipt
+may reach `releaseAll.sh --publish-verified`. The pinned plugin must first gain the separately
+reviewed existing-bundle upload capability. Keep per-module scripts identical but never invoke
+them for the 8.4 tuple. Do not publish the temporary draft GitHub Release used for transport.
+
 **The pure-Java modules release through the combined flow, not these scripts.** Since Phase 8.1,
 `jmlx-jinja`, `jmlx-tokenizer` and `jmlx-vision` publish as one `releaseAll` deployment of
 nexus-release-plugin (`se.alipsa.nexus-release-plugin`, pinned in `gradle/libs.versions.toml`)
@@ -283,7 +291,7 @@ the combined flow spends one slot for the whole tuple). The auxiliary modes are
 bundling, no upload) and `--resume <deployment-id>` (polls an already-submitted deployment,
 journaled in `build/releaseAll/deployment.json`, to `PUBLISHED` without re-uploading). A
 successful `releaseAll` is not proof of availability: the post-publication gate is the
-fresh-cache `./tools/release-smoke/run.sh central --profile pure-java` (in central mode the
+fresh-cache `./tools/release-smoke/run.sh central --profile pure-java --release 8.1` (in central mode the
 committed `tools/release-smoke/released-8.1.properties` is the sole version source).
 `tools/release-all/README.md` and `req/phase8-1-release-checklist.md` document the full
 procedure; the 8.4 first-native release also rides the combined flow (see the 8.4 amendment in

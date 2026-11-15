@@ -5,7 +5,7 @@ plugins {
 }
 
 // The profile selects which consumer is configured at all: the native app (Java 25) for the full
-// seven-module graph, or the pure-Java consumer (Java 21, headless) for jinja/tokenizer/vision.
+// nine-module graph, or the pure-Java consumer (Java 21, headless) for jinja/tokenizer/vision.
 // The pure profile therefore never configures or compiles the native app, so a machine or CI job
 // without the Java 25 toolchain can still run it.
 def profile = providers.gradleProperty('smokeProfile').getOrElse('all')

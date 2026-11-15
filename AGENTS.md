@@ -223,9 +223,11 @@ JMLX_TIER_B_MODEL_DIR=<model-dir> JMLX_TIER_B_MANIFEST=tools/tier-b/<manifest>.j
 `req/phase6-tier-b-artifacts.md`.
 
 **CI checks that native tests actually ran.** The macOS native job in `.github/workflows/ci.yml`
-reads the JUnit XML for a hard-coded list of suites, the "Assert required native suites executed"
-step, and fails if any of them was skipped. When you add a native test class that must run, add it
-to that list. Otherwise a native skip passes CI unnoticed.
+uses the shared inventory in `tools/release-all/native_suites.py` through
+`verify_native_tests.py`. It rejects missing/empty results, failures/errors and **any skipped
+test within a required suite**, including a single assumption skip. This is stricter than the
+former all-skipped-suite check. When adding a native suite that must run, update that inventory;
+both CI and release verification consume it.
 
 ## Releasing a module
 

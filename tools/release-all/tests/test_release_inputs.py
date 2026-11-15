@@ -1,6 +1,7 @@
 """Release preflights reject corrupt metadata before any release mutation."""
 
 import copy
+import hashlib
 import importlib.util
 import json
 import struct
@@ -87,6 +88,16 @@ class ReleaseInputsTest(unittest.TestCase):
             (root / name).write_bytes(header + command)
         (root / "mlx.metallib").write_bytes(b'fixture')
         self.assertEqual(R.native_report(root, bootstrap, ["/Users/release"])["minimum"], (26,2,0))
+        upstream = header + command + R.UPSTREAM_PATH + b'\0'
+        (root / "libmlx.dylib").write_bytes(upstream)
+        with patch.object(R, "UPSTREAM_MLX_HASH", hashlib.sha256(upstream).hexdigest()):
+            R.native_report(root, bootstrap, ["/Users/runner"])
+            altered = upstream + b'/Users/runner/private/source.cpp\0'
+            (root / "libmlx.dylib").write_bytes(altered)
+            with patch.object(R, "UPSTREAM_MLX_HASH", hashlib.sha256(altered).hexdigest()):
+                with self.assertRaisesRegex(ValueError, "path leaked"):
+                    R.native_report(root, bootstrap, ["/Users/runner"])
+        (root / "libmlx.dylib").write_bytes(header + command)
         (root / "libmlxc.dylib").write_bytes(header + command + b'/Users/release/source.cpp\0')
         with self.assertRaisesRegex(ValueError, "path leaked"):
             R.native_report(root, bootstrap, ["/Users/release"])
@@ -132,6 +143,34 @@ class ReleaseInputsTest(unittest.TestCase):
             record["bundleSha256"] = R.sha256(bundle)
             with self.assertRaisesRegex(ValueError, "unsafe bundle path"):
                 R.check_bundle(bundle, record_path, save_record(), manifest_path, root)
+
+    def test_notice_wheel_digest_is_checked_against_bootstrap_not_only_its_inventory_hash(self):
+        root = Path(self.temp.name)
+        bootstrap = root / "scripts/bootstrap-native.sh"
+        bootstrap.parent.mkdir()
+        wheel_hash = "e"*64
+        bootstrap.write_text('MLX_METAL_WHEEL_SHA256="' + wheel_hash + '"\n')
+        pins = {"mlxMetalVersion": "0.32.4", "mlxcCommit": "a"*40}
+        legal = {"LICENSE": b"MIT", "LICENSE-APACHE-2.0": b"Apache-2.0",
+                 "NOTICE": ("0.32.4 " + "a"*40 + " " + wheel_hash).encode()}
+        inventory_file = root / "req/native-license-inventory.json"
+        inventory_file.parent.mkdir()
+        jar = root / "native.jar"
+        def write_jar():
+            inventory_file.write_text(json.dumps({"nativePins": pins, "wheelSha256": wheel_hash,
+                "packagedTexts": {name: hashlib.sha256(data).hexdigest() for name, data in legal.items()}}))
+            with zipfile.ZipFile(jar, "w") as archive:
+                for name in R.NATIVE_FILES:
+                    archive.writestr("se/alipsa/jmlx/native/macos-aarch64/" + name, b"payload")
+                for name, data in legal.items():
+                    archive.writestr("META-INF/" + name, data)
+        write_jar()
+        with patch.object(R, "native_report", return_value={"pins": pins}):
+            R.native_jar_report(jar, bootstrap, [])
+            legal["NOTICE"] = legal["NOTICE"].replace(wheel_hash.encode(), b"f"*64)
+            write_jar()  # Its new NOTICE hash matches the inventory, but provenance is stale.
+            with self.assertRaisesRegex(ValueError, "NOTICE provenance"):
+                R.native_jar_report(jar, bootstrap, [])
 
 
 if __name__ == "__main__":

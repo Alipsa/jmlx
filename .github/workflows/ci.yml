@@ -77,6 +77,9 @@ jobs:
       - name: Verify release isolation and task evidence
         run: bash tools/release-all/selftest.sh
 
+      - name: Validate GitHub workflow contexts
+        run: bash tools/release-all/check-workflows.sh
+
       # Root `check` owns repository-wide verification (currently the generated MLX inventory).
       # Module checks below do not execute it, so invoke it explicitly rather than assuming a
       # module lifecycle task covers handwritten source across the repository.

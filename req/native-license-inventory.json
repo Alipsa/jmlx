@@ -67,10 +67,12 @@
   "packagedTexts": {
     "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
     "THIRD-PARTY-NOTICES": "05b1c3f340a7dfa55be9bdf9ea6722f66e4b5805ce1db62d4accfee79051108e",
-    "NOTICE": "24504f331cf88fc190b6b94c34080f170fc978a0808c8ca3ca34a15888414e90"
+    "NOTICE": "24504f331cf88fc190b6b94c34080f170fc978a0808c8ca3ca34a15888414e90",
+    "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
   },
   "nativePins": {
     "mlxMetalVersion": "0.32.4",
     "mlxcCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a"
-  }
+  },
+  "wheelSha256": "514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936"
 }

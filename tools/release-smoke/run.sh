@@ -198,6 +198,17 @@ fi
 
 smoke_paths
 parse_args "$@"
+if [ "$MODE" != ci ]; then
+  python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11+ is required for release smoke")'
+fi
+
+home=""
+bundle_temp=""
+cleanup_smoke() {
+  [ -z "$home" ] || rm -rf "$home"
+  [ -z "$bundle_temp" ] || rm -rf "$bundle_temp"
+}
+trap cleanup_smoke EXIT
 
 # Candidate mode checks the actual producer versions against what the consumer will resolve
 # immediately after argument parsing, before any side effect: a failing preflight exits with the
@@ -256,7 +267,8 @@ args=()
 case "$MODE" in
   ci|candidate)
     if [ -n "$BUNDLE" ]; then
-      REPO_DIR="$(mktemp -d)/repository"
+      bundle_temp="$(mktemp -d)"
+      REPO_DIR="$bundle_temp/repository"
       python3 "$ROOT/tools/release-all/release_inputs.py" bundle "$BUNDLE" \
         --record "$BUNDLE_RECORD" --record-sha256 "$BUNDLE_RECORD_SHA256" \
         --manifest "$SMOKE_DIR/released-8.4.json" --root "$ROOT" --extract "$REPO_DIR"
@@ -294,7 +306,6 @@ for pair in JMLX_SPRING_AI_VERSION:jmlxSpringAiVersion JMLX_LANGCHAIN4J_VERSION:
 done
 
 home="$(mktemp -d)"
-trap 'rm -rf "$home"; if [ -n "$BUNDLE" ]; then rm -rf "${REPO_DIR%/repository}"; fi' EXIT
 
 env -u JMLX_LIBRARY_PATH GRADLE_USER_HOME="$home" \
   "$gradle_bin" --project-dir "$SMOKE_DIR" --no-daemon --no-build-cache "${args[@]}" "$consumer_task"

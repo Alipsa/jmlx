@@ -14,6 +14,10 @@ import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
+from xml.etree import ElementTree
+
+if sys.version_info < (3, 11):
+    raise SystemExit("Python 3.11+ is required for release verification")
 
 MODULE_KEYS = {
     "jmlx-jinja": "jmlxJinjaVersion",
@@ -53,6 +57,18 @@ def read_json(path):
     if b"\r" in raw:
         raise ValueError(f"{path}: LF line endings required")
     return json.loads(raw, object_pairs_hook=unique_object)
+
+
+def read_runtime(path):
+    properties = ElementTree.parse(path).getroot()
+    pairs = [(entry.attrib["key"], entry.text or "") for entry in properties.findall("entry")]
+    result = unique_object(pairs)
+    fields = {"java.feature", "java.version", "java.runtime.version", "java.vendor", "java.home", "java.vm.name"}
+    if properties.tag != "properties" or set(result) != fields or not all(result.values()):
+        raise ValueError("incomplete measured Java runtime evidence")
+    if not result["java.feature"].isdigit():
+        raise ValueError("invalid measured Java feature version")
+    return result
 
 
 def manifest(path, profile="all"):
@@ -144,13 +160,14 @@ def native_report(directory, bootstrap, forbidden):
                 raise ValueError(f"{name}: minos {build['minos']} exceeds {target}")
             entry.update(build)
         if name != "native-pin.properties":
-            for prefix in forbidden:
-                if prefix and prefix.encode() in data:
-                    raise ValueError(f"{name}: release-machine path leaked")
-            users = re.findall(rb"/Users/[^\x00\n\r]+", data)
+            scanned = data
             if name == "libmlx.dylib" and digest == UPSTREAM_MLX_HASH:
-                users = [s for s in users if s != UPSTREAM_PATH]
+                scanned = scanned.replace(UPSTREAM_PATH, b"")
                 entry["upstreamPathAllowlist"] = [UPSTREAM_PATH.decode()]
+            for prefix in forbidden:
+                if prefix and prefix.encode() in scanned:
+                    raise ValueError(f"{name}: release-machine path leaked")
+            users = re.findall(rb"/Users/[^\x00\n\r]+", scanned)
             if users:
                 raise ValueError(f"{name}: unreviewed /Users/ path")
         result["files"][name] = entry
@@ -170,12 +187,19 @@ def native_jar_report(jar, bootstrap, forbidden):
                 if not archive.read(name).strip():
                     raise ValueError(f"missing native legal text: {name}")
             inventory = read_json(Path(bootstrap).resolve().parents[1] / "req/native-license-inventory.json")
+            notice = archive.read("META-INF/NOTICE").decode("utf-8")
             for name, digest in inventory["packagedTexts"].items():
                 if hashlib.sha256(archive.read("META-INF/" + name)).hexdigest() != digest:
                     raise ValueError(f"native legal text differs from reviewed inventory: {name}")
         report = native_report(temp, bootstrap, forbidden)
         if inventory.get("nativePins") != report["pins"]:
             raise ValueError("native license inventory targets different upstream pins")
+        wheel_hash = re.search(r'^MLX_METAL_WHEEL_SHA256="([0-9a-f]{64})"$',
+                               Path(bootstrap).read_text(), re.M)
+        if not wheel_hash or inventory.get("wheelSha256") != wheel_hash[1]:
+            raise ValueError("native license inventory targets a different wheel digest")
+        if not all(value in notice for value in (*report["pins"].values(), wheel_hash[1])):
+            raise ValueError("native NOTICE provenance differs from bootstrap pins/wheel digest")
         return report
 
 

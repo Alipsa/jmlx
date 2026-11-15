@@ -106,7 +106,7 @@ tasks.named('jar') {
     manifest.attributes('Automatic-Module-Name': 'se.alipsa.jmlx.nativelib.macosarm64')
     dependsOn tasks.named('stageNativeResources')
     from(generatedResourcesDir)
-    // LICENSE/NOTICE are added to every published jar by the root build.gradle convention.
+    // The root convention adds this main jar's LICENSE/NOTICE; companion jars are handled below.
 }
 
 tasks.withType(Jar).configureEach {

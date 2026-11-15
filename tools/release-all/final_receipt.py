@@ -6,7 +6,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from release_inputs import check_bundle, native_report, read_json, sha256
+from release_inputs import check_bundle, native_report, read_json, read_runtime, sha256
 from verify_native_tests import verify_events
 
 REQUIRED = {"macos-full", "macos-pure", "linux-pure", "minimum-host"}
@@ -20,6 +20,9 @@ def verify(root, receipt_path):
     bundle = Path(receipt["bundle"])
     record = check_bundle(bundle, preliminary, receipt["preliminary"]["sha256"],
                           root / "tools/release-smoke/released-8.4.json", root)
+    plugin_bundle = root / "build/releaseAll/jmlx-mega-bundle.zip"
+    if bundle.resolve() != plugin_bundle.resolve() or sha256(plugin_bundle) != record["bundleSha256"]:
+        raise ValueError("verified bundle must be the unchanged ZIP configured for plugin upload")
     if subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"], text=True).strip():
         raise ValueError("verified upload requires a clean checkout")
     plugin_receipt = root / "build/releaseAll/bundle-receipt.json"
@@ -36,6 +39,14 @@ def verify(root, receipt_path):
         raise ValueError("task evidence changed")
     events = read_json(evidence["path"])
     verify_events(events, record["invocationId"])
+    argv_file = record["gradleArgvFile"]
+    if sha256(argv_file["path"]) != argv_file["sha256"] or read_json(argv_file["path"]) != record["gradleArgv"]:
+        raise ValueError("bundle-producing argument vector changed")
+    for key, feature in (("releaseJdk", "25"), ("pureJavaJdk", "21")):
+        jdk = record.get(key, {})
+        if jdk.get("java.feature") != feature or not all(jdk.get(name) for name in
+                ("java.version", "java.runtime.version", "java.vendor", "java.home", "java.vm.name")):
+            raise ValueError("bundle-producing JDK identity missing")
     for path, digest in record["junit"].items():
         if sha256(root / path) != digest:
             raise ValueError(f"JUnit report changed: {path}")
@@ -51,13 +62,19 @@ def verify(root, receipt_path):
                 or report.get("candidateSha") != record["tag"]["sha"]):
             raise ValueError(f"report identity/status mismatch: {kind}")
         env = report.get("environment", {})
-        if report.get("consumerJavaFeature") != (21 if kind.endswith("pure") else 25):
+        runtime = report.get("consumerRuntime", {})
+        if (runtime.get("java.feature") != str(21 if kind.endswith("pure") else 25)
+                or not all(runtime.get(key) for key in ("java.version", "java.vendor", "java.home"))):
             raise ValueError("consumer Java feature evidence differs")
         if not report.get("outputs"):
             raise ValueError("smoke result log digests missing")
         for name, digest in report["outputs"].items():
             if Path(name).name != name or sha256(Path(report_file["path"]).parent / name) != digest:
                 raise ValueError(f"smoke output changed: {kind}/{name}")
+        runtime_file = report.get("consumerRuntimeFile")
+        if (not runtime_file or runtime_file not in report["outputs"]
+                or read_runtime(Path(report_file["path"]).parent / runtime_file) != runtime):
+            raise ValueError("consumer runtime measurement differs from its evidence file")
         if kind == "minimum-host":
             target = ".".join(map(str, record["native"]["minimum"][:2]))
             if (env.get("system") != "Darwin" or env.get("osVersion", "").split(".")[:2] != target.split(".")
@@ -67,7 +84,7 @@ def verify(root, receipt_path):
         elif kind == "linux-pure" and (env.get("system") != "Linux" or env.get("architecture") != "aarch64"
                                        or not env.get("containerImage") or not env.get("osRelease")):
             raise ValueError("expected local Linux ARM64 evidence")
-        elif kind.startswith("macos-") and env.get("system") != "Darwin":
+        elif kind.startswith("macos-") and (env.get("system") != "Darwin" or env.get("architecture") != "arm64"):
             raise ValueError("expected macOS evidence")
     return receipt
 
@@ -95,6 +112,7 @@ if __name__ == "__main__":
                 reports[kind] = {"path": str(Path(path).resolve()), "sha256": sha256(path)}
             receipt = {"schema": "jmlx-verified-bundle-1", "bundle": str(args.bundle.resolve()),
                        "preliminary": {"path": str(args.preliminary.resolve()), "sha256": sha256(args.preliminary)},
+                       "identityAssurance": "Local runtime measurements with operator-attested workflow/container identity; not authenticated remote provenance",
                        "reports": reports}
             # Validate a temporary representation before writing the immutable final record.
             import tempfile

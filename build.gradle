@@ -90,6 +90,13 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
     }
     def existingBundle = providers.gradleProperty('releaseAllUseExistingBundle').getOrElse('false') == 'true'
     def verifiedReceipt = providers.gradleProperty('releaseAllVerifiedReceipt').getOrElse('')
+    def resumeRequested = !providers.gradleProperty('releaseAllResume').getOrElse('').isEmpty()
+    gradle.taskGraph.whenReady { graph ->
+        if (graph.hasTask(':releaseAll') && !resumeRequested && (!existingBundle || verifiedReceipt.isEmpty())) {
+            throw new GradleException('Use releaseAll.sh --publish-verified with a final receipt; ' +
+                    'refusing the upload graph before checking, signing or bundling.')
+        }
+    }
     def receiptVerifier = rootProject.file('tools/release-all/final_receipt.py').absolutePath
     def releaseRoot = rootProject.projectDir.absolutePath
     def releaseExec = services.get(org.gradle.process.ExecOperations)

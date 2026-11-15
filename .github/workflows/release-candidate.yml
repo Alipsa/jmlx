@@ -34,6 +34,9 @@ jobs:
     permissions:
       contents: write # Draft asset access; this job never extracts or executes the bundle.
     steps:
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
       - name: Download and verify both draft assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -83,12 +86,18 @@ jobs:
     permissions:
       contents: read
     env:
-      GRADLE_USER_HOME: ${{ runner.temp }}/jmlx-release-gradle-${{ github.run_id }}-${{ github.run_attempt }}
       CANDIDATE_TAG: ${{ inputs.candidate_tag }}
       CANDIDATE_SHA: ${{ inputs.candidate_sha }}
       RECORD_SHA: ${{ inputs.record_sha256 }}
       ZIP_SHA: ${{ inputs.bundle_sha256 }}
     steps:
+      - name: Prepare job-local Gradle home
+        shell: bash
+        run: echo "GRADLE_USER_HOME=$RUNNER_TEMP/jmlx-release-gradle-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+      - name: Check provisioned Python runtime
+        shell: bash
+        run: |
+          python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11+ is required on the minimum host")'
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.candidate_tag }}
@@ -117,6 +126,7 @@ jobs:
         env:
           GRADLE_OPTS: >-
             -Dorg.gradle.java.installations.fromEnv=JAVA_HOME_21_ARM64,JAVA_HOME_25_ARM64
+            -Dorg.gradle.java.installations.auto-detect=false
             -Dorg.gradle.java.installations.auto-download=false
         shell: bash
         run: |
@@ -140,6 +150,7 @@ jobs:
           path: |
             build/releaseAll/minimum-host.json
             build/releaseAll/minimum-host.log
+            build/releaseAll/minimum-host.runtime.xml
           if-no-files-found: warn
           retention-days: 30
       - name: Remove job-local Gradle state

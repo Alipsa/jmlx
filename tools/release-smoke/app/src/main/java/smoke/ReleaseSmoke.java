@@ -154,6 +154,7 @@ public final class ReleaseSmoke {
       }
     }
     AdapterSmoke.run(modelDir, Path.of(requireProperty("smoke.encoder.dir")));
+    evidence.RuntimeEvidence.write();
     System.out.println("release smoke OK: " + firstResult.generatedTokenIds() + " " + deltas);
   }
 

@@ -8,6 +8,14 @@
 // The consumer toolchain follows the profile: Java 21 for the pure profile (the release floor the
 // published artifacts must meet), Java 25 for the full profile (the checkout's own toolchain).
 java.toolchain.languageVersion = JavaLanguageVersion.of(smokeProfile == 'pure-java' ? 21 : 25)
+sourceSets.main.java.srcDir(rootProject.file('runtime/src/main/java'))
+def consumerRuntimeFile = layout.buildDirectory.file('reports/consumer-runtime.xml')
+tasks.withType(JavaExec).configureEach {
+    if (name == 'smoke') {
+        systemProperty 'smoke.runtime.evidence', consumerRuntimeFile.get().asFile.absolutePath
+        doFirst { delete consumerRuntimeFile }
+    }
+}
 
 // The profile's entry dependencies. In the pure profile jinja arrives ONLY transitively through
 // tokenizer's published `api` edge, proving that edge; in the full profile core, tokenizer, vision

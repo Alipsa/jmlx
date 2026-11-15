@@ -55,6 +55,9 @@ producer tasks**. Wrapper distribution discovery still requires a full candidate
 Reused entries resolve exclusively from actual Central. The bundle repository is removed on exit.
 `tools/release-all/bundle_smoke.py` wraps this interface to create final-receipt-compatible
 reports/logs with environment identity; see [the combined runbook](../release-all/README.md).
+The consumer itself writes its actual JVM vendor, full runtime version, feature and home to
+`build/reports/consumer-runtime.xml`. Bundle reports retain and hash this file; a hard-coded
+requested Java feature or the launcher on PATH does not stand in for that measurement.
 
 The locally signed ZIP and preliminary record reach the physical minimum-host workflow via
 separate assets of a temporary draft Release, with both expected hashes passed independently.
@@ -90,3 +93,6 @@ full consumers on Java 25. A fresh home does not inherit downloaded JDKs or user
 Retain `GRADLE_OPTS` toolchain discovery settings (CI uses `org.gradle.java.installations.fromEnv`
 with auto-download disabled) or allow the configured Foojay resolver to download missing JDKs.
 The wrapper distribution is located/downloaded before launching the isolated consumer.
+The manual minimum-host workflow instead disables detection and downloads and selects only
+the Java 21/25 paths supplied by setup-java. Its run/container identity fields are explicitly
+operator attestations. Release entry points reject Python older than 3.11 before side effects.

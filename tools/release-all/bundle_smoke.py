@@ -6,9 +6,13 @@ import json
 import os
 import platform
 import subprocess
+import sys
 from pathlib import Path
 
-from release_inputs import check_bundle, sha256
+if sys.version_info < (3, 11):
+    raise SystemExit("Python 3.11+ is required for bundle smoke")
+
+from release_inputs import check_bundle, read_runtime, sha256
 
 
 def output(*args):
@@ -52,7 +56,7 @@ def main():
     elif args.kind == "linux-pure":
         if env["system"] != "Linux" or env["architecture"] != "aarch64" or not env["containerImage"]:
             raise ValueError("local Ubuntu ARM64 container identity required")
-    elif env["system"] != "Darwin":
+    elif env["system"] != "Darwin" or env["architecture"] != "arm64":
         raise ValueError("macOS report requested on another OS")
     profile = "pure-java" if args.kind.endswith("pure") else "all"
     command = ["bash", str(root / "tools/release-smoke/run.sh"), "candidate", "--profile", profile,
@@ -62,11 +66,20 @@ def main():
     log = args.output.with_suffix(".log")
     with log.open("x") as stream:
         subprocess.run(command, cwd=root, stdout=stream, stderr=subprocess.STDOUT, check=True)
+    runtime_source = root / "tools/release-smoke" / ("pure-java" if profile == "pure-java" else "app") / "build/reports/consumer-runtime.xml"
+    runtime = read_runtime(runtime_source)
+    if runtime["java.feature"] != str(21 if profile == "pure-java" else 25):
+        raise ValueError("measured smoke consumer used the wrong Java feature version")
+    runtime_file = args.output.with_suffix(".runtime.xml")
+    with runtime_file.open("xb") as stream:
+        stream.write(runtime_source.read_bytes())
     report = {"schema": "jmlx-bundle-smoke-1", "kind": args.kind, "passed": True,
               "bundleSha256": record["bundleSha256"], "preliminarySha256": args.preliminary_sha256,
               "candidateSha": record["tag"]["sha"], "environment": env, "command": command,
-              "consumerJavaFeature": 21 if profile == "pure-java" else 25,
-              "runId": os.environ.get("GITHUB_RUN_ID"), "outputs": {log.name: sha256(log)}}
+              "consumerRuntime": runtime, "consumerRuntimeFile": runtime_file.name,
+              "runId": os.environ.get("GITHUB_RUN_ID"),
+              "identityAssurance": "Local measurements; workflow run ID and container image are operator attestations, not authenticated provenance",
+              "outputs": {log.name: sha256(log), runtime_file.name: sha256(runtime_file)}}
     with args.output.open("x") as stream:
         json.dump(report, stream, indent=2)
         stream.write("\n")

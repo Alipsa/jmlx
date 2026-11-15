@@ -81,3 +81,39 @@ postpublication path still require their actual candidate execution after those 
 The proposed all-new tuple needs post-plugin audit/review; license inventory and current
 account publishing capacity need release review. No earlier/local report substitutes for
 these gates. Phase 8.4 is not complete.
+
+## Review corrections (2026-11-15)
+
+The minimum-host workflow now creates its Gradle home through `GITHUB_ENV` at step scope;
+checksum-pinned actionlint 1.7.12 rejects the former invalid job-level `runner` expression and
+passes the corrected workflows. CI runs that context check. Transfer uses Python 3.12;
+the physical host checks for provisioned Python 3.11+, and release entry points reject the
+system Python 3.9 with a clear message before cleanup/building.
+
+Final verification requires the receipt's canonical bundle path to be the plugin's configured
+`build/releaseAll/jmlx-mega-bundle.zip` and independently checks its bytes. Both mocked-boundary
+and real ZIP/tag-check fixtures reject a verified external copy with a replaced upload ZIP.
+The consumers themselves emit actual JVM properties; reports retain/hash the XML and reject
+invented JSON runtime properties. Java 21 public-API smoke passed on macOS and Ubuntu ARM64,
+and full native smoke passed with a measured Java 25 runtime.
+
+Bundling pins explicit Java 25/21 installations, disables discovery/downloads/inherited
+`fromEnv`, and records the exact command vector plus each selected JDK's vendor/full version/
+home. Root verification passed with only those explicit installations enabled. Tool preflight
+now checks Apple developer tooling before bundling and supports CLT-only metadata; fixtures
+cover both the CLT selection and xcodebuild failure fallback.
+
+The exact digest-scoped upstream MLX path is removed before personal-prefix scanning; an
+actual `--forbid /Users/runner` check now passes and the fixture still rejects other runner
+paths. MIT is pinned alongside the other three notice files; NOTICE's wheel digest is checked
+directly against bootstrap. Direct unverified `releaseAll` fails at graph readiness before
+signing/bundling. Extraction failure cleanup and ARM64 checks for both macOS report kinds are
+covered. Reports explicitly label workflow/container identity as operator attestations.
+
+The expanded 21-test release suite passed on macOS and Ubuntu ARM64. Both the direct helper
+and shell runner reject the actual system Python 3.9 without a traceback; the runner preserves
+its pre-cleanup sentinel. The current workflows pass actionlint, while linting the previous
+workflow confirms its forbidden job-level context is detected.
+
+These corrections do not close the plugin release, physical minimum-host or signed-candidate
+execution gates above. No publication or tag was created.

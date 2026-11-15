@@ -63,6 +63,7 @@ public final class PureSmoke {
     checkTokenizer(fixtures);
     checkVision(checkout, fixtures);
 
+    evidence.RuntimeEvidence.write();
     System.out.println("Pure smoke passed: " + expected + " (mode " + mode + ")");
   }
 

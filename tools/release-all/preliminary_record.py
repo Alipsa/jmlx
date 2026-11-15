@@ -9,9 +9,10 @@ from pathlib import Path
 
 from release_inputs import native_jar_report, native_report, read_json, sha256
 from verify_native_tests import verify, verify_events
+from runtime_evidence import java_runtime, native_toolchain
 
 
-def create(root, tag, events_path, invocation):
+def create(root, tag, events_path, invocation, argv_path, java_home, java21_home):
     def git(*args):
         return subprocess.check_output(["git", "-C", str(root), *args], text=True).strip()
     if not re.fullmatch(r"jmlx-phase8\.4-rc\.[1-9][0-9]*", tag):
@@ -43,12 +44,13 @@ def create(root, tag, events_path, invocation):
         packaged = native_jar_report(jar, bootstrap, [str(Path.home()), str(root)])
     if packaged != staged:
         raise ValueError("bundle native bytes differ from staged runtime")
-    toolchain = {}
-    for name, command in {
-        "cc": ["cc", "--version"], "cmake": ["cmake", "--version"],
-        "sdk": ["xcrun", "--show-sdk-version"], "xcode": ["xcodebuild", "-version"],
-    }.items():
-        toolchain[name] = subprocess.check_output(command, text=True).strip()
+    toolchain = native_toolchain()
+    release_jdk, pure_jdk = java_runtime(java_home), java_runtime(java21_home)
+    if release_jdk["java.feature"] != "25" or pure_jdk["java.feature"] != "21":
+        raise ValueError("release JDK features must be 25 (native) and 21 (pure Java)")
+    argv = read_json(argv_path)
+    if not isinstance(argv, list) or not argv or not all(isinstance(arg, str) for arg in argv):
+        raise ValueError("exact bundle-producing argument vector missing")
     return {
         "schema": "jmlx-preliminary-bundle-1",
         "tag": {"name": tag, "object": git("rev-parse", ref), "sha": head},
@@ -57,6 +59,8 @@ def create(root, tag, events_path, invocation):
         "pluginReceipt": receipt,
         "releaseManifestSha256": sha256(root / "tools/release-smoke/released-8.4.json"),
         "native": staged, "toolchain": toolchain, "invocationId": invocation,
+        "releaseJdk": release_jdk, "pureJavaJdk": pure_jdk, "gradleArgv": argv,
+        "gradleArgvFile": {"path": str(argv_path.resolve()), "sha256": sha256(argv_path)},
         "taskEvidence": {"path": str(events_path.resolve()), "sha256": sha256(events_path)},
         "junit": verify(root),
     }
@@ -68,10 +72,14 @@ if __name__ == "__main__":
     parser.add_argument("--tag", required=True)
     parser.add_argument("--events", type=Path, required=True)
     parser.add_argument("--invocation", required=True)
+    parser.add_argument("--argv-json", type=Path, required=True)
+    parser.add_argument("--java-home", type=Path, required=True)
+    parser.add_argument("--java21-home", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     try:
-        result = create(args.root.resolve(), args.tag, args.events, args.invocation)
+        result = create(args.root.resolve(), args.tag, args.events, args.invocation,
+                        args.argv_json, args.java_home, args.java21_home)
         # A preliminary record is immutable. A new bundle requires a new record path.
         with args.output.open("x") as stream:
             json.dump(result, stream, indent=2)

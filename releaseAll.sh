@@ -26,7 +26,11 @@ esac
 release_tools_preflight "$mode"
 gradle=("$RELEASE_ROOT/gradlew" -p "$RELEASE_ROOT" -PreleaseAllMode=true)
 if [[ "$mode" != resume ]]; then
-  gradle+=("-Dorg.gradle.java.installations.paths=$RELEASE_JAVA_HOME")
+  gradle=(env "JAVA_HOME=$RELEASE_JAVA_HOME" "${gradle[@]}")
+  gradle+=("-Dorg.gradle.java.installations.paths=$RELEASE_JAVA_HOME,$RELEASE_JAVA21_HOME"
+    -Dorg.gradle.java.installations.auto-detect=false
+    -Dorg.gradle.java.installations.auto-download=false
+    -Dorg.gradle.java.installations.fromEnv=)
 fi
 if [[ "$mode" == resume ]]; then
   "${gradle[@]}" releaseAll "-PreleaseAllResume=$resume"
@@ -83,13 +87,22 @@ if [[ "$mode" == bundle ]]; then
     test_args+=("$task" --rerun)
   done
   before=$(shasum -a 256 "$manifest" | cut -d' ' -f1)
-  "${gradle[@]}" "${test_args[@]}" bundleAll --no-build-cache \
-    --init-script "$RELEASE_ROOT/tools/release-all/task-evidence.init.gradle" \
-    "-PreleaseRequiredTasks=$required" "-PreleaseInvocationId=$invocation" "-PreleaseEvidenceFile=$evidence"
+  bundle_command=("${gradle[@]}" "${test_args[@]}" bundleAll --no-build-cache
+    --init-script "$RELEASE_ROOT/tools/release-all/task-evidence.init.gradle"
+    "-PreleaseRequiredTasks=$required" "-PreleaseInvocationId=$invocation" "-PreleaseEvidenceFile=$evidence")
+  argv_file="$RELEASE_ROOT/build/releaseAll/gradle-argv-$invocation.json"
+  python3 - "$argv_file" "${bundle_command[@]}" <<'PY'
+import json, sys
+with open(sys.argv[1], 'x') as stream:
+    json.dump(sys.argv[2:], stream, indent=2)
+    stream.write('\n')
+PY
+  "${bundle_command[@]}"
   after=$(shasum -a 256 "$manifest" | cut -d' ' -f1)
   [[ "$before" == "$after" ]] || { echo 'Plan manifest changed during bundling' >&2; exit 1; }
   python3 "$RELEASE_ROOT/tools/release-all/preliminary_record.py" \
     --root "$RELEASE_ROOT" --tag "$JMLX_RELEASE_CANDIDATE_TAG" \
     --events "$evidence" --invocation "$invocation" \
+    --argv-json "$argv_file" --java-home "$RELEASE_JAVA_HOME" --java21-home "$RELEASE_JAVA21_HOME" \
     --output "$RELEASE_ROOT/build/releaseAll/preliminary-$invocation.json"
 fi

@@ -11,8 +11,11 @@ for this tuple. The root script rejects an ordinary upload without a verified re
 
 ## Prerequisites
 
-Bash 4+, Groovy, Git, Python 3.11+, a Java 21+ Gradle launcher, and a **Java 25 toolchain**
-selected by `JMLX_RELEASE_JAVA_HOME`. Bundle preparation requires macOS ARM64 and a complete
+Bash 4+, Groovy, Git, Python 3.11+, and explicit Java 25/21 installations selected by
+`JMLX_RELEASE_JAVA_HOME` and `JMLX_RELEASE_JAVA21_HOME` (the latter may use a Java 21
+`JAVA_HOME`). Non-resume release invocations launch Gradle with the selected Java 25 and
+restrict toolchain paths to those two installations, disabling detection, downloads and
+inherited `fromEnv` discovery. Bundle preparation requires macOS ARM64 and a complete
 `native/install/lib` matching bootstrap pins, with validated dylib minimum OS/path hygiene.
 The supported native floor is macOS 26.2; physical minimum-host kernel execution remains a
 release gate. Ordinary contributor builds retain their unstaged-runtime skip behavior.
@@ -44,7 +47,9 @@ the pinned plugin lacks that property; no local substitution is allowed for a re
    explicit producer init script. The shared native suite inventory validates fresh JUnit XML,
    including both precision modes and loader/worker probes. The plan digest must stay unchanged.
 6. The resulting immutable `preliminary-<invocation>.json` identifies ZIP/tag/SHA/manifest,
-   native hashes, plugin receipt and this bundle-producing invocation's test evidence. Its
+   native hashes, plugin receipt, exact Gradle argument vector and file digest, selected
+   native/pure JDK vendor/full version/home, and this invocation's test evidence. Apple tool
+   preflight runs before bundling and records either Xcode or selected CLT package metadata. Its
    printed SHA-256 is an input to every remote/local exact-bundle verification.
 7. Use `bundle_smoke.py` for `macos-full`, `macos-pure` and local `linux-pure` reports. It calls
    the independent consumer in read-only bundle mode, records the environment and binds its
@@ -68,14 +73,18 @@ python3 tools/release-all/final_receipt.py --root "$PWD" \
   --output build/releaseAll/verified.json
 ```
 
-Each report's log must remain beside its JSON. Only a **final** receipt can be submitted:
+Each report's log and measured `.runtime.xml` must remain beside its JSON. The consumer JVM
+itself writes feature/version/runtime build/vendor/home; its file and digest are verified,
+independently of the Java launcher on PATH. Only a **final** receipt can be submitted:
 
 ```sh
 ./releaseAll.sh --publish-verified build/releaseAll/verified.json
 ./releaseAll.sh --resume <deployment-id>  # status-only recovery, no rebuild/re-upload
 ```
 
-The final receipt, native directory, tag/SHA, plugin plan/receipt, JUnit/event evidence and report
+The receipt's bundle path must resolve to `build/releaseAll/jmlx-mega-bundle.zip`, whose digest
+is independently compared with the preliminary record. The final receipt, native directory,
+tag/SHA, plugin plan/receipt, JUnit/event evidence and report
 logs are rechecked before upload. The plugin uploads the saved ZIP without `bundleAll`.
 AUTOMATIC publication makes it public without a Portal inspection interval; authorization must
 name the reviewed ZIP digest. If anything changes, prepare and verify a new candidate.
@@ -100,3 +109,9 @@ The native publication's unconditional unstaged guard also applies to combined s
 The Portal upload documentation states a 1 GB archive limit; account-level publishing limits
 must be checked against current Usage Center data rather than assuming a universal deployment
 quota. See the dated readiness record for sources and pending account-specific verification.
+
+Workflow run IDs and container image IDs are operator attestations, not authenticated remote
+provenance. Review actual workflow runs and the declared host before publication. Both macOS
+report kinds require ARM64. The minimum-host user must provide Python 3.11+; the workflow checks
+it before downloading candidate inputs. CI runs checksum-pinned actionlint 1.7.12 for workflow
+expression/context validation, in addition to the release regressions.

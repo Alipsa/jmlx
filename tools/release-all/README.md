@@ -28,7 +28,8 @@ The catalog pins nexus-release-plugin **2.6.0**, including the separately review
 [existing-bundle upload API](https://github.com/Alipsa/nexus-release-plugin/pull/15).
 The wrapper obtains reviewed ZIP/manifest SHA-256 anchors only after full final-receipt
 verification and passes both to the plugin. The root upload action verifies the receipt
-again before submission. See the
+again and compares both returned anchors with the plugin inputs before submission. The shell
+rejects malformed verifier output before launching Gradle. See the
 [historical 8.1 compatibility evidence](../../req/phase8-4-plugin-2.6.0-compatibility.md).
 Resume trusts the manifest copy retained in the deployment journal; those digest inputs
 are ignored for status-only recovery. Protect the journal against modification.
@@ -104,8 +105,10 @@ stdlib unit tests plus real Gradle fixtures for exclusive repository routing
 (POM and module metadata, conflicting Maven-local copies, missing sources, warm state) and
 producer task outcomes (executed/up-to-date/cached/skipped, configuration-cache reuse).
 Its published-plugin HTTPS fixture checks the real root upload block and shell digest bridge
-with dummy credentials and synthetic consumer evidence. It does not establish physical-host
-or signed-candidate compatibility.
+with dummy credentials and synthetic consumer evidence. Each run uses an empty Gradle home
+and a private copy of the launch JDK default CAs extended with the fixture certificate, so
+Plugin Portal resolution is tested cold. It does not establish physical-host or signed-candidate
+compatibility.
 `verify_native_tests.py` and CI read `native_suites.py`; no second suite list is maintained.
 `release_inputs.py native <directory-or-jar> --bootstrap scripts/bootstrap-native.sh` checks
 ARM64 Mach-O `LC_BUILD_VERSION`, native pins, personal path leaks and exact legal text digests.

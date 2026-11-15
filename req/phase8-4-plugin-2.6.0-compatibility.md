@@ -62,8 +62,10 @@ hashes are retained locally under ignored `build/releaseAll/plugin-2.6.0-evidenc
 - Release-smoke parser/preflight selftests pass; the full nine-module artifact consumer
   passes native extraction, scheduler/generation, adapter APIs and published graph checks.
   The separate fresh-cache Java 21 pure-Java artifact consumer also passes.
-- All 23 release selftests pass. They include the real root upload block and released plugin against a local
-  HTTPS Portal with a test truststore. All nine synthetic producer coordinates enter the plan.
+- The original local 23-test run passed using shared downloaded caches; it did not establish
+  cold-cache TLS resolution. The 2026-11-16 correction below replaces that fixture setup.
+  The suite includes the real root upload block and released plugin against a local HTTPS
+  Portal. All nine synthetic producer coordinates enter the plan.
   The fixture confirms that ordinary uploads, source/manifest/ZIP drift and rejected test
   evidence make no upload request. Success uploads exactly the reviewed ZIP bytes without
   `bundleAll` and records the same hash in the deployment journal.
@@ -71,6 +73,26 @@ hashes are retained locally under ignored `build/releaseAll/plugin-2.6.0-evidenc
   receipt filename with spaces, and verifies that rejected evidence prevents Gradle invocation.
   Native/consumer evidence and shell preflight are synthetic in this integration fixture;
   the real final-receipt validator has separate evidence-integrity regression coverage.
+
+## Cold-cache and receipt-binding correction (2026-11-16)
+
+The first hosted CI run exposed a fixture error: its one-certificate truststore replaced
+public CA roots and the developer-cache symlinks hid the resulting Portal resolution failure.
+The fixture now starts with an entirely empty Gradle home, copies the selected launch JDK's
+`cacerts` into a private truststore and adds only the fixture certificate to that copy. It
+uses that same JDK for Gradle, checks that the original CA file is unchanged, and borrows no
+artifact or JDK cache. Gradle output uses `--console=plain` for task-header assertions.
+
+The root upload block has explicit extraction markers. Its upload action obtains the
+reviewed hashes from the receipt verifier again and compares them with both plugin inputs,
+including for direct Gradle invocations. The shell rejects malformed or extra verifier
+output before launching Gradle. Regression cases cover both rejection paths and exact
+successful upload. All 23 release selftests pass locally with the isolated cold-cache TLS
+fixture. Hosted CI verification is pending this correction.
+
+The recorded plugin JAR hash above identifies the resolved artifact; it is not currently
+enforced by Gradle dependency verification. Verification metadata covering the release
+plugin and its dependency graph remains a separate dependency-policy follow-up.
 
 ## Remaining release work
 

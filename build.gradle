@@ -44,6 +44,7 @@ tasks.named('dependencyUpdates').configure {
 // combinedRelease.modules; jmlx only sets the module list, the committed Portal fixture and
 // the report/resume overrides below. The subprojects get the plugin through the maven-publish
 // wiring exactly as before, and ordinary builds never reach this block.
+// BEGIN JMLX COMBINED RELEASE
 if (providers.gradleProperty('releaseAllMode').isPresent()) {
     apply plugin: 'se.alipsa.nexus-release-plugin'
     def credentialsUser = providers.gradleProperty('sonatypeUsername')
@@ -110,7 +111,7 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
                         'Complete the separately reviewed upstream release and catalog pin bump first.')
             }
             useExistingBundle.set(true)
-            // These anchors come from the revalidated preliminary record, not mutable build files.
+            // The wrapper supplies anchors; the upload action binds them to the receipt again.
             expectedBundleSha256.set(
                     providers.gradleProperty('releaseAllExpectedBundleSha256').orElse(''))
             expectedManifestSha256.set(
@@ -122,13 +123,23 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
                     throw new GradleException('Use releaseAll.sh --publish-verified with a final receipt; ' +
                             'ordinary releaseAll must not rebuild and upload unchecked bytes.')
                 }
+                def digestOutput = new ByteArrayOutputStream()
                 releaseExec.exec {
-                    commandLine 'python3', receiptVerifier, '--root', releaseRoot, '--verify', verifiedReceipt
+                    commandLine 'python3', receiptVerifier, '--root', releaseRoot,
+                            '--verify', verifiedReceipt, '--plugin-digests'
+                    standardOutput = digestOutput
+                }
+                def reviewedAnchors = digestOutput.toString('UTF-8').trim().split('\t', -1).toList()
+                def uploadAnchors = [releaseTask.expectedBundleSha256.get().toLowerCase(Locale.ROOT),
+                        releaseTask.expectedManifestSha256.get().toLowerCase(Locale.ROOT)]
+                if (reviewedAnchors != uploadAnchors) {
+                    throw new GradleException('Receipt digest anchors differ from plugin upload inputs')
                 }
             }
         }
     }
 }
+// END JMLX COMBINED RELEASE
 
 def projectJavaVersion = 25
 

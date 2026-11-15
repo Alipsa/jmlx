@@ -45,6 +45,10 @@ if [[ "$mode" == verified ]]; then
   verified_hashes=$(python3 "$RELEASE_ROOT/tools/release-all/final_receipt.py" \
     --root "$RELEASE_ROOT" --verify "$verified_receipt" --plugin-digests)
   IFS=$'\t' read -r verified_bundle_sha verified_manifest_sha <<< "$verified_hashes"
+  [[ "$verified_bundle_sha" =~ ^[0-9a-f]{64}$ && "$verified_manifest_sha" =~ ^[0-9a-f]{64}$ &&
+     "$verified_hashes" == "$verified_bundle_sha"$'\t'"$verified_manifest_sha" ]] || {
+    echo 'Receipt verifier returned malformed digests' >&2; exit 1;
+  }
   "${gradle[@]}" -PreleaseAllUseExistingBundle=true "-PreleaseAllVerifiedReceipt=$verified_receipt" \
     "-PreleaseAllExpectedBundleSha256=$verified_bundle_sha" \
     "-PreleaseAllExpectedManifestSha256=$verified_manifest_sha" releaseAll

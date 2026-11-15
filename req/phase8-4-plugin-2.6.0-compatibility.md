@@ -88,7 +88,11 @@ reviewed hashes from the receipt verifier again and compares them with both plug
 including for direct Gradle invocations. The shell rejects malformed or extra verifier
 output before launching Gradle. Regression cases cover both rejection paths and exact
 successful upload. All 23 release selftests pass locally with the isolated cold-cache TLS
-fixture. Hosted CI verification is pending this correction.
+fixture. [Hosted CI run 43773425790](https://github.com/Alipsa/jmlx/actions/runs/43773425790)
+passed both Java and native jobs for code commit
+`fae4a586bda6841668ab5bc9cccc2bc75c946b6b`. Its Linux release-isolation step ran all
+23 tests successfully in 138.499 seconds, including cold Plugin Portal resolution. The
+remaining root, pure-Java and native checks and both artifact smoke profiles also passed.
 
 The recorded plugin JAR hash above identifies the resolved artifact; it is not currently
 enforced by Gradle dependency verification. Verification metadata covering the release

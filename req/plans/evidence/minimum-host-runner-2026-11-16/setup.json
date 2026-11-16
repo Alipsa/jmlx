@@ -1,0 +1,74 @@
+{
+  "recordedAt": "2026-11-16T21:15:47.934215+00:00",
+  "sourceCommit": "26765a18ece616441c98d58469b5069630b5298e",
+  "accountInspection": {
+    "account": "jmlxrunner",
+    "uid": 503,
+    "nonAdmin": true,
+    "homeMode": "0o700",
+    "osVersion": "27.2.1",
+    "osBuild": "26B131",
+    "architecture": "arm64",
+    "chip": "Apple M5 Max",
+    "virtualized": false,
+    "python": "3.15.2",
+    "git": "git version 2.56.1",
+    "ownerGradlePropertiesReadable": false,
+    "ownerSshDirectorySearchable": false,
+    "ownerSigningDirectorySearchable": false,
+    "accountSshDirectoryExists": false,
+    "accountSigningDirectoryExists": false,
+    "accountGradlePropertiesExists": false
+  },
+  "runnerPackage": {
+    "version": "2.338.2",
+    "source": "https://github.com/actions/runner/releases/download/v2.338.2/actions-runner-osx-arm64-2.338.2.tar.gz",
+    "sha256": "25a065af409ffa317ab4d5a3b614dd15fc9c40f2172bc1b35a1b1258e919a388",
+    "digestMatchedBeforeExtraction": true
+  },
+  "service": {
+    "definition": "com.alipsa.jmlx-release-runner.plist",
+    "sha256": "2a101a9a1ee71a0d35359d8f63dd5726745bc78e1c5280a498f51d2482322418",
+    "installedPath": "/Library/LaunchDaemons/com.alipsa.jmlx-release-runner.plist",
+    "user": "jmlxrunner",
+    "runAtLoad": false,
+    "keepAlive": false,
+    "stateAfterCheck": "unloaded"
+  },
+  "connectivity": {
+    "listenerUserObserved": "jmlxrunner",
+    "listenerMessageObserved": "Listening for Jobs",
+    "githubOnlineAndIdleObserved": true,
+    "stoppedAfterCheck": true,
+    "candidateJobDispatched": false
+  },
+  "repositoryRunnersAfterCheck": [
+    {
+      "id": 23,
+      "name": "jmlx-release-minimum-m5-max",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "macOS",
+        "ARM64",
+        "jmlx-release-minimum"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "local-m5-max",
+      "status": "online",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "macOS",
+        "ARM64",
+        "self-macos-xl"
+      ]
+    }
+  ],
+  "registrationTokenFileRemoved": true,
+  "accountPasswordRetained": false,
+  "acceptance": "Provisioning and connectivity only; exact signed-candidate Metal execution and consumer reports remain pending."
+}

@@ -28,7 +28,8 @@ same-repository PR-label trigger. It is not the dedicated manual-only release ru
 by the plan. Leave its registration and labels intact. Use a separate standard macOS account
 and a separate runner installation; two installations under the same account would still
 share that account's state. The owner approved creating `jmlxrunner`; it is now provisioned
-with UID 503 and a private (`0700`) home. Its runner is `jmlx-release-minimum-m5-max`, ID 23,
+with UID 503 and a private (`0700`) home. At provisioning its runner was
+`jmlx-release-minimum-m5-max`, ID 23,
 with labels `self-hosted`, `macOS`, `ARM64`, `jmlx-release-minimum`. The original runner's
 registration and labels were preserved.
 
@@ -50,10 +51,33 @@ locations are absent. These are scoped filesystem checks, not a machine-wide sec
 
 The custom [launchd definition](plans/evidence/minimum-host-runner-2026-11-16/com.alipsa.jmlx-release-runner.plist)
 is installed at `/Library/LaunchDaemons/com.alipsa.jmlx-release-runner.plist`.
-It launches GitHub's `runsvc.sh` with `UserName=jmlxrunner`, an explicit account home/PATH,
-and both `RunAtLoad` and `KeepAlive` disabled. The definition remains installed but unloaded;
+The connectivity check used the documented `launchctl bootstrap` and `kickstart` commands,
+including the configured log directory; it did not use `./run.sh`.
+The service launches GitHub's `runsvc.sh` with `UserName=jmlxrunner` and an explicit account
+home. `runsvc.sh` replaces launchd's PATH with the configuration-time `.path`; the listener
+also restores `.env`. Inspection as the account found `.path` equal to the deliberately
+supplied clean PATH and `.env` empty. Their digests are retained in
+[the review evidence](plans/evidence/minimum-host-runner-2026-11-16/review.json).
+Neither contains the owner's home or an inherited `JAVA_HOME`. Configuration used `env -i`,
+not the owner's shell environment. Both `RunAtLoad` and `KeepAlive` are disabled.
+The definition remains installed but unloaded;
 it will not start the worker on reboot. GitHub's own runner authentication files are private
-to the account. The service does not load the owner's environment or shell profile.
+to the account. Reinspect these saved files before each release window; the plist alone
+does not control the effective environment.
+
+Python and Git resolve to **owner-managed Homebrew** installations under `/opt/homebrew`.
+The review records selected/resolved executable paths, owners, groups, modes and versions.
+This setup isolates release-account credentials; it does not isolate the toolchain from
+the owner who can modify Homebrew. Upgrades can change executable paths and versions.
+Resolve and record them again before each window and review any change before acceptance.
+
+The owner's Gradle properties file is now mode `0600`, rather than relying solely on
+parent-directory permissions. The account still cannot read or write it. The sharing group
+`com.apple.sharepoint.group.1` includes `everyone` through a nested group, explaining the
+new account's membership. Inspection found an existing owner Public-folder SMB share with
+guest access configured; `smbd` was not loaded at inspection. No new share was created for
+`jmlxrunner`. This is not proof that File Sharing is globally disabled or that all network
+sharing access has been audited; keep the private account home and recheck sharing at window time.
 
 For a reviewed release verification window, a host administrator can start it with:
 
@@ -111,12 +135,72 @@ temporary evidence before another candidate; retain reports outside disposable b
 
 ## Verify registration, then execute the candidate
 
-Check the repository runner list and record the new runner ID, labels, account and date:
+GitHub [automatically removes persistent runners](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/remove-runners)
+after more than 14 days without a connection (ephemeral registrations have a one-day limit).
+The 2026-11-16 connection therefore does not reserve ID 23 beyond approximately 2026-11-30.
+Keep the worker stopped; plan to re-register at window time if the registration has expired,
+using GitHub's removal/re-registration instructions and a fresh short-lived token.
+Record the replacement ID and repeat connectivity/identity checks. There is no periodic
+keepalive job. Historical setup evidence and the checked support-floor decision remain historical.
+
+Check the repository runner list **before starting** and compare its ID with both the last
+reviewed window record and the local `.runner` agent ID. A missing or different ID requires
+re-registration or review, not silently treating ID 23 as current. Record labels, account and date:
 
 ```sh
 gh api repos/Alipsa/jmlx/actions/runners \
   --jq '.runners[] | {id,name,status,busy,labels:[.labels[].name]}'
 ```
+
+Automatic runner updates remain enabled. The archive digest records the **initial install**,
+not a permanently pinned running binary. GitHub documents its
+[update behavior](https://docs.github.com/en/actions/reference/runners/self-hosted-runners#runner-software-updates-on-self-hosted-runners).
+As the dedicated account, record `./bin/Runner.Listener --version` and its executable SHA-256
+before starting and again after connection or any update, before dispatch. Review version
+changes alongside the saved environment and tool paths. Persistent registration and manual
+workspace cleanup remain the chosen setup; ephemeral registration alone would not wipe files.
+
+List active workflow runs and their jobs matching the release label before bringing the
+runner online. The following read-only commands paginate both collections and list matching
+unfinished jobs (including jobs queued behind another job):
+
+```sh
+python3 - <<'PY'
+import json
+import subprocess
+
+def gh(*args):
+    return subprocess.check_output(["gh", "api", "--paginate", *args], text=True, timeout=60)
+
+run_ids = set()
+for status in ("queued", "in_progress", "waiting", "requested", "pending"):
+    run_ids.update(gh(f"repos/Alipsa/jmlx/actions/runs?status={status}",
+                      "--jq", ".workflow_runs[].id").split())
+for run_id in sorted(run_ids, key=int):
+    run = json.loads(gh(f"repos/Alipsa/jmlx/actions/runs/{run_id}"))
+    jobs = gh(f"repos/Alipsa/jmlx/actions/runs/{run_id}/jobs", "--jq",
+              '.jobs[] | select(.status != "completed") | '
+              'select(.labels | index("jmlx-release-minimum")) | {id,name,status,labels}')
+    if jobs.strip():
+        print(json.dumps({key: run[key] for key in ("id", "path", "head_branch", "head_sha", "event")}))
+        print(jobs)
+PY
+```
+
+Investigate every matching job; leave the worker offline if anything unexpected is queued.
+Both jobs in the reviewed `release-candidate.yml` now require `github.ref == 'refs/heads/main'`.
+Dispatch explicitly from `main`; review that workflow commit and the candidate tag separately.
+The minimum-host report records workflow ref, event and `github.workflow_sha`, and the final
+receipt checks their required form. Compare the recorded SHA with the actual reviewed GitHub
+run; these local fields are operator attestations, not authenticated remote provenance.
+
+A main-branch guard protects this workflow's normal dispatch path. Another workflow, or
+an edited branch copy that removes the guard, can still request the runner's labels.
+Queue inspection is a snapshot, not an access-control boundary. This repository-level runner
+therefore trusts repository writers during the window; preserve fork approval controls,
+review workflow changes, and keep the online window short. A server-enforced workflow
+allowlist would require an appropriately restricted organization runner group; this setup
+does not claim that restriction is installed.
 
 Recheck Python, OS, architecture, chip/GPU and virtualization **as the dedicated account**.
 Do not dispatch a placeholder candidate merely to test registration. Once readiness and tuple

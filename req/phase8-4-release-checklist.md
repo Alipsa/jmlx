@@ -39,6 +39,9 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   required before release acceptance. The dedicated
   `jmlxrunner` account and runner registration were provisioned and connectivity checked
   on 2026-11-16; the worker is stopped until the reviewed verification window.
+- [ ] Revalidate minimum-host registration, saved environment, tool/runner versions and
+  queued jobs immediately before the window. ID 23 is historical: GitHub removes persistent
+  registrations after more than 14 offline days; re-register and record a new ID if necessary.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
   The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
   inventory to 26 entries. Two provenance findings (Juffa `erf`/`erfinv` and Cephes)

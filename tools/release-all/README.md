@@ -63,13 +63,16 @@ are ignored for status-only recovery. Protect the journal against modification.
    `JMLX_LINUX_CONTAINER_IMAGE_ID`. It requires network access for the pinned wrapper/toolchains.
 8. Upload **both ZIP and preliminary JSON** as assets of a temporary draft GitHub Release on
    the candidate tag, after authorization for that external write. Dispatch
-   `release-candidate.yml` with both asset IDs/digests, Release ID and tag/peeled SHA. The transfer
+   `release-candidate.yml` from `main` with both asset IDs/digests, Release ID and tag/peeled SHA.
+   The transfer
    job has draft-access permissions and never executes the bundle. The dedicated physical
    minimum-host job has read-only repository access and checks tag object, HEAD, digests,
    native OS floor and actual packaged kernels. Provision its `jmlx-release-minimum` runner
    label before attempting this gate; a VM or moving hosted image cannot establish the floor.
    Use the [dedicated-account setup procedure](../../req/phase8-4-minimum-host-setup.md);
    the existing `self-macos-xl` PR/Tier-B runner does not satisfy that isolation requirement.
+   Revalidate registration, saved environment, runner/tool versions and queued label-matching
+   jobs before starting the worker. Offline registrations can expire after more than 14 days.
 9. Download minimum-host JSON/log evidence, then create the final receipt:
 
 ```sh
@@ -82,7 +85,10 @@ python3 tools/release-all/final_receipt.py --root "$PWD" \
 
 Each report's log and measured `.runtime.xml` must remain beside its JSON. The consumer JVM
 itself writes feature/version/runtime build/vendor/home; its file and digest are verified,
-independently of the Java launcher on PATH. Only a **final** receipt can be submitted:
+independently of the Java launcher on PATH. The minimum-host report also records the manual
+workflow's main ref and SHA; review these against the actual GitHub run and reviewed workflow
+commit. Job guards and recorded identity do not restrict other workflows from using its labels.
+Only a **final** receipt can be submitted:
 
 ```sh
 ./releaseAll.sh --publish-verified build/releaseAll/verified.json

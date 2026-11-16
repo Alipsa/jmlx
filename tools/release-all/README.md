@@ -126,6 +126,8 @@ ARM64 Mach-O `LC_BUILD_VERSION`, native pins, personal path leaks and exact lega
 Only the known pinned upstream MLX path is allowlisted; upstream binaries remain unchanged.
 `--documentation-jar <jar>` also checks every reviewed notice in a companion artifact;
 it scans companion entries for the supplied `--forbid` prefixes as well.
+The main JAR's other entries receive the same scan; its five native payload entries retain
+the separate binary/path verifier and pinned upstream MLX exception.
 `:jmlx-native-macos-arm64:verifyNativeReleasePayload` checks main, sources and Javadoc jars.
 The [native license audit](../../req/phase8-4-native-license-audit.md) records the source
 inventory, reproduction command and unresolved provenance findings. Its

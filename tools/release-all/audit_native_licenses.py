@@ -13,6 +13,8 @@ from pathlib import Path
 
 from release_inputs import native_notice_report, read_json, sha256, validate_native_legal_inventory
 
+NOTICE_SEPARATOR = "======== JMLX NATIVE NOTICE SECTION ========"
+
 
 def normalized(text):
     """Ignore line-end whitespace when matching a license excerpt, preserving its words."""
@@ -68,7 +70,7 @@ def source_bytes(entry, cache, wheel):
 
 def notice_sections(text):
     sections = {}
-    for section in re.split(r"^={8,}\s*$", text, flags=re.M):
+    for section in re.split(r"^" + re.escape(NOTICE_SEPARATOR) + r"[ \t]*$", text, flags=re.M):
         lines = section.strip().splitlines()
         if lines:
             title = lines[0]

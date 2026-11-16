@@ -198,7 +198,8 @@ class NativeLicensesTest(unittest.TestCase):
         for target in ("missing", None, [], 1):
             with self.subTest(target=target), self.assertRaisesRegex(ValueError, "unknown packaged text"):
                 A.check_attribution(dict(entry, packagedAs=target), text, texts)
-        misplaced = {"THIRD-PARTY-NOTICES": "example\nother text\n========\nother component\n" + text}
+        misplaced = {"THIRD-PARTY-NOTICES": "example\nother text\n" + A.NOTICE_SEPARATOR
+                     + "\nother component\n" + text}
         for selectors in ({}, {"noticeLines": [1, 1]}, {"noticeFragments": text.splitlines()}):
             with self.subTest(selectors=selectors), self.assertRaisesRegex(ValueError, "upstream attribution missing"):
                 A.check_attribution(dict(entry, **selectors), text, misplaced)
@@ -210,6 +211,47 @@ class NativeLicensesTest(unittest.TestCase):
             del inventory["packagedTexts"][name]
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, "inventory lacks required"):
                 R.native_notice_report(jar, inventory)
+
+    def test_license_equals_rules_remain_inside_the_component_section(self):
+        text = "Copyright\n========\nPermission\n" + "=" * 72 + "\nDisclaimer\n"
+        target = "example\n" + text + A.NOTICE_SEPARATOR + "\nother component\nother text\n"
+        self.assertEqual(A.notice_sections(target)["example"], text.rstrip())
+        A.check_attribution(self.inventory["components"][0], text,
+                            {"THIRD-PARTY-NOTICES": target})
+
+    def test_main_jar_scans_other_entries_but_keeps_native_payload_validation_separate(self):
+        scripts = self.root / "scripts"
+        scripts.mkdir()
+        bootstrap = scripts / "bootstrap-native.sh"
+        wheel_hash = self.inventory["wheelSha256"]
+        pins = {"mlxMetalVersion": "0.32.4", "mlxcCommit": "a" * 40}
+        bootstrap.write_text('MLX_METAL_WHEEL_SHA256="' + wheel_hash + '"\n')
+        self.inventory["nativePins"] = pins
+        (self.legal / "NOTICE").write_text(" ".join((*pins.values(), wheel_hash)), encoding="utf-8")
+        self.inventory["packagedTexts"]["NOTICE"] = R.sha256(self.legal / "NOTICE")
+        self.save()
+        jar = self.root / "native.jar"
+        prefix = "se/alipsa/jmlx/native/macos-aarch64/"
+        def write_jar(leak=None):
+            with zipfile.ZipFile(jar, "w") as archive:
+                for name in self.inventory["packagedTexts"]:
+                    archive.writestr("META-INF/" + name, (self.legal / name).read_bytes())
+                for name in R.NATIVE_FILES:
+                    archive.writestr(prefix + name, R.UPSTREAM_PATH if name == "libmlx.dylib" else b"payload")
+                if leak:
+                    archive.writestr(leak, b"/Users/runner/private/source")
+        with patch.object(R, "native_report", return_value={"pins": pins}) as payload_check:
+            write_jar()
+            R.native_jar_report(jar, bootstrap, ["/Users/runner"])
+            self.assertEqual(payload_check.call_args.args[2], ["/Users/runner"])
+            payload_check.reset_mock()
+            for entry in ("META-INF/MANIFEST.MF", "META-INF/debug.txt", "api/example.class",
+                          prefix + "unexpected.txt"):
+                with self.subTest(entry=entry):
+                    write_jar(entry)
+                    with self.assertRaisesRegex(ValueError, "personal path leaked in " + entry):
+                        R.native_jar_report(jar, bootstrap, ["/Users/runner"])
+            payload_check.assert_not_called()
 
     def test_native_main_missing_reviewed_text_fails_before_payload_parsing(self):
         scripts = self.root / "scripts"

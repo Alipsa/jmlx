@@ -206,14 +206,14 @@
     "componentCount": 26,
     "packagedTexts": {
       "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
-      "THIRD-PARTY-NOTICES": "ef25c942cd907e22c0177d1726facffca4be894f848e31e92464e5d80ffaadda",
+      "THIRD-PARTY-NOTICES": "4efc6e66304629e287bb7120b732a5784c2c1e398e28bf47e214eef885e34eb8",
       "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
       "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
     },
-    "result": "Source/notice consistency and companion path checks pass; legal findings remain open.",
+    "result": "Source/notice consistency and main/companion non-payload path checks pass; legal findings remain open.",
     "releaseSelftests": {
-      "tests": 72,
-      "seconds": 64.873,
+      "tests": 74,
+      "seconds": 59.161,
       "result": "passed"
     },
     "gradle": {
@@ -226,10 +226,9 @@
       "components": 26,
       "sourceEvidenceRecords": 34,
       "sourceUrlDigestPairs": 57,
-      "newCacheEntries": 57,
-      "networkCacheInitiallyEmpty": true,
+      "networkCacheInitiallyEmpty": false,
+      "cache": "Prior URL-bound review cache; all source objects rehashed without new requests.",
       "locale": "en_US.ISO8859-1",
-      "preferredEncoding": "ISO8859-1",
       "pythonUtf8Mode": false,
       "checkedJars": [
         "jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar",
@@ -242,16 +241,16 @@
   },
   "artifacts": {
     "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar": {
-      "sha256": "8cbd8ceff0d126b435b9b57634c4c49c89f4f1392efe18dce74b14835419c37e",
-      "size": 77821143
+      "sha256": "895b8e847735663859aad46d0083b9081ba33b3fbf7f5967bf1c8c94f71e6435",
+      "size": 77821148
     },
     "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar": {
-      "sha256": "6d8752626fcefff509c489d52ca20995ba58d5e81a14d81493ac89ceb1d2e490",
-      "size": 15594
+      "sha256": "b61dbff6e31caf5a9a2226d942c0a474308345ceef0d890cf533f988edd2a4b9",
+      "size": 15599
     },
     "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar": {
-      "sha256": "df47c556060393ac65fe10381386e0fba5ea1446658c767c734afb204cb32a81",
-      "size": 4167648
+      "sha256": "1c759f986d1ed8d102a3ef4d08b4a37b4a59895ddb3b2242ab1937d5da87fa82",
+      "size": 4167653
     },
     "jmlx-native-macos-arm64/build/publications/maven/pom-default.xml": {
       "sha256": "84d86eecdea022cdd63b5dcac25ae0586a627ee3f722bf9c972b4170ff11ae35",
@@ -261,6 +260,11 @@
   "retainedEvidence": {
     "req/plans/evidence/native-license-audit-2026-11-16/commands.json": "bb7405bae0fc42201d644b8a7196ccf188d3529b6e49f458f863a90604b57fa8",
     "req/plans/evidence/native-license-audit-2026-11-16/dylib-dependencies.txt": "6a89c22df5bd2df1233ac72062eaa3c0ed43877e5d4a95650be221f7bc105cdc",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-commands.json": "74d43b6c91a9ea17cb6a93a2507b0496b7e1ef976e38df340acbb634808efe15",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-gradle.log": "ecf1908c967a38780f74512d1c10aa59b5c940f2a052e250135e1f17b89385f7",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-release-selftests.log": "0c5bb6869448f0333c5bfa457297e78ffd3ce5612f7cba895213df71f41f8a78",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-require-clear.log": "790b5abfba72fb67f90bf1b69735aad801d2f57ac2dcb73cf38a9e98d435b36e",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-source-verification.json": "e6f34e6d83d1e387956728cf14eda4f6fe46fd1e9d8f9bfc6eb6fd759f37e1c9",
     "req/plans/evidence/native-license-audit-2026-11-16/gradle.log": "b6c4f673c6ec2344860aa5f7f9f2777ee48875c6875c8db83483a1ab823451d0",
     "req/plans/evidence/native-license-audit-2026-11-16/release-selftests.log": "8349212051702036b0a08fe9d45375449db51005eded98d20a8b32be680fa27a",
     "req/plans/evidence/native-license-audit-2026-11-16/require-clear.log": "790b5abfba72fb67f90bf1b69735aad801d2f57ac2dcb73cf38a9e98d435b36e",
@@ -273,9 +277,9 @@
     "req/plans/evidence/native-license-audit-2026-11-16/source-verification.json": "d997ffe28d000a2fbc6fff5fd94d4e1331e038750131826b70c9b24bce01e1ac"
   },
   "verificationTools": {
-    "tools/release-all/audit_native_licenses.py": "df78dee92318e25ea75def6180ce066403a1ba43a161d54711d04aa793e8eee8",
-    "tools/release-all/release_inputs.py": "63905ff3704a99d4b82314e0e40647018c8cc32b6e75c68916c5bc431a00cd4f",
-    "tools/release-all/tests/test_native_licenses.py": "a0db1f0ff2d891e3eb438ecfe26e0e7003734c2af7439fd5f1ad7c170fac99dc",
+    "tools/release-all/audit_native_licenses.py": "3b26e1a6976a882d5d1dd0ada610381239e9f2dadfc39a593ada3392504a349a",
+    "tools/release-all/release_inputs.py": "5266931df56ab5c6b119d26d632365a4a912956ed8e5bdf4593e02bdae4a9018",
+    "tools/release-all/tests/test_native_licenses.py": "274c3bbe0d4fe8de34e2298c3b62c320270f1e77b3333ed4be6d64ee693454ef",
     "tools/release-all/tests/test_release_inputs.py": "b6154e90f6cf0ab136f2458d56cd9c669b06a5e7c999e91b06419cb26b8165ac"
   },
   "originalVerification": {
@@ -329,6 +333,62 @@
       "size": 1793
     }
   },
-  "reviewOfCommit": "fb6ff7430399203deef77598b9db99ea53078572",
-  "historicalEvidenceNote": "Unprefixed evidence and originalVerification/originalArtifacts record the first PR #100 implementation. Its digest-only cache fetched 56 of 57 distinct URL/digest pairs. The review-prefixed evidence supersedes that verification and binds every source URL independently."
+  "reviewOfCommit": "8dd48dc7ee85fb6e449db2c6cbdcc4efbcda9d9b",
+  "historicalEvidenceNote": "Unprefixed evidence and originalVerification/originalArtifacts record the first PR #100 implementation (56 of 57 distinct URL/digest fetches). Review-prefixed evidence and priorReviewVerification/priorReviewArtifacts record the subsequent URL-bound cold run (57 of 57). Followup-prefixed evidence supersedes the artifact/section/path validation using that warm URL-bound cache.",
+  "priorReviewVerification": {
+    "componentCount": 26,
+    "packagedTexts": {
+      "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+      "THIRD-PARTY-NOTICES": "ef25c942cd907e22c0177d1726facffca4be894f848e31e92464e5d80ffaadda",
+      "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
+      "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
+    },
+    "result": "Source/notice consistency and companion path checks pass; legal findings remain open.",
+    "releaseSelftests": {
+      "tests": 72,
+      "seconds": 64.873,
+      "result": "passed"
+    },
+    "gradle": {
+      "result": "passed",
+      "tasks": 15,
+      "executed": 6,
+      "upToDate": 9
+    },
+    "sourceCheck": {
+      "components": 26,
+      "sourceEvidenceRecords": 34,
+      "sourceUrlDigestPairs": 57,
+      "newCacheEntries": 57,
+      "networkCacheInitiallyEmpty": true,
+      "locale": "en_US.ISO8859-1",
+      "preferredEncoding": "ISO8859-1",
+      "pythonUtf8Mode": false,
+      "checkedJars": [
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar"
+      ],
+      "requireClearExitCode": 1,
+      "releaseReady": false
+    }
+  },
+  "priorReviewArtifacts": {
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar": {
+      "sha256": "8cbd8ceff0d126b435b9b57634c4c49c89f4f1392efe18dce74b14835419c37e",
+      "size": 77821143
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar": {
+      "sha256": "6d8752626fcefff509c489d52ca20995ba58d5e81a14d81493ac89ceb1d2e490",
+      "size": 15594
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar": {
+      "sha256": "df47c556060393ac65fe10381386e0fba5ea1446658c767c734afb204cb32a81",
+      "size": 4167648
+    },
+    "jmlx-native-macos-arm64/build/publications/maven/pom-default.xml": {
+      "sha256": "84d86eecdea022cdd63b5dcac25ae0586a627ee3f722bf9c972b4170ff11ae35",
+      "size": 1793
+    }
+  }
 }

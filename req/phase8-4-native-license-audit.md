@@ -151,6 +151,8 @@ The script verifies the wheel digest, fetches/hash-checks the recorded primary s
 cache miss, checks every extracted notice against its source and the component's own section
 of the packaged text, and checks all supplied JARs. Notice headings match inventory component
 names exactly. The inventory independently requires all four legal files in every JAR.
+Sections use the literal `======== JMLX NATIVE NOTICE SECTION ========` marker;
+ordinary lines of equals signs inside upstream license texts remain part of that section.
 Cache keys bind both the original URL and the declared digest, so two different URLs with
 identical contents are fetched separately. Cached objects are rehashed before use, never
 rewritten on a hit, and new objects are installed atomically after validation.
@@ -194,3 +196,21 @@ license tests, and the native Gradle checks (15 tasks: 6 executed, 9 up-to-date)
 preferred encoding as `ISO8859-1`; the real audit still verified all 26 entries and 34 source
 records. Its initially empty cache gained 57 entries for 57 distinct URL/digest pairs, and
 all three JARs passed. `--require-clear` again exited 1 for the two unresolved legal findings.
+
+### Main-JAR metadata and separator follow-up (2026-11-16)
+
+`native_jar_report` now scans all main-JAR entries for the supplied forbidden prefixes except
+the five exact native payload entries, which still go through `native_report` and its pinned
+MLX path exception. This includes the manifest, other `META-INF` entries and unexpected entries
+under the native resource directory. Companion scans remain unchanged.
+
+The notice separator is now the distinctive literal marker above. Regression coverage checks
+that upstream rules of eight and 72 equals signs survive within a license section, and that
+main-JAR metadata leaks fail without applying the generic scan to the pinned native payload.
+Follow-up evidence uses the `followup-` prefix; its source check reuses the independently
+URL-validated cache from the prior cold run, rehashing every cached object.
+
+All 74 release selftests passed (59.161 seconds), including 17 focused license tests. Native
+Gradle checks passed (15 tasks: 6 executed, 9 up-to-date), and the warm-cache source/notice
+check verified all 57 URL/digest pairs and all three rebuilt JARs under the same ISO-8859-1
+environment. `--require-clear` retained its expected exit 1 for the two open legal findings.

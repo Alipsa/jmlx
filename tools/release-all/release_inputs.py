@@ -214,7 +214,7 @@ def validate_native_legal_inventory(inventory):
         raise ValueError("native license inventory lacks required packaged texts")
 
 
-def native_notice_report(jar, inventory, forbidden=()):
+def native_notice_report(jar, inventory, forbidden=(), *, skip_native_payload=False):
     """Check reviewed legal texts in either the runtime or documentation artifact."""
     validate_native_legal_inventory(inventory)
     with zipfile.ZipFile(jar) as archive:
@@ -231,6 +231,10 @@ def native_notice_report(jar, inventory, forbidden=()):
                 raise ValueError(f"{jar}: native legal text differs from reviewed inventory: {name}")
             result[name] = digest
         for entry in archive.infolist():
+            if skip_native_payload and entry.filename in {
+                    "se/alipsa/jmlx/native/macos-aarch64/" + name for name in NATIVE_FILES}:
+                # native_report checks these bytes separately, including the pinned MLX exception.
+                continue
             if not entry.is_dir() and forbidden:
                 data = archive.read(entry)
                 if any(prefix and prefix.encode("utf-8") in data for prefix in forbidden):
@@ -240,7 +244,7 @@ def native_notice_report(jar, inventory, forbidden=()):
 
 def native_jar_report(jar, bootstrap, forbidden):
     inventory = read_json(Path(bootstrap).resolve().parents[1] / "req/native-license-inventory.json")
-    native_notice_report(jar, inventory)
+    native_notice_report(jar, inventory, forbidden, skip_native_payload=True)
     with tempfile.TemporaryDirectory(prefix="jmlx-native-verify-") as temp:
         with zipfile.ZipFile(jar) as archive:
             names = archive.namelist()

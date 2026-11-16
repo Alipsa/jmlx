@@ -111,6 +111,15 @@ entries; both legal findings still produce the intended nonzero `--require-clear
 Native Gradle checks passed again (15 tasks: 6 executed, 9 up-to-date). Review-prefixed evidence
 supersedes the earlier cache/network verification; the original logs remain identified as history.
 
+The further PR #100 follow-up (2026-11-16) scans main-JAR metadata and all other entries
+outside the five separately verified native payload files for forbidden prefixes. A distinctive
+literal notice separator preserves ordinary equals-sign rules inside licenses. All 74 release
+selftests passed (59.161 seconds), including 17 focused license tests; native Gradle checks
+passed again (15 tasks: 6 executed, 9 up-to-date). Follow-up source checks rehashed the prior
+URL-bound cache and verified all 57 URL/digest pairs plus three rebuilt JARs. Follow-up-prefixed
+evidence records this warm-cache check separately from the prior cold run. Both legal findings
+remain open and `--require-clear` still exits 1.
+
 ## Review corrections (2026-11-15)
 
 The minimum-host workflow now creates its Gradle home through `GITHUB_ENV` at step scope;

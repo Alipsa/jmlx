@@ -1,6 +1,6 @@
 Third-party notices for the pinned macOS ARM64 native payload
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 MLX and JACCL (MIT)
 Source: https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/LICENSE
@@ -28,7 +28,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 mlx-c (MIT)
 Source: https://github.com/ml-explore/mlx-c/blob/a26f2d584a14ec619ae8db9a09be03becd47598a/LICENSE
@@ -56,7 +56,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 nlohmann/json single-header transitive MIT attributions
 Source: https://github.com/nlohmann/json/blob/9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03/single_include/nlohmann/json.hpp
@@ -71,7 +71,7 @@ SHA-256 of source: 9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103
 
 The complete MIT permission text appears in the nlohmann/json section below.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 nlohmann/json 3.11.3 (MIT)
 Source: https://github.com/nlohmann/json/blob/9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03/LICENSE.MIT
@@ -99,7 +99,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 fmt 12.1.0 (MIT)
 Source: https://github.com/fmtlib/fmt/blob/407c905e45ad75fc29bf0f9bb7c5c2fd3475976f/LICENSE
@@ -133,7 +133,7 @@ of this Software are embedded into a machine-executable object form of such
 source code, you may redistribute such embedded portions in such object form
 without including the above copyright and permission notices.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 gguf-tools (MIT)
 Source: https://github.com/antirez/gguf-tools/blob/8fa6eb65236618e28fd7710a0fba565f7faa1848/LICENSE
@@ -161,7 +161,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 FP16 code referenced by gguf-tools fp16.c (MIT)
 Source: https://github.com/Maratyszcza/FP16/blob/782eea126dc5c755827be751a099eb01826175cf/LICENSE
@@ -179,7 +179,7 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 pocketfft (BSD-3-Clause)
 Source: https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/3rdparty/pocketfft.h
@@ -222,7 +222,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 V8 small_vector adaptation (BSD-3-Clause)
 Source: https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/small_vector.h
@@ -257,7 +257,7 @@ SHA-256 of source: 2fd7d2a423a74b7857ae886ddae0b6c4183f5b9f1d6b8f8d3ba8db38a5ad4
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 ThreadPool modifications in MLX/JACCL (zlib)
 Source: https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/threadpool.h
@@ -286,7 +286,7 @@ SHA-256 of source: e22e3eb7a2ee0b06b0ea69e8a49375761de9b799dd96b06e7ae9e778d9820
 //    3. This notice may not be removed or altered from any source
 //    distribution.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 Norbert Juffa expm1f (BSD-2-Clause)
 Source: https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/expm1f.h
@@ -325,7 +325,7 @@ SHA-256 of source: dbdf551f45723639da54d72e327008bde6ef01a2f1ed561bb065e251ab6c9
 //  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 //  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 NVIDIA/Filipe RNC Maia cexpf adaptation (Apache-2.0)
 Source: https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/cexpf.h
@@ -350,7 +350,7 @@ SHA-256 of source: 88b6e15a52a5800d98d9bc6da840ca5cf70bf572fda136409580c1f17b1e0
 // Forked from
 // https://github.com/NVIDIA/cccl/blob/main/thrust/thrust/detail/complex/cexpf.h
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 NumPy einsum adaptation (BSD-3-Clause)
 Source: https://github.com/numpy/numpy/blob/1d49c7f7ff527c696fc26ab2278ad51632a66660/LICENSE.txt
@@ -388,7 +388,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 opt_einsum algorithm attribution (MIT)
 Source: https://github.com/dgasmith/opt_einsum/blob/c15aec2c7dbbcaf5b9790b980f699bf295baa7d9/LICENSE
@@ -417,7 +417,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 supervised-lda NumpyFormat adaptation (MIT)
 Source: https://github.com/angeloskath/supervised-lda/blob/fe3a39bb0d6c7d0c2a33f069440869ad70774da8/LICENSE
@@ -446,7 +446,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 fastermath exponential adaptation (BSD-3-Clause)
 Source: https://github.com/akohlmey/fastermath/blob/2ed806f45871129c9ccddc63422370641af9f14d/src/exp.c
@@ -482,7 +482,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 Julien Pommier NEON math adaptation (zlib)
 Source: https://github.com/JishinMaster/simd_utils/blob/3c1433a86fb38edcc9b02039f3c9a65b16640976/neon_mathfun.h
@@ -510,7 +510,7 @@ MLX adaptation/reference: mlx/backend/cpu/simd/math.h
   (this is the zlib license)
 */
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 PyTorch CPU and Metal math adaptations (BSD-3-Clause)
 Source: https://github.com/pytorch/pytorch/blob/e3643e1e0e923f0fc063dfab6f45c956d568919d/LICENSE
@@ -602,7 +602,7 @@ CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 TensorFlow cumulative log-sum-exp gradient adaptation (Apache-2.0)
 Source: https://github.com/tensorflow/tensorflow/blob/2a5910906a0e0f3dbc186ff9db6386d81a63448c/tensorflow/python/ops/math_grad.py
@@ -623,7 +623,7 @@ MLX adaptation/reference: mlx/primitives.cpp
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 JAX Threefry algorithm reference (Apache-2.0)
 Source: https://github.com/jax-ml/jax/blob/81991d87c8608d07f9752940375092aa4fb9610e/jax/_src/prng.py
@@ -644,7 +644,7 @@ MLX adaptation/reference: mlx/backend/cpu/threefry.h, mlx/random.cpp
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 Random123 Threefry attribution (BSD-3-Clause)
 Source: https://github.com/DEShawResearch/random123/blob/726a093cd9a73f3ec3c8d7a70ff10ed8efec8d13/LICENSE
@@ -683,7 +683,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 VkFFT algorithm reference (MIT)
 Source: https://github.com/DTolm/VkFFT/blob/066a17c17068c0f11c9298d848c2976c71fad1c1/LICENSE
@@ -712,7 +712,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 CUB merge-sort algorithm reference (BSD-3-Clause)
 Source: https://github.com/NVIDIA/cccl/blob/64d3a5f0c1c83ed83be8c0a9a1f0cdb31f913e81/cub/LICENSE.TXT
@@ -744,7 +744,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 Cephes math provenance (upstream permission statement; review open)
 Source: https://www.netlib.org/cephes/readme
@@ -765,7 +765,7 @@ integral.
    Stephen L. Moshier
    moshier@na-net.ornl.gov
 
-========================================================================
+======== JMLX NATIVE NOTICE SECTION ========
 
 PyTorch Metal hypot license variant (BSD-3-Clause)
 Source: https://github.com/pytorch/pytorch/blob/a82aae9d4a7827849ce50f31c4c7ee8f278d05f5/LICENSE

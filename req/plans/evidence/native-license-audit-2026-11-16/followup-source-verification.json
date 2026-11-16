@@ -1,0 +1,128 @@
+{
+  "schema": 1,
+  "inventorySha256": "778f44d7947e1ff722c6bd14ab54c1ebbe66e40e967a23bcc414eea3344c6d82",
+  "components": [
+    {
+      "component": "MLX and JACCL (MIT)",
+      "sha256": "ccfab7ccb2ea306f71531c8ca77bb55507606cd90768b1e32b8b52ab5b48cf01"
+    },
+    {
+      "component": "mlx-c (MIT)",
+      "sha256": "44326a4ea062241ae6fc26ee2ec90bdc81af7eb7b9d3966181b733fa69d42057"
+    },
+    {
+      "component": "nlohmann/json 3.11.3 (MIT)",
+      "sha256": "86b998c792894ccb911a1cb7994f7a9652894e7a094c0b5e45be2f553f45cf14"
+    },
+    {
+      "component": "fmt 12.1.0 (MIT)",
+      "sha256": "07580f2a3b35709ce703d523f447b242f6dfec7582a8c0df102c7fa2849375f8"
+    },
+    {
+      "component": "gguf-tools (MIT)",
+      "sha256": "7cce16d2bf2e2ce6a7d70b5ecd5fb43c6409a97aa0750ff75c11823e6e8c9d05"
+    },
+    {
+      "component": "FP16 code referenced by gguf-tools fp16.c (MIT)",
+      "sha256": "17e4f539024be2749ee729d1e2f01d24cef12ece8c9bf18e91a4349be29c80bf"
+    },
+    {
+      "component": "pocketfft (BSD-3-Clause)",
+      "sha256": "0eaea21304bf324639ff11022ee63faf48a8fab64afe5c3c2d1efefbe1d7dfa6"
+    },
+    {
+      "component": "V8 small_vector adaptation (BSD-3-Clause)",
+      "sha256": "2fd7d2a423a74b7857ae886ddae0b6c4183f5b9f1d6b8f8d3ba8db38a5ad4677"
+    },
+    {
+      "component": "ThreadPool modifications in MLX/JACCL (zlib)",
+      "sha256": "e22e3eb7a2ee0b06b0ea69e8a49375761de9b799dd96b06e7ae9e778d9820667"
+    },
+    {
+      "component": "Norbert Juffa expm1f (BSD-2-Clause)",
+      "sha256": "dbdf551f45723639da54d72e327008bde6ef01a2f1ed561bb065e251ab6c9f1a"
+    },
+    {
+      "component": "NVIDIA/Filipe RNC Maia cexpf adaptation (Apache-2.0)",
+      "sha256": "88b6e15a52a5800d98d9bc6da840ca5cf70bf572fda136409580c1f17b1e0aab"
+    },
+    {
+      "component": "nlohmann/json single-header transitive MIT attributions",
+      "sha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6"
+    },
+    {
+      "component": "NumPy einsum adaptation (BSD-3-Clause)",
+      "sha256": "01fb016849aa427edb1bbbbd55f91c26ca6cadb32a5b20e7f000655dd05b0760"
+    },
+    {
+      "component": "opt_einsum algorithm attribution (MIT)",
+      "sha256": "7b26691a7c8ee48af425a53cbaeaabc9aa3a84ea2e93fe47a1ecc550c1de76db"
+    },
+    {
+      "component": "supervised-lda NumpyFormat adaptation (MIT)",
+      "sha256": "b50379222802591434ac7a2137ba171b6c7529e9c1bb95eba1c9c9aa55609621"
+    },
+    {
+      "component": "fastermath exponential adaptation (BSD-3-Clause)",
+      "sha256": "1d408b5aed22e94947cd8bcb74594b8e0d0287bada919d875fc9a32d2d3cf665"
+    },
+    {
+      "component": "Julien Pommier NEON math adaptation (zlib)",
+      "sha256": "e75773addab087ff17c288f1143f45af0a532b1fafe2b550f13e55475a7d05a6"
+    },
+    {
+      "component": "PyTorch CPU and Metal math adaptations (BSD-3-Clause)",
+      "sha256": "a8a2c6b67cf8a597ffaa5c82380a6bd1b82629c0417e00673d8013d662eb500a"
+    },
+    {
+      "component": "TensorFlow cumulative log-sum-exp gradient adaptation (Apache-2.0)",
+      "sha256": "29ff2b107b055bd5be79647d790d7a6ad89b9363a6bfee15c79c1c08c0b02658"
+    },
+    {
+      "component": "JAX Threefry algorithm reference (Apache-2.0)",
+      "sha256": "8d41666e2e2a5ceedfc4848ec38cedf48a38ccab2da004edf3c6095745751470"
+    },
+    {
+      "component": "Random123 Threefry attribution (BSD-3-Clause)",
+      "sha256": "5fd0885ab205878bd90c19144677286252eb9b988c1545a3a910edfe1e27b6df"
+    },
+    {
+      "component": "VkFFT algorithm reference (MIT)",
+      "sha256": "2bfae14bf46ead0effe63ed36b0d28bcc8846716bfc030d03b146eda7f0bdebd"
+    },
+    {
+      "component": "CUB merge-sort algorithm reference (BSD-3-Clause)",
+      "sha256": "2e15eba2e130f3e80d9e91724c7dce3781ce99316324681ff54b00c1fc9759b3"
+    },
+    {
+      "component": "metal-cpp 26 (Apache-2.0)",
+      "sha256": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2"
+    },
+    {
+      "component": "Cephes math provenance (upstream permission statement; review open)",
+      "sha256": "82004ae6ed8feb08fd16783b6b32e82adfe047f60cb2f238dbf5d4bf9dae42a2"
+    },
+    {
+      "component": "PyTorch Metal hypot license variant (BSD-3-Clause)",
+      "sha256": "bd018feef8825e88181c84eb7e3aa4eafb8f08a20d9fd6ef948569610c4a3e43"
+    }
+  ],
+  "sourceEvidenceCount": 34,
+  "sourceUrlDigestPairs": 57,
+  "packagedTexts": {
+    "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+    "THIRD-PARTY-NOTICES": "4efc6e66304629e287bb7120b732a5784c2c1e398e28bf47e214eef885e34eb8",
+    "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
+    "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
+  },
+  "checkedJars": [
+    "jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar",
+    "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar",
+    "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar"
+  ],
+  "releaseReady": false,
+  "unresolvedFindings": [
+    "NATIVE-LICENSE-1",
+    "NATIVE-LICENSE-2"
+  ]
+}

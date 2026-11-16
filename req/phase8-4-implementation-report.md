@@ -128,8 +128,16 @@ correspondence and prepares a provenance request. The owner subsequently submitt
 check. The investigation and submission do not establish an additional
 grant or close either legal finding. Validation confirms the comparison inputs and retained
 file hashes and reproduces the unchanged audit result (57 URL/digest pairs, releaseReady false,
-expected exit 1). This follow-up changes only documentation and research evidence; the 74-test
+expected exit 1). The initial investigation changed only documentation and research evidence;
+the 74-test
 and native Gradle results above remain evidence for PR #100's implementation, not a new run.
+
+PR #101 review corrections commit the dated `compare_literals.py` verifier and record its
+digest, exact comment record shape/JSON serialization and function/literal extraction rules.
+Fresh downloads reproduce the original two comment hashes and all five comparison results;
+offline replay produces the identical report. The scope now explicitly excludes PyTorch-derived
+CPU `erf` from the Juffa comparison. Five new regressions bring release selftests to 79, all
+passing in 49.296 seconds. Native code/notices and both open legal findings are unchanged.
 
 ## Review corrections (2026-11-15)
 

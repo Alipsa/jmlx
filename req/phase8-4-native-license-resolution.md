@@ -17,6 +17,10 @@ bindings, notices, artifact hashes and the publication flow are unchanged.
 
 ## Juffa implementations: the BSD samples differ
 
+CPU `erf` is outside this Juffa comparison: its SIMD implementation cites PyTorch's
+Abramowitz–Stegun approximation and is already covered by the packaged PyTorch notice.
+The Juffa scope is Metal `erf` and Metal/CPU `erfinv`, rather than every function in `simd/math.h`.
+
 Juffa published explicit BSD-2-Clause code in his NVIDIA forum posts for
 [`erff`](https://forums.developer.nvidia.com/t/optimized-version-of-single-precision-error-function-erff/40977/1)
 and [`erfinvf`](https://forums.developer.nvidia.com/t/a-very-compact-implementation-of-the-inverse-error-function-erfinvf/61961/1).
@@ -106,12 +110,48 @@ Only the two explicitly BSD-licensed samples and derived comparison facts are re
 Stack Overflow answer bodies and correspondence HTML are referenced rather than recopied.
 The original audit retains the Stack Overflow body hashes and licenses.
 
-Comparison method: extract the named function using balanced braces from these particular
-inputs, strip C/C++ comments, collect signed decimal floating literals, remove `f`/`F` suffixes
-and normalize with Python's `decimal.Decimal`. The comparison does not parse arbitrary C++
+Comparison method: extract text starting at the function name (excluding the return type),
+through its balanced closing brace, from these particular inputs. Strip C/C++ comments,
+collect decimal floating literals, remove `f`/`F` suffixes and normalize with Python's
+`decimal.Decimal`. An optional plus/minus sign is included only when directly attached to
+the numeric token, as specified by `FLOAT_LITERAL_PATTERN` in the committed script.
+A separated minus sign is not treated as part of the literal. The comparison does not parse
+arbitrary C++
 and excludes integer/hexadecimal literals. Code input hashes and all seven extracted function
 hashes are recorded, so readers can check the exact variants being compared. The two BSD
 samples are reference evidence only and are not built or added to the native artifacts.
+
+The committed [comparison and projection script](plans/evidence/native-license-resolution-2026-11-16/compare_literals.py)
+reproduces all seven function records, five checks and both comment-list hashes. From the
+repository root with Python 3.11+:
+
+```sh
+python3 req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py \
+  --inputs build/releaseAll/license-resolution-inputs --fetch-missing \
+  --output build/releaseAll/license-resolution-reproduction.json
+```
+
+The script downloads missing inputs into a URL/digest-bound cache; omit `--fetch-missing`
+to verify the cached responses offline. It checks the original audit's complete Stack Overflow
+answer-body hashes before extracting their longest HTML-decoded code blocks, and validates
+every function input/hash/literal record against `code-comparison.json`. The retained BSD
+samples need no download. Changed projected content fails with a contextual error.
+
+For each comment response, preserve the API `items` array order. Project each item to exactly
+`{"comment_id": item["comment_id"], "creation_date": item["creation_date"],
+"body": item["body"], "ownerUserId": item.get("owner", {}).get("user_id")}`.
+`body` remains the raw HTML string; the owner field is flattened to `ownerUserId`, and a
+missing owner/user ID becomes JSON null. Serialize the complete list as
+`json.dumps(records, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")`,
+with no trailing newline. Both original hashes are preserved. The manifest records this exact
+format and the script's digest. Partial comment pages are rejected rather than silently hashed.
+
+The review rerun reproduced both original comment hashes and all five checks from fresh
+downloads, then produced an identical report offline. Five focused regressions cover exact
+serialization/order, incomplete responses, function/sign boundaries, HTML/body extraction and
+URL-bound input integrity. All 79 release selftests passed (49.296 seconds); the research
+manifest retains the verifier/test digests and reproduction result. No native runtime code,
+notices, license findings or numerical implementations changed.
 
 Validation checks source hashes against the existing audit, the five recorded comparison
 results and every retained sample/report digest. The unchanged audit command still produces

@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-16",
-  "method": "Extract each named function by balanced braces from the captured, hash-identified input. Strip C/C++ comments, collect signed decimal floating literals in order, strip f/F suffixes and normalize with Python decimal.Decimal. Integer and hexadecimal literals are not included. This bounded lexical comparison is not a C++ parser, semantic equivalence proof or licensing determination.",
+  "method": "Extract text beginning at the function name (excluding return type), through its balanced closing brace. Strip C/C++ comments, collect decimal floating literals with the exact recorded regex, strip f/F suffixes and normalize with str(decimal.Decimal(token)). A sign is included only when directly attached to the token. Integer and hexadecimal literals are excluded. This bounded lexical comparison is not a C++ parser, semantic equivalence proof or licensing determination.",
   "records": [
     {
       "id": "mlx-metal-erf",
@@ -212,5 +212,7 @@
     "metalErfLiteralMultisetIsSubsetOfStackOverflow": true,
     "bsdErfLiteralSequenceMatchesShipped": false,
     "bsdInverseLiteralSequenceMatchesShipped": false
-  }
+  },
+  "functionPattern": "\\b<escaped-function-name>\\s*\\([^)]*\\)\\s*\\{",
+  "literalPattern": "(?<![\\w.])[+-]?(?:\\d+\\.\\d*|\\.\\d+)(?:[eE][+-]?\\d+)?[fF]?"
 }

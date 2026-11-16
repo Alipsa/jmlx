@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "matchesRecordedResults": true,
+  "functionRecords": 7,
+  "checks": {
+    "metalInverseLiteralSequenceMatchesStackOverflow": true,
+    "cpuInverseLiteralMultisetMatchesStackOverflow": true,
+    "metalErfLiteralMultisetIsSubsetOfStackOverflow": true,
+    "bsdErfLiteralSequenceMatchesShipped": false,
+    "bsdInverseLiteralSequenceMatchesShipped": false
+  },
+  "commentProjections": [
+    {
+      "id": "erf-answer-comments",
+      "sha256": "6e71966d58d42b16ab61817b37ea595fe03e2acfb33f66129842af459787b45b",
+      "count": 16
+    },
+    {
+      "id": "erfinv-answer-comments",
+      "sha256": "a3d35031fe28152f103a3cfc43c51e95220e32a3500f1bbd90f269fc723dbbdc",
+      "count": 6
+    }
+  ]
+}

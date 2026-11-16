@@ -47,7 +47,7 @@ class FinalReceiptTest(unittest.TestCase):
                        "pluginReceiptSha256": sha256(plugin), "pluginReceipt": {"manifestHash": sha256(plan)},
                        "invocationId": "run", "taskEvidence": {"path": str(events), "sha256": sha256(events)},
                        "junit": {"result.xml": sha256(junit)}}
-        self.record["native"] = {"minimum": [26, 2, 0]}
+        self.record["native"] = {"minimum": [27, 2, 0]}
         argv = write("gradle-argv.json", ["gradlew", "bundleAll", "--no-build-cache"])
         self.record["gradleArgv"] = json.loads(argv.read_text())
         self.record["gradleArgvFile"] = {"path": str(argv), "sha256": sha256(argv)}
@@ -61,8 +61,8 @@ class FinalReceiptTest(unittest.TestCase):
         for kind in F.REQUIRED:
             env = {"system": "Linux" if kind == "linux-pure" else "Darwin",
                    "architecture": "aarch64" if kind == "linux-pure" else "arm64",
-                   "osVersion": "26.2", "virtualized": False, "chip": "Apple fixture",
-                   "swVers": "macOS 26.2", "containerImage": "fixture-image", "osRelease": "Ubuntu fixture"}
+                   "osVersion": "27.2.1", "virtualized": False, "chip": "Apple fixture",
+                   "swVers": "macOS 27.2.1", "containerImage": "fixture-image", "osRelease": "Ubuntu fixture"}
             log = self.root / (kind + ".log")
             log.write_text("smoke passed")
             runtime = {"java.feature": "21" if kind.endswith("pure") else "25",
@@ -116,6 +116,21 @@ class FinalReceiptTest(unittest.TestCase):
         self.write("final.json", {"schema": "jmlx-preliminary-bundle-1"})
         with self.assertRaisesRegex(ValueError, "only a final"):
             F.verify(self.root, self.path)
+
+    def test_minimum_host_requires_supported_minor_and_accepts_patch_releases(self):
+        path = self.root / "minimum-host.json"
+        report = json.loads(path.read_text())
+        for version in ("27.2", "27.2.0", "27.2.1", "27.2.9", "26.2.1", "27.1.9", "27.3.0"):
+            with self.subTest(version=version):
+                report["environment"]["osVersion"] = version
+                self.write("minimum-host.json", report)
+                self.receipt["reports"]["minimum-host"]["sha256"] = sha256(path)
+                self.write("final.json", self.receipt)
+                if version.split(".")[:2] == ["27", "2"]:
+                    F.verify(self.root, self.path)
+                else:
+                    with self.assertRaisesRegex(ValueError, "minimum-host evidence"):
+                        F.verify(self.root, self.path)
 
     def test_missing_reports_changed_plan_and_logs_block_upload(self):
         missing = copy.deepcopy(self.receipt)

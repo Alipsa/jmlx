@@ -5,7 +5,7 @@ The core (`req/plans/initial-plan.md`) is a v0.1 vertical slice — native boots
 
 ## Requirements
 
-- macOS on Apple Silicon, macOS 26.2 or later (the bundled wheel's dylib minimum).
+- macOS on Apple Silicon, macOS 27.2 or later (27.2.x is the minimum supported release series).
 - Java 25 (JDK 25 toolchain; Gradle's toolchain support will provision it if you don't already have one).
 - Xcode Command Line Tools (`xcode-select --install`), which provide `git`, `cc` (clang) and `otool`.
 - `cmake`: `brew install cmake` (or the cmake.org installer).

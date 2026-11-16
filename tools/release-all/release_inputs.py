@@ -146,7 +146,13 @@ def native_report(directory, bootstrap, forbidden):
         raise ValueError("bootstrap deployment target missing")
     target = tuple(map(int, target_match[1].split(".")))
     target = (target + (0, 0, 0))[:3]
-    result = {"pins": pin, "minimum": target, "files": {}}
+    minimum_match = re.search(r'^MACOS_SUPPORTED_MINIMUM="([0-9]+\.[0-9]+)"$', script, re.M)
+    if not minimum_match:
+        raise ValueError("bootstrap supported minimum missing")
+    minimum = tuple(map(int, minimum_match[1].split("."))) + (0,)
+    if target > minimum:
+        raise ValueError("deployment target exceeds supported minimum")
+    result = {"pins": pin, "minimum": minimum, "deploymentTarget": target, "files": {}}
     for name in NATIVE_FILES:
         path = directory / name
         if not path.is_file() or not path.stat().st_size:

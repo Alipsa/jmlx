@@ -75,11 +75,13 @@ selection checks. The HTTPS integration fixture verifies byte-identical upload a
 gates with synthetic producer/evidence inputs. See the
 [compatibility report](phase8-4-plugin-2.6.0-compatibility.md) for exact identities and limits.
 
-The physical minimum-host resource is not secured. Exact signed-bundle consumers, the manual
+The owner approved a 27.2.x supported minimum on 2026-11-16; the local physical Mac runs
+27.2.1. Dedicated runner setup and exact-candidate verification remain open (see the
+[readiness checklist](phase8-4-release-checklist.md)). Exact signed-bundle consumers, the manual
 workflow, final receipt and Central postpublication path still require actual candidate
 execution. No jmlx release has been performed.
-The proposed all-new tuple needs post-plugin audit/review; license inventory and current
-account publishing capacity need release review. No earlier/local report substitutes for
+The post-plugin audit is complete; the proposed all-new tuple still needs review. License
+inventory and current account publishing capacity need release review. No earlier/local report substitutes for
 these gates. Phase 8.4 is not complete.
 
 ## Review corrections (2026-11-15)
@@ -117,3 +119,21 @@ workflow confirms its forbidden job-level context is detected.
 
 The later 2.6.0 integration closes the external plugin prerequisite; physical minimum-host
 and signed-candidate execution gates remain open. No jmlx publication or tag was created.
+
+
+## Supported minimum correction (2026-11-16)
+
+The owner raised native support to macOS 27.2 or later, with any 27.2.x patch release
+eligible for minimum-host acceptance. Bootstrap now records that policy separately from
+its unchanged 26.2 binary deployment target. Native reports include both values; missing
+support policy or a deployment target above that policy fails verification. The minimum-host
+smoke and final-receipt gates derive their required OS major/minor from the supported floor.
+Hosted `macos-26` checks remain additional regression coverage.
+
+Local validation on macOS 27.2.1: all 51 release selftests passed (64.036 seconds), including
+accepted 27.2 patch versions and rejected 26.2/27.1/27.3 minimum-host evidence. Native module
+`check` and `verifyNativeReleasePayload` passed (11 tasks, 2 executed); the staged and packaged
+native reports pass with supported minimum 27.2 and all three dylib minos values 26.2.
+Bootstrap shell syntax and `git diff --check` pass. This verifies policy and existing payload
+metadata; dedicated physical-runner setup and exact signed-candidate Metal execution remain
+release gates.

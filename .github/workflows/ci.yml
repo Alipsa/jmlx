@@ -128,6 +128,8 @@ jobs:
   native:
     # macos-26 is GitHub's hosted ARM64 (M1) image. Each job starts on a
     # fresh VM, so the pinned MLX runtime must be bootstrapped in the checkout.
+    # Additional coverage below the supported 27.2 floor; release acceptance separately
+    # requires the exact signed candidate on physical 27.2.x hardware.
     runs-on: macos-26
 
     steps:

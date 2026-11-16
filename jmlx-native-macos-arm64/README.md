@@ -2,7 +2,9 @@
 
 Native MLX and mlx-c runtime binaries for jmlx on macOS running on Apple Silicon. This artifact is
 the optional runtime companion for `jmlx-ffi` and `jmlx-core`; it is not useful by itself and does
-not provide a general MLX installation.
+not provide a general MLX installation. Native inference requires macOS 27.2 or later
+(Apple Silicon) and Java 25. The binary deployment target remains 26.2 for hosted CI checks;
+it does not change the supported minimum. Release acceptance uses physical 27.2.x hardware.
 
 It packages `libmlxc.dylib`, `libmlx.dylib`, `libjaccl.dylib`, `mlx.metallib`, and pin metadata
 produced by `scripts/bootstrap-native.sh`. `jmlx-ffi` automatically extracts those resources to a

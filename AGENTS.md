@@ -36,7 +36,7 @@ release) is built in milestones, each with its own plan under `req/plans/`:
 the Phase 6 state and lists the remaining release steps. The pure-Java 8.1 tuple is
 on Central; native modules and adapters have not been published.
 
-Requires macOS on Apple Silicon, macOS 26.2+, and a Java 25 toolchain. The native bootstrap also needs
+Requires macOS on Apple Silicon, macOS 27.2+, and a Java 25 toolchain. The native bootstrap also needs
 the Xcode Command Line Tools (`git`, `cc`, `otool`) and `cmake` (`brew install cmake`); see
 `README.md`.
 

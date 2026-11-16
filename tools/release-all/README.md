@@ -17,8 +17,10 @@ Bash 4+, Groovy, Git, Python 3.11+, and explicit Java 25/21 installations select
 restrict toolchain paths to those two installations, disabling detection, downloads and
 inherited `fromEnv` discovery. Bundle preparation requires macOS ARM64 and a complete
 `native/install/lib` matching bootstrap pins, with validated dylib minimum OS/path hygiene.
-The supported native floor is macOS 26.2; physical minimum-host kernel execution remains a
-release gate. Ordinary contributor builds retain their unstaged-runtime skip behavior.
+The supported native floor is macOS 27.2 (any 27.2.x patch release); physical minimum-host
+kernel execution remains a release gate. `MACOS_SUPPORTED_MINIMUM` in bootstrap supplies
+the receipt minimum independently of the 26.2 binary deployment target. Hosted `macos-26`
+checks provide additional coverage; they do not satisfy the physical 27.2.x release gate. Ordinary contributor builds retain their unstaged-runtime skip behavior.
 
 Signing and Portal credentials use the existing Gradle properties/environment contract.
 Reports must contain no credentials. Receipts/logs live under ignored `build/releaseAll/`

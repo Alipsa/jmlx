@@ -10,14 +10,15 @@ tokenizer/vision 0.1.2. See the [readiness checklist](phase8-4-release-checklist
 tuple review and final candidate verification remain open. The original 8.1 coordinates
 remain available unchanged.
 
-Native inference requires Java 25 and Apple Silicon macOS 26.2 or later. This minimum reflects
-bundled dylib metadata; physical minimum-host execution must pass before publication. No claim
+Native inference requires Java 25 and Apple Silicon macOS 27.2 or later (all 27.2.x patch
+releases). The supported minimum was raised by owner decision on 2026-11-16; physical
+27.2.x execution of the exact packaged candidate must pass before publication. No claim
 of all Apple GPU families is made. Record tested chip(s), OS versions and physical host identity
 here when that evidence exists. Pure-Java modules retain their Java 21 headless contract.
 
 Native pins: mlx-metal 0.32.4 (wheel SHA-256
 514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936), mlx-c
-`a26f2d584a14ec619ae8db9a09be03becd47598a`. The locally compiled wrapper now targets 26.2 and
+`a26f2d584a14ec619ae8db9a09be03becd47598a`. The binary deployment target remains 26.2 for hosted CI coverage; the wrapper
 maps build-machine paths to relative paths. Wheel binaries are unchanged. Full license texts
 and source attribution travel inside the native artifact and its documentation companions.
 

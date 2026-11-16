@@ -10,6 +10,17 @@ Phase 8.3 merged in [PR #94](https://github.com/Alipsa/jmlx/pull/94), merge comm
 WP0 records hosted acceptance evidence separately. Creating this plan does not authorize
 Central publication or claim that the release gates have passed.
 
+## Supported minimum amendment (2026-11-16)
+
+Owner decision raises the supported native floor to macOS 27.2 (all 27.2.x patch releases
+and later). This supersedes the 26.2 support/resource assumption below. The available physical
+Apple Silicon host runs 27.2.1; use a dedicated credential-free runner account for the exact
+signed-candidate workflow. That execution gate remains open until the candidate exists.
+`MACOS_SUPPORTED_MINIMUM` supplies the receipt and minimum-host OS checks; retain the
+separate 26.2 binary deployment target for hosted `macos-26` regression coverage. Earlier
+26.2 metadata findings remain historical evidence, not the support policy. No native pins,
+bindings or binary build flags change with this amendment.
+
 ## 1. Goal and boundaries
 
 Publish the native runtime, FFM/core/models chain and both framework adapters in one combined

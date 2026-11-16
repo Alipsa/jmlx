@@ -139,6 +139,13 @@ offline replay produces the identical report. The scope now explicitly excludes 
 CPU `erf` from the Juffa comparison. Five new regressions bring release selftests to 79, all
 passing in 49.296 seconds. Native code/notices and both open legal findings are unchanged.
 
+The recipe follow-up documents that exponent-only floating forms are excluded by the
+decimal-point pattern, with no such forms in the seven recorded function inputs. Missing
+research sources and unexpected evidence types now produce contextual CLI errors without
+tracebacks; the live selftest dependency on the dated recipe path is explicitly documented.
+All 80 release selftests passed (50.066 seconds), including six focused recipe tests.
+Cached-input replay preserves the original seven records, five checks and both comment hashes.
+
 ## Review corrections (2026-11-15)
 
 The minimum-host workflow now creates its Gradle home through `GITHUB_ENV` at step scope;

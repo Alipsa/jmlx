@@ -158,8 +158,12 @@ def verify(root, inputs, fetch_missing=False):
     audit_sources = {entry["source"]: entry["sha256"] for entry in audit["sourceEvidence"]}
     records, comments = [], []
     for entry in expected["records"]:
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+            raise ValueError("comparison record must have a string id")
         if entry["id"].startswith("bsd-forum-"):
-            source = next(item for item in research["sources"] if item["id"] == entry["id"])
+            source = next((item for item in research["sources"] if item["id"] == entry["id"]), None)
+            if source is None:
+                raise ValueError(f"research source missing for comparison record: {entry['id']}")
             data = (root / source["retainedPath"]).read_bytes()
             if digest(data) != source["sha256"] or digest(data) != entry["inputSha256"]:
                 raise ValueError(f"retained BSD sample differs: {entry['id']}")
@@ -204,5 +208,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (ValueError, OSError, KeyError) as error:
+    except (ValueError, OSError, KeyError, TypeError) as error:
         raise SystemExit(f"license comparison: {error}") from error

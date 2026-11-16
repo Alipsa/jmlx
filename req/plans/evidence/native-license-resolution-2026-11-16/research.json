@@ -103,7 +103,7 @@
     }
   ],
   "codeComparison": "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json",
-  "codeComparisonSha256": "82b1fc70bf3c31aef76345d3926af9665b458fbf1c2d1e48c5268fb644769622",
+  "codeComparisonSha256": "a2dec69a5b92599ef94723025a1b4c91d7cb13a9823ab815f55d74e652bc9086",
   "unresolvedFindingIds": [
     "NATIVE-LICENSE-1",
     "NATIVE-LICENSE-2"
@@ -123,11 +123,23 @@
     "nativeAndArtifactHashesMatchMergedAudit": true,
     "reproduction": "Committed verifier reproduced both original comment-list digests, seven function records and five recorded comparison results from fresh primary-source downloads.",
     "releaseSelftests": {
+      "tests": 80,
+      "seconds": 50.066,
+      "result": "passed",
+      "log": "req/plans/evidence/native-license-resolution-2026-11-16/followup-release-selftests.log"
+    },
+    "literalLimit": {
+      "requiresDecimalPoint": true,
+      "exponentOnlyLiteralsInRecordedFunctions": 0,
+      "functionRecordsChecked": 7
+    },
+    "initialRecipeReleaseSelftests": {
       "tests": 79,
       "seconds": 49.296,
       "result": "passed",
       "log": "req/plans/evidence/native-license-resolution-2026-11-16/review-release-selftests.log"
-    }
+    },
+    "malformedEvidenceCli": "Missing research source, non-iterable sources and invalid comparison record types all exit with a license comparison prefix and no traceback."
   },
   "upstreamHistory": {
     "source": "https://api.github.com/repos/ml-explore/mlx/commits?path=mlx/backend/metal/kernels/erf.h&per_page=100&sha=36969c094354086e15d2a327a9c50feb20b9cf11",
@@ -155,8 +167,9 @@
     "disposition": "The latest PR describes a numerical substitution, not a grant for the other functions; public file history alone does not establish a separate permission record."
   },
   "retainedFiles": {
-    "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json": "82b1fc70bf3c31aef76345d3926af9665b458fbf1c2d1e48c5268fb644769622",
-    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "34aeee398535b364c11c9e28b17db00e9a11d8a85d78872697520e90dc4f715c",
+    "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json": "a2dec69a5b92599ef94723025a1b4c91d7cb13a9823ab815f55d74e652bc9086",
+    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "9c96aec5fc79d1fd0a3068188185a74f8978ef55f98ee3faab45a9a7e8efa4f8",
+    "req/plans/evidence/native-license-resolution-2026-11-16/followup-release-selftests.log": "485ebdd39ccfcf2f5c3c02a5973d2de2d3ea7133054e14653381600792fd84f8",
     "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt": "2bb462ea7debd5deb0b069b6218061e8dcd37cc9dc020e790338082a1fbff09c",
     "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt": "8f1c6fa6aabff58fd6138bb8b2b8e9e6cef2598966ac49dd8f05a592309063c3",
     "req/plans/evidence/native-license-resolution-2026-11-16/reproduction-result.json": "873f948dc1f4f7bc45e09ae28b2c3aa7b1b2b992f6dbcb3c51adce1aee2ef5d1",
@@ -177,6 +190,31 @@
   },
   "reproduction": {
     "script": "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
+    "sha256": "9c96aec5fc79d1fd0a3068188185a74f8978ef55f98ee3faab45a9a7e8efa4f8",
+    "command": [
+      "python3",
+      "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
+      "--inputs",
+      "build/releaseAll/license-resolution-inputs",
+      "--fetch-missing",
+      "--output",
+      "build/releaseAll/license-resolution-reproduction.json"
+    ],
+    "result": "req/plans/evidence/native-license-resolution-2026-11-16/reproduction-result.json",
+    "networkInputsInitiallyEmpty": false,
+    "cache": "Prior URL/digest-bound inputs revalidated offline; no fresh source fetch was needed for limits/error-handling changes.",
+    "functionRecords": 7,
+    "comparisonChecks": 5,
+    "commentHashMatches": 2,
+    "resultIdenticalToInitialReproduction": true,
+    "originalCommentHashesPreserved": true
+  },
+  "verificationTools": {
+    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "9c96aec5fc79d1fd0a3068188185a74f8978ef55f98ee3faab45a9a7e8efa4f8",
+    "tools/release-all/tests/test_license_resolution.py": "037cae1eb341f2ffdd50eac672d49ea6f885a726223b24d1348466e57e9e84ff"
+  },
+  "initialReproduction": {
+    "script": "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
     "sha256": "34aeee398535b364c11c9e28b17db00e9a11d8a85d78872697520e90dc4f715c",
     "command": [
       "python3",
@@ -195,9 +233,5 @@
     "offlineResultIdentical": true,
     "downloadedInputResponses": 6,
     "originalCommentHashesPreserved": true
-  },
-  "verificationTools": {
-    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "34aeee398535b364c11c9e28b17db00e9a11d8a85d78872697520e90dc4f715c",
-    "tools/release-all/tests/test_license_resolution.py": "ab3db6c6689fbf709eb4a9b81cf8f66f5726ce90df5d2b3ccbf16665b28fb4d9"
   }
 }

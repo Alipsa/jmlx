@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "date": "2026-11-16",
-  "method": "Extract text beginning at the function name (excluding return type), through its balanced closing brace. Strip C/C++ comments, collect decimal floating literals with the exact recorded regex, strip f/F suffixes and normalize with str(decimal.Decimal(token)). A sign is included only when directly attached to the token. Integer and hexadecimal literals are excluded. This bounded lexical comparison is not a C++ parser, semantic equivalence proof or licensing determination.",
+  "method": "Extract text beginning at the function name (excluding return type), through its balanced closing brace. Strip C/C++ comments, collect decimal floating literals with the exact recorded regex, strip f/F suffixes and normalize with str(decimal.Decimal(token)). A sign is included only when directly attached to the token. The pattern requires a decimal point: exponent-only forms such as 1e-5f are excluded, along with integer and hexadecimal literals. None of the seven recorded function inputs contains an exponent-only form. This bounded lexical comparison is not a C++ parser, semantic equivalence proof or licensing determination.",
   "records": [
     {
       "id": "mlx-metal-erf",

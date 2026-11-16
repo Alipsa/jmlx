@@ -115,9 +115,10 @@ through its balanced closing brace, from these particular inputs. Strip C/C++ co
 collect decimal floating literals, remove `f`/`F` suffixes and normalize with Python's
 `decimal.Decimal`. An optional plus/minus sign is included only when directly attached to
 the numeric token, as specified by `FLOAT_LITERAL_PATTERN` in the committed script.
-A separated minus sign is not treated as part of the literal. The comparison does not parse
-arbitrary C++
-and excludes integer/hexadecimal literals. Code input hashes and all seven extracted function
+A separated minus sign is not treated as part of the literal. The pattern requires a decimal
+point, so exponent-only decimal floating forms such as `1e-5f` are also excluded; none occurs
+in the seven recorded function inputs. The comparison does not parse arbitrary C++ and
+excludes integer/hexadecimal literals. Code input hashes and all seven extracted function
 hashes are recorded, so readers can check the exact variants being compared. The two BSD
 samples are reference evidence only and are not built or added to the native artifacts.
 
@@ -130,6 +131,10 @@ python3 req/plans/evidence/native-license-resolution-2026-11-16/compare_literals
   --inputs build/releaseAll/license-resolution-inputs --fetch-missing \
   --output build/releaseAll/license-resolution-reproduction.json
 ```
+
+Release selftests import this dated recipe. Moving or archiving the evidence folder requires
+retaining the recipe or updating the test's `RECIPE` path and recorded evidence/verifier paths
+in the same change.
 
 The script downloads missing inputs into a URL/digest-bound cache; omit `--fetch-missing`
 to verify the cached responses offline. It checks the original audit's complete Stack Overflow
@@ -152,6 +157,12 @@ serialization/order, incomplete responses, function/sign boundaries, HTML/body e
 URL-bound input integrity. All 79 release selftests passed (49.296 seconds); the research
 manifest retains the verifier/test digests and reproduction result. No native runtime code,
 notices, license findings or numerical implementations changed.
+
+The limits/error-handling follow-up documents the decimal-point requirement and adds a CLI
+regression for missing research source IDs and unexpected evidence value types. These failures
+now report `license comparison: …` without a traceback. Cached-input replay preserves all
+seven function records, five checks and both original comment hashes; the legal findings stay open.
+All 80 release selftests passed (50.066 seconds), including six focused recipe tests.
 
 Validation checks source hashes against the existing audit, the five recorded comparison
 results and every retained sample/report digest. The unchanged audit command still produces

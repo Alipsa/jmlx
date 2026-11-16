@@ -1,10 +1,16 @@
-"""The dated comparison recipe preserves exact projections and extraction boundaries."""
+"""The dated comparison recipe preserves exact projections and extraction boundaries.
+
+These live release selftests import the recipe from the dated evidence folder below.
+Archiving or moving that folder requires updating RECIPE and the recorded verifier/evidence
+paths in the same change, or retaining the recipe at its current path.
+"""
 
 import hashlib
 import importlib.util
 import io
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -50,6 +56,7 @@ class LicenseResolutionTest(unittest.TestCase):
         self.assertTrue(function.endswith("}"))
         self.assertNotIn("other", function)
         self.assertEqual(C.literals(function), ["-1.0", "0.0020", "3.0"])
+        self.assertEqual(C.literals("1e-5f 2E3f 3.0f"), ["3.0"])
         for source in ("float sample(float a);", "float sample(float a) { return 1.0f;"):
             with self.subTest(source=source), self.assertRaises(ValueError):
                 C.function_text(source, "sample")
@@ -86,6 +93,35 @@ class LicenseResolutionTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "projected source digest differs"):
                     C.read_source("https://example.invalid/three", expected, lambda raw: raw, inputs, True)
             self.assertEqual(len(list(inputs.iterdir())), 2)
+
+    def test_cli_reports_missing_sources_and_unexpected_json_types_without_tracebacks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / "req/plans/evidence/fixture"
+            folder.mkdir(parents=True)
+            recipe = folder / "compare_literals.py"
+            recipe.write_bytes(RECIPE.read_bytes())
+            (root / "req/phase8-4-native-license-audit.json").write_text('{"sourceEvidence":[]}')
+            cases = [
+                ({"sources": []}, {"records": [{"id": "bsd-forum-missing"}]},
+                 "research source missing for comparison record: bsd-forum-missing"),
+                ({"sources": None}, {"records": [{"id": "bsd-forum-erf"}]},
+                 "not iterable"),
+                ({"sources": []}, {"records": [None]}, "comparison record must have a string id"),
+                ({"sources": []}, {"records": [{"id": 1}]}, "comparison record must have a string id"),
+            ]
+            for research, comparison, message in cases:
+                with self.subTest(research=research, comparison=comparison):
+                    (folder / "research.json").write_text(json.dumps(research), encoding="utf-8")
+                    (folder / "code-comparison.json").write_text(json.dumps(comparison), encoding="utf-8")
+                    result = subprocess.run(
+                        [sys.executable, str(recipe), "--root", str(root), "--inputs", str(root / "inputs"),
+                         "--output", str(root / "output.json")], capture_output=True, text=True,
+                        encoding="utf-8", timeout=15)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("license comparison: ", result.stderr)
+                    self.assertIn(message, result.stderr)
+                    self.assertNotIn("Traceback", result.stderr)
 
 
 if __name__ == "__main__":

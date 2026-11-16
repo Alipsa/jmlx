@@ -146,23 +146,7 @@
     ],
     "environment": {
       "JAVA_HOME": "$AUDIT/toolchain/jdk-21.0.12.1.jdk",
-      "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin",
-      "LC_ALL": "C",
-      "LANG": "C",
-      "LANGUAGE": "C",
-      "TZ": "UTC",
-      "unset": [
-        "JAVA_TOOL_OPTIONS",
-        "JDK_JAVA_OPTIONS",
-        "_JAVA_OPTIONS",
-        "JAVA_OPTS",
-        "GRADLE_OPTS",
-        "GRADLE_RO_DEP_CACHE",
-        "CLASSPATH"
-      ],
-      "discardInheritedPrefixes": [
-        "LC_"
-      ]
+      "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin"
     },
     "publicationCopies": [
       {
@@ -225,7 +209,8 @@
         "source": "checkout/jmlx-vision/build/publications/maven/module.json",
         "target": "candidate/jmlx-vision-0.1.1.module"
       }
-    ]
+    ],
+    "environmentNote": "Original invocation: only these overrides were recorded; other caller environment variables were inherited and not captured. The controlled environment applies only to reproduce.py runs."
   },
   "comparisonVersionOverrides": {
     "jmlx-jinja": "0.6.1",
@@ -442,9 +427,13 @@
   },
   "retainedEvidence": {
     "directory": "req/plans/evidence/pure-java-audit-2026-11-16",
-    "representation": "Committed small inputs and logs; machine-specific path prefixes normalized. Large artifacts/JDK remain disposable local outputs. Hashes refer to these committed representations. comparison-toolchains.log is the preliminary installed-JDK probe; build.log is the historical successful extracted-JDK build; review-build.log records the fresh reproduction and daemon JVM. portable-build.log and portable-gradle-version.log record the controlled-environment reproduction with verified inputs/results; duplicate AUDIT_DAEMON lines cover root and buildSrc.",
+    "representation": "Committed small inputs and logs; machine-specific path prefixes normalized. Large artifacts/JDK remain disposable local outputs. Hashes refer to these committed representations. comparison-toolchains.log is the preliminary installed-JDK probe; build.log is the historical successful extracted-JDK build; review-build.log records the fresh reproduction and daemon JVM. portable-build.log and portable-gradle-version.log record the controlled-environment reproduction with verified inputs/results; duplicate AUDIT_DAEMON lines cover root and buildSrc. allowlist-* records the subsequent allow-listed build with SHA-256-verified JDK archive extraction. The original build environment and current reproductionEnvironment are recorded separately.",
     "sha256": {
-      "build-command.json": "d88568636c0efe32075f87c103368b47b0ce79aca79e31271af8c76f91733580",
+      "allowlist-build.log": "4a528512a37e10fc8e971ecd25c83d14da6c5e8b086ffdf3d909208be2fca2ea",
+      "allowlist-gradle-version.log": "f97deab1b18a6de37c38b90d0c2a6064ab1bd93cb6744582bf3433fa031757ef",
+      "allowlist-jdk-provenance.json": "472975440612cd2bd512237c1110858a5752574cee938109649639b93f813294",
+      "allowlist-selftest.log": "f0066de0cef85d350398ef5e88ec41aeae9fe262d0bb2143718af13251a8d7b1",
+      "build-command.json": "18c4c2143db601c781a98e5febe96999264cf3b415906ceb2d9f127d9ec7c86e",
       "build.log": "d218ad25ef7c309b618aeeeafabdc6d140dfc4c36a86c1c2006141f7d8a01149",
       "comparison-toolchains.log": "cb756f6c95404d505e5d5556df084d4feda3398928d6dcf3aa66aea89baecb3c",
       "comparison-version-overrides.patch": "ff3a494b3995706edcb25c1c8a9176668be9ae7a57190c376d74278689a295ff",
@@ -459,14 +448,14 @@
       "record-daemon.init.gradle": "bf8ce13a0b7598c4c9c29521e5dbdd4328d03580b71253d439d016a7eb0ac1fc",
       "relevant-source-stat.txt": "43d56ba5c6756efbbe75048c532f7ab4fd5a0ec40c9dbad5efa0ed75f6ee4fa5",
       "relevant-source.patch": "cacd5eda51b794c9d1938c6730b164ae95243062858e4e0727b1eedd9dda67ec",
-      "reproduce.py": "ebd721e6a19c9950427e270436ccce58739990fd8a73345f74e790037ef77ea8",
+      "reproduce.py": "5dc372e3be53c57874a23bc2bbae45ed8d5be88f7491387ccde957aaa1cb00a5",
       "review-build.log": "dec6de555c90d6d536150e53ad87cfa1d3951a553572599423bdc4b65c5c7adf",
       "review-selftest.log": "b1c3dc7733db57e316e119041fee709dbac80605a72163301655fd4a5be03a2b",
       "selftest.log": "82e42288d4dc40ba4106f1cc15683338b204fe42073cd8a6a81d965e642d7624",
       "toolchains.init.gradle": "4340d9157275c31e796739db8bff89bd2a07d0f6cecc31246848c097875fa0fe",
       "tools/release-all/compare_publications.py": "a5b06cf05b7e1298ad70650ee067887b1be52f292bd3a52c5cb74c26f9a348a5",
       "tools/release-all/tests/test_compare_publications.py": "590433ae8f90befa827b20a5bc8e8a9121a8bdabca1b8f192c09def973515ef4",
-      "tools/release-all/tests/test_reproduce_audit.py": "249df1b89762bdd1174cc89412942c7119933a1cd40510255fcad2805617b696"
+      "tools/release-all/tests/test_reproduce_audit.py": "c5150cb17dde16bb039672c0d1f1696a487fdd7dd6bab326411adb33aa7d2971"
     }
   },
   "validation": {
@@ -521,7 +510,47 @@
         "normalization": "ZIP_STORED; original compression method compared separately"
       },
       "gitDiffCheck": "passed"
+    },
+    "allowlistReview": {
+      "date": "2026-11-16",
+      "releaseSelftests": {
+        "passed": 48,
+        "seconds": 79.713
+      },
+      "reproductionGuardTests": 7,
+      "freshReproduction": {
+        "tasksExecuted": 27,
+        "seconds": 40,
+        "jdkArchiveSha256Verified": "0fffffac0fe6ebe7af583bdb15f8725e4873b874dd648cbf485e53fc2b4d9218",
+        "environment": "Only HOME, PATH, TMPDIR and USER inherited; fixed locale/timezone and selected JDK overrides.",
+        "gradleVersionVerified": "9.9.0",
+        "allDaemonCompilerAndJavadocIdentitiesVerified": true,
+        "centralSha256Verified": 15,
+        "completeComparisonAutomaticallyVerified": true,
+        "rawIdenticalJars": 9,
+        "differentMetadataFiles": 5
+      },
+      "evidenceBytecodeCache": "absent after test run",
+      "gitDiffCheck": "passed"
     }
   },
-  "allEqual": false
+  "allEqual": false,
+  "reproductionEnvironment": {
+    "appliesTo": "Current reproduce.py runs only; the original build.log inherited the caller environment except its recorded JAVA_HOME/PATH overrides. Historical portable-* runs used the earlier deny-list policy.",
+    "inherit": [
+      "HOME",
+      "PATH",
+      "TMPDIR",
+      "USER"
+    ],
+    "fixed": {
+      "LC_ALL": "C",
+      "LANG": "C",
+      "LANGUAGE": "C",
+      "TZ": "UTC"
+    },
+    "JAVA_HOME": "selected comparison JDK",
+    "PATH_prefix": "selected comparison JDK/bin",
+    "allOtherInheritedVariables": "discarded"
+  }
 }

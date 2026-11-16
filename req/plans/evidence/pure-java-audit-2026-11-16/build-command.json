@@ -35,23 +35,7 @@
   ],
   "environment": {
     "JAVA_HOME": "$AUDIT/toolchain/jdk-21.0.12.1.jdk",
-    "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin",
-    "LC_ALL": "C",
-    "LANG": "C",
-    "LANGUAGE": "C",
-    "TZ": "UTC",
-    "unset": [
-      "JAVA_TOOL_OPTIONS",
-      "JDK_JAVA_OPTIONS",
-      "_JAVA_OPTIONS",
-      "JAVA_OPTS",
-      "GRADLE_OPTS",
-      "GRADLE_RO_DEP_CACHE",
-      "CLASSPATH"
-    ],
-    "discardInheritedPrefixes": [
-      "LC_"
-    ]
+    "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin"
   },
   "publicationCopies": [
     {
@@ -114,5 +98,23 @@
       "source": "checkout/jmlx-vision/build/publications/maven/module.json",
       "target": "candidate/jmlx-vision-0.1.1.module"
     }
-  ]
+  ],
+  "environmentNote": "Original invocation: only these overrides were recorded; other caller environment variables were inherited and not captured. The controlled environment applies only to reproduce.py runs.",
+  "reproductionEnvironment": {
+    "inherit": [
+      "HOME",
+      "PATH",
+      "TMPDIR",
+      "USER"
+    ],
+    "fixed": {
+      "LC_ALL": "C",
+      "LANG": "C",
+      "LANGUAGE": "C",
+      "TZ": "UTC"
+    },
+    "JAVA_HOME": "selected comparison JDK",
+    "PATH_prefix": "selected comparison JDK/bin",
+    "allOtherInheritedVariables": "discarded"
+  }
 }

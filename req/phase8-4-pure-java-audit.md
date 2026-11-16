@@ -54,12 +54,14 @@ three modules. The normal checkout independently selects its installed BellSoft
 An isolated clone starts at the audited SHA. Only its three version declarations are changed
 to 0.6.1/0.1.1/0.1.1; the main checkout retains its SNAPSHOT versions. The comparison runs
 Gradle 9.9.0 with plugin 2.6.0, Jackson 3.3.0, a separate Gradle home containing no user
-credentials/init scripts, configuration/build caches disabled and task reruns. JAVA_HOME points
+Gradle properties/init scripts, configuration/build caches disabled and task reruns. JAVA_HOME points
 to the extracted comparison JDK; the original log does not independently record the daemon JVM.
 Review reproductions record its java.home, vendor and runtime version explicitly (see below). For each module it runs `jar`, `sourcesJar`,
 `javadocJar`, `generatePomFileForMavenPublication` and
 `generateMetadataFileForMavenPublication`. All 27 selected tasks execute successfully.
-No signing, Maven-local publication or Portal submission runs.
+No signing, Maven-local publication or Portal submission runs. The original invocation inherited
+the caller environment apart from its recorded JAVA_HOME/PATH overrides; those other values
+were not captured. The reproduction policy below does not describe that original environment.
 
 All 15 historical artifacts are freshly downloaded from
 `https://repo.maven.apache.org/maven2/se/alipsa/<module>/<version>/<filename>`.
@@ -73,15 +75,20 @@ machine-specific logs. Large downloaded artifacts and the JDK remain disposable 
 `comparison-toolchains.log` is an earlier installed-JDK probe; the successful build's compiler
 and Javadoc selections are in `build.log`.
 
-To reproduce on macOS ARM64, download the BellSoft archive above, verify its SHA-256 and
-extract it. Use a Gradle 9.9.0 executable and an unused workspace outside `build/`:
+To reproduce on macOS ARM64, download the BellSoft archive above. The recipe verifies its
+recorded SHA-256 before extracting it into the workspace. Use a Gradle 9.9.0 executable and
+an unused workspace outside `build/`:
 
 ```sh
 python3 req/plans/evidence/pure-java-audit-2026-11-16/reproduce.py \
   --workspace /tmp/jmlx-audit-reproduction \
-  --jdk /path/to/extracted/jdk-21.0.12.1.jdk \
+  --jdk-archive /path/to/bellsoft-jdk21.0.12.1+1-macos-aarch64.tar.gz \
   --gradle /path/to/gradle-9.9.0/bin/gradle
 ```
+
+Alternatively, `--jdk /path/to/existing/jdk` checks identity/version/path only; it cannot
+establish that the installation came from the pinned archive. The selected provenance is
+recorded in the workspace's `jdk-provenance.json`.
 
 The recipe clones the recorded source SHA, applies only the committed old-version patch,
 uses a fresh isolated Gradle home, reruns all publication tasks, copies each exact output
@@ -93,10 +100,15 @@ committed raw SHA-256 values. It then requires the complete comparison report (i
 artifact hash, change list and verdict) to equal the committed report, and exits nonzero on
 any mismatch. The comparator runs with the recipe's own `sys.executable`.
 
-The build environment sets `LC_ALL=C`, `LANG=C`, `LANGUAGE=C` and `TZ=UTC`, discards inherited
-`LC_*` settings and removes `JAVA_TOOL_OPTIONS`, `JDK_JAVA_OPTIONS`, `_JAVA_OPTIONS`,
-`JAVA_OPTS`, `GRADLE_OPTS`, `GRADLE_RO_DEP_CACHE` and `CLASSPATH`. The policy is recorded in
-`build-command.json`; `JAVA_HOME` and the PATH prefix point to the selected comparison JDK.
+The current reproduction build inherits only `HOME`, `PATH`, `TMPDIR` and `USER`, sets
+`LC_ALL=C`, `LANG=C`, `LANGUAGE=C` and `TZ=UTC`, and points `JAVA_HOME` and the PATH prefix
+to the selected JDK. Every other caller variable is dropped, including all
+`ORG_GRADLE_PROJECT_*`, `ORG_GRADLE_*`, JVM options and other locale settings. The allow-list
+and fixed values are recorded under `reproductionEnvironment` in `build-command.json` and
+the audit JSON. The audit JSON's `build.environment` and `build-command.json`'s `environment` describe only the
+original run's recorded JAVA_HOME/PATH overrides; accompanying notes distinguish these scopes.
+The prior `portable-*` evidence used the earlier deny-list policy; the latest allow-list
+and archive-verification evidence is recorded below.
 The additional init script records the daemon JVM in `build.log`. Two `AUDIT_DAEMON` lines
 are expected because the init script applies to the root build and `buildSrc`; both must
 match. This recipe reproduces this dated development audit; a final-candidate audit requires
@@ -168,6 +180,17 @@ all 15 Central raw hashes and the entire committed stored-byte comparison report
 The nine identical JARs and five metadata differences remain. `portable-build.log`,
 `portable-gradle-version.log` and `portable-selftest.log` retain this evidence; the JSON
 hashes cover all committed evidence files. `git diff --check` passed.
+
+The allow-list correction passed all 48 release selftests in 79.713 seconds. Seven
+reproduction-guard tests now check the environment policy against both committed records,
+including injected Gradle properties, and verify archive digest rejection, archive structure
+and safe extraction. The test import temporarily disables bytecode writing; the evidence
+directory has no `__pycache__` after the suite. A fresh archive-mode reproduction verified
+SHA-256 `0fffffac0fe6ebe7af583bdb15f8725e4873b874dd648cbf485e53fc2b4d9218`, extracted
+that JDK into its workspace and executed all 27 publication tasks in 40 seconds. Toolchain,
+Central hash and complete result checks passed with the same nine raw JAR matches and five
+metadata differences. The `allowlist-*` logs and JDK provenance record retain this run;
+evidence digests were refreshed and `git diff --check` passed.
 
 The tuple still needs human review and minimum-host readiness before a candidate is frozen.
 Repeat this comparison at the final candidate SHA, and rerun it after dependency, wrapper,

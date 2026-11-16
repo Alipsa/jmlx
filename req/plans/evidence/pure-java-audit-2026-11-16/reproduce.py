@@ -10,21 +10,36 @@ import re
 import shutil
 import subprocess
 import sys
+import tarfile
 import urllib.request
 from pathlib import Path
 
 
-REMOVED_ENVIRONMENT = ("JAVA_TOOL_OPTIONS", "JDK_JAVA_OPTIONS", "_JAVA_OPTIONS",
-                       "JAVA_OPTS", "GRADLE_OPTS", "GRADLE_RO_DEP_CACHE", "CLASSPATH")
+ALLOWED_ENVIRONMENT = ("HOME", "PATH", "TMPDIR", "USER")
 FIXED_ENVIRONMENT = {"LC_ALL": "C", "LANG": "C", "LANGUAGE": "C", "TZ": "UTC"}
 
 
 def build_environment(caller, jdk):
-    environment = {key: value for key, value in caller.items()
-                   if key not in REMOVED_ENVIRONMENT and not key.startswith("LC_")}
+    environment = {key: caller[key] for key in ALLOWED_ENVIRONMENT if key in caller}
     environment.update(FIXED_ENVIRONMENT, JAVA_HOME=str(jdk))
     environment["PATH"] = str(jdk / "bin") + os.pathsep + caller.get("PATH", "")
     return environment
+
+
+def extract_jdk_archive(archive, destination, expected_sha256):
+    checksum = hashlib.sha256()
+    with archive.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            checksum.update(chunk)
+    if checksum.hexdigest() != expected_sha256:
+        raise ValueError("JDK archive SHA-256 differs from recorded distribution")
+    destination.mkdir()
+    with tarfile.open(archive, "r:gz") as bundle:
+        bundle.extractall(destination, filter="data")
+    homes = [path.parent.parent for path in destination.rglob("bin/java") if path.is_file()]
+    if len(homes) != 1:
+        raise ValueError("JDK archive must contain exactly one bin/java")
+    return homes[0].resolve()
 
 
 def verify_gradle(output, expected):
@@ -80,7 +95,10 @@ def verify_result(actual, expected):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--workspace", required=True, type=Path)
-    parser.add_argument("--jdk", required=True, type=Path)
+    jdk_source = parser.add_mutually_exclusive_group(required=True)
+    jdk_source.add_argument("--jdk", type=Path, help="existing JDK; identity checks only")
+    jdk_source.add_argument("--jdk-archive", type=Path,
+                            help="verify recorded SHA-256 and extract the JDK into the workspace")
     parser.add_argument("--gradle", required=True, type=Path)
     args = parser.parse_args()
     evidence = Path(__file__).resolve().parent
@@ -90,7 +108,15 @@ def main():
     command = json.loads((evidence / "build-command.json").read_text())
     report = json.loads((repo / "req/phase8-4-pure-java-audit.json").read_text())
     expected = json.loads((evidence / "comparison.json").read_text())
-    jdk = args.jdk.resolve()
+    if args.jdk_archive:
+        jdk = extract_jdk_archive(args.jdk_archive, workspace / "toolchain",
+                                  report["comparisonJdk"]["distributionSha256"])
+        provenance = {"source": "verified archive",
+                      "sha256": report["comparisonJdk"]["distributionSha256"]}
+    else:
+        jdk = args.jdk.resolve()
+        provenance = {"source": "existing installation; identity checks only"}
+    (workspace / "jdk-provenance.json").write_text(json.dumps(provenance, indent=2) + "\n")
     environment = build_environment(os.environ, jdk)
     version = subprocess.run([str(args.gradle.resolve()), "--version", "--console=plain",
                               "--gradle-user-home", str(workspace / "gradle-home")],
@@ -107,7 +133,7 @@ def main():
     shutil.copyfile(evidence / "toolchains.init.gradle", workspace / "toolchains.init.gradle")
 
     def expand(value):
-        return (value.replace("$AUDIT/toolchain/jdk-21.0.12.1.jdk", str(args.jdk.resolve()))
+        return (value.replace("$AUDIT/toolchain/jdk-21.0.12.1.jdk", str(jdk))
                 .replace("$AUDIT", str(workspace))
                 .replace("$GRADLE_9_9_0", str(args.gradle.resolve())))
 

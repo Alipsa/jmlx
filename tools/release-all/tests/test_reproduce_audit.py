@@ -3,7 +3,11 @@
 import copy
 import hashlib
 import importlib.util
+import io
 import json
+import sys
+import tarfile
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -11,25 +15,72 @@ RECIPE = (Path(__file__).resolve().parents[3]
           / "req/plans/evidence/pure-java-audit-2026-11-16/reproduce.py")
 SPEC = importlib.util.spec_from_file_location("reproduce_audit", RECIPE)
 R = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(R)
+PREVIOUS_BYTECODE_SETTING = sys.dont_write_bytecode
+try:
+    sys.dont_write_bytecode = True
+    SPEC.loader.exec_module(R)
+finally:
+    sys.dont_write_bytecode = PREVIOUS_BYTECODE_SETTING
 
 
 class ReproduceAuditTest(unittest.TestCase):
     def test_environment_removes_injection_and_controls_locale(self):
-        caller = {key: "untrusted" for key in R.REMOVED_ENVIRONMENT}
+        caller = {"ORG_GRADLE_PROJECT_sonatypePassword": "credential",
+                  "ORG_GRADLE_PROJECT_releaseVerificationRepository": "unexpected-repository",
+                  "ORG_GRADLE_other": "unexpected-option", "FUTURE_INJECTION": "unknown",
+                  "JAVA_TOOL_OPTIONS": "unexpected-option", "JDK_JAVA_OPTIONS": "unexpected-option",
+                  "GRADLE_OPTS": "unexpected-option", "HTTPS_PROXY": "unapproved-proxy"}
         caller.update(LC_MESSAGES="de_DE", LC_ALL="fr_FR", LANG="sv_SE", LANGUAGE="sv",
-                      TZ="Europe/Stockholm", JAVA_HOME="other-jdk", PATH="caller-path", HOME="home")
+                      TZ="Europe/Stockholm", JAVA_HOME="other-jdk", PATH="caller-path", HOME="home",
+                      TMPDIR="temporary-directory", USER="user")
         actual = R.build_environment(caller, Path("/comparison-jdk"))
-        self.assertTrue(all(key not in actual for key in R.REMOVED_ENVIRONMENT))
-        self.assertNotIn("LC_MESSAGES", actual)
+        self.assertEqual(actual.keys(), set(R.ALLOWED_ENVIRONMENT) | R.FIXED_ENVIRONMENT.keys()
+                         | {"JAVA_HOME"})
         self.assertEqual({key: actual[key] for key in R.FIXED_ENVIRONMENT}, R.FIXED_ENVIRONMENT)
         self.assertEqual(actual["JAVA_HOME"], "/comparison-jdk")
         self.assertTrue(actual["PATH"].startswith("/comparison-jdk/bin"))
         self.assertEqual(actual["HOME"], "home")
         self.assertEqual(caller["LANG"], "sv_SE")
-        recorded = json.loads((RECIPE.parent / "build-command.json").read_text())["environment"]
-        self.assertEqual({key: recorded[key] for key in R.FIXED_ENVIRONMENT}, R.FIXED_ENVIRONMENT)
-        self.assertEqual(recorded["unset"], list(R.REMOVED_ENVIRONMENT))
+        command = json.loads((RECIPE.parent / "build-command.json").read_text())
+        recorded = command["reproductionEnvironment"]
+        self.assertEqual(recorded["fixed"], R.FIXED_ENVIRONMENT)
+        self.assertEqual(recorded["inherit"], list(R.ALLOWED_ENVIRONMENT))
+        self.assertEqual(set(command["environment"]), {"JAVA_HOME", "PATH_prefix"})
+        report = json.loads((RECIPE.parents[3] / "phase8-4-pure-java-audit.json").read_text())
+        self.assertEqual(report["reproductionEnvironment"]["inherit"], list(R.ALLOWED_ENVIRONMENT))
+        self.assertEqual(report["reproductionEnvironment"]["fixed"], R.FIXED_ENVIRONMENT)
+        self.assertEqual(set(report["build"]["environment"]), {"JAVA_HOME", "PATH_prefix"})
+
+    def test_jdk_archive_is_verified_before_extraction(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            archive = root / "jdk.tar.gz"
+            with tarfile.open(archive, "w:gz") as bundle:
+                info = tarfile.TarInfo("jdk/bin/java")
+                info.size = 4
+                info.mode = 0o755
+                bundle.addfile(info, io.BytesIO(b"java"))
+            wanted = hashlib.sha256(archive.read_bytes()).hexdigest()
+            self.assertEqual(R.extract_jdk_archive(archive, root / "verified", wanted),
+                             (root / "verified/jdk").resolve())
+            with self.assertRaisesRegex(ValueError, "JDK archive SHA-256"):
+                R.extract_jdk_archive(archive, root / "rejected", "0" * 64)
+            self.assertFalse((root / "rejected").exists())
+
+    def test_archive_requires_one_jdk_and_rejects_path_traversal(self):
+        for names, message in ((["other-file"], "exactly one bin/java"),
+                               (["one/bin/java", "two/bin/java"], "exactly one bin/java"),
+                               (["../outside-file"], "outside")):
+            with self.subTest(names=names), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                archive = root / "jdk.tar.gz"
+                with tarfile.open(archive, "w:gz") as bundle:
+                    for name in names:
+                        bundle.addfile(tarfile.TarInfo(name), io.BytesIO(b""))
+                wanted = hashlib.sha256(archive.read_bytes()).hexdigest()
+                with self.assertRaisesRegex((ValueError, tarfile.FilterError), message):
+                    R.extract_jdk_archive(archive, root / "extracted", wanted)
+                self.assertFalse((root / "outside-file").exists())
 
     def test_gradle_version_is_checked(self):
         R.verify_gradle("banner\nGradle 9.9.0\nmore output\n", "9.9.0")

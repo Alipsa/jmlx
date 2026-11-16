@@ -84,6 +84,23 @@ The post-plugin audit is complete; the proposed all-new tuple still needs review
 inventory and current account publishing capacity need release review. No earlier/local report substitutes for
 these gates. Phase 8.4 is not complete.
 
+## Native transitive-license review (2026-11-16)
+
+The [native source audit](phase8-4-native-license-audit.md) reviews the pinned macOS
+CPU/Metal payload and expands the packaged inventory to 26 entries, including previously
+missing NumPy/opt_einsum, loader, SIMD math, PyTorch/TensorFlow and GPU/PRNG attributions.
+The explicit native release check now verifies the reviewed legal text digests in main,
+sources and Javadoc artifacts. Six new regressions cover source/cache tampering, changed
+notice text even after its inventory hash is updated, wheel identity/member checks,
+incomplete companion JARs and the nonzero unresolved-findings CLI result.
+
+All 63 release selftests passed locally (51.987 seconds); the native module check and
+release-payload verification also passed. Source evidence was verified from an empty cache.
+The audit retains small source/packaging reports and logs outside `build/`. Native payload
+bytes and upstream pins are unchanged. Juffa `erf`/`erfinv` licensing and the Cephes permission
+chain remain explicit provenance findings, so the license release gate is still open.
+No signed candidate or publication is claimed by these checks.
+
 ## Review corrections (2026-11-15)
 
 The minimum-host workflow now creates its Gradle home through `GITHUB_ENV` at step scope;

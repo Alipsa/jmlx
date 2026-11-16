@@ -38,6 +38,9 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   The local physical Apple Silicon Mac runs 27.2.1; exact-candidate execution and the
   dedicated credential-free runner setup remain required before release acceptance.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
+  The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
+  inventory to 26 entries. Two provenance findings (Juffa `erf`/`erfinv` and Cephes)
+  still prevent closing this gate; successful notice checks do not resolve them.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
 - [x] Integrate released upstream plugin 2.6.0 and verify the clean historical 8.1 fixture.
   [Compatibility evidence](phase8-4-plugin-2.6.0-compatibility.md) records the unpushed scratch
@@ -86,8 +89,9 @@ Apple Clang 21.0.0 (clang-2100.4.1.1), CMake 4.5.0, selected SDK 27.2.
 This is metadata/path evidence only, not a minimum-host Metal execution result.
 
 The native main/sources/Javadoc jars now carry full Apache-2.0 and additional dependency texts.
-The pinned-source inventory covers JSON, fmt, gguflib/FP16, pocketfft, V8, ThreadPool and Metal
-math adaptations as well as MLX/mlx-c. Review the inventory before closing the legal gate.
+The pinned-source inventory also covers NumPy/opt_einsum, supervised-lda, SIMD math,
+PyTorch/TensorFlow and GPU/PRNG algorithm references. The dated audit records inclusion,
+exclusions, evidence and unresolved provenance; review its findings before closing the legal gate.
 Logs/receipts belong under ignored `build/releaseAll/` or outside the checkout.
 Never put credentials in the evidence or publish the temporary candidate draft Release.
 

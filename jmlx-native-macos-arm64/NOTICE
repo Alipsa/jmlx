@@ -8,7 +8,12 @@ jmlx-native-macos-arm64 bundles precompiled binaries built from:
 See META-INF/LICENSE for the MIT text and META-INF/LICENSE-APACHE-2.0 for the complete
 Apache License 2.0 text in this jar.
 META-INF/THIRD-PARTY-NOTICES carries the additional MLX/JACCL compiled-in dependency texts,
-including JSON, fmt, gguflib/FP16, pocketfft, V8, ThreadPool and Metal math adaptations.
+including JSON, fmt, gguflib/FP16, pocketfft, V8, ThreadPool, NumPy/opt_einsum,
+supervised-lda, SIMD math, PyTorch, TensorFlow and GPU/PRNG algorithm references.
+MLX adaptations remain modifications of the attributed upstream code; the listed reference
+versions are license-evidence snapshots where MLX does not pin an upstream revision.
+The release audit and unresolved provenance findings are recorded in
+req/phase8-4-native-license-audit.md in the jmlx source repository.
 
 Provenance: mlx-metal 0.32.4, wheel SHA-256
 514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936;

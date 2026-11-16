@@ -2,6 +2,7 @@
 """Compare flat publication directories, preserving artifact content and metadata changes."""
 
 import argparse
+import copy
 import hashlib
 import io
 import json
@@ -15,16 +16,24 @@ def digest(data, algorithm="sha256"):
 
 
 def archive_content(data):
-    """Canonical ZIP: sorted names, fixed timestamps, stored uncompressed entry bytes."""
-    with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        names = archive.namelist()
+    """Sort entries and fix timestamps; retain compression, attributes, extras and comments."""
+    with zipfile.ZipFile(io.BytesIO(data)) as source:
+        names = source.namelist()
         if len(names) != len(set(names)):
             raise ValueError("duplicate archive entry")
-        entries = {name: archive.read(name) for name in names}
-    output = io.BytesIO()
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
-        for name in sorted(entries):
-            archive.writestr(zipfile.ZipInfo(name, (1980, 1, 1, 0, 0, 0)), entries[name])
+        entries = {}
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w") as target:
+            target.comment = source.comment
+            for name in sorted(names):
+                info = copy.copy(source.getinfo(name))
+                info.date_time = (1980, 1, 1, 0, 0, 0)
+                content = source.read(name)
+                entries[name] = (content, info.compress_type, info.external_attr,
+                                 info.internal_attr, info.extra, info.comment,
+                                 info.create_system, info.create_version, info.extract_version,
+                                 info.flag_bits, info.reserved, info.volume)
+                target.writestr(info, content)
     return output.getvalue(), entries
 
 
@@ -32,9 +41,15 @@ def module_content(data, directory):
     """Recompute only artifact sizes/checksums, after validating the original references."""
     metadata = json.loads(data)
     replacements = []
+    if not isinstance(metadata, dict) or not isinstance(metadata.get("variants"), list):
+        raise ValueError("module metadata requires a variants list")
     for variant in metadata["variants"]:
         for artifact in variant.get("files", []):
+            if not isinstance(artifact, dict) or not isinstance(artifact.get("url"), str):
+                raise ValueError("artifact record requires a string url")
             name = artifact["url"]
+            if type(artifact.get("size")) is not int or artifact["size"] < 0:
+                raise ValueError(f"artifact record requires a nonnegative integer size: {name}")
             if Path(name).name != name or not name.endswith(".jar"):
                 raise ValueError(f"expected a sibling JAR reference: {name}")
             original = (directory / name).read_bytes()
@@ -75,7 +90,7 @@ def module_content(data, directory):
     return result.encode("utf-8")
 
 
-def compare(central, candidate):
+def compare(central, candidate, publications=None):
     """Compare every JAR, POM and module file in both directories; missing files fail."""
     def files(directory):
         return {path.name for path in directory.iterdir()
@@ -84,6 +99,13 @@ def compare(central, candidate):
     names = files(central)
     if not names or names != files(candidate):
         raise ValueError("publication file sets differ or are empty")
+    if publications is not None:
+        expected = {f"{module}-{version}{suffix}"
+                    for module, version in publications.items()
+                    for suffix in (".jar", "-sources.jar", "-javadoc.jar", ".pom", ".module")}
+        if names != expected:
+            raise ValueError(f"unexpected publication file set; missing={sorted(expected - names)}, "
+                             f"extra={sorted(names - expected)}")
     results = {}
     for name in sorted(names):
         left = (central / name).read_bytes()
@@ -100,11 +122,11 @@ def compare(central, candidate):
             right = module_content(right, candidate)
         result = {"rawSha256": before,
                   "normalizedSha256": {"central": digest(left), "candidate": digest(right)},
-                  "equal": left == right}
+                  "equal": left == right and not changed_entries}
         if changed_entries is not None:
             result["changedEntries"] = changed_entries
         results[name] = result
-    return results
+    return {"allEqual": all(result["equal"] for result in results.values()), "artifacts": results}
 
 
 if __name__ == "__main__":
@@ -112,5 +134,12 @@ if __name__ == "__main__":
     parser.add_argument("--central", required=True, type=Path)
     parser.add_argument("--candidate", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--publications", type=Path,
+                        help="JSON object mapping expected module names to versions (five files each)")
+    parser.add_argument("--require-equal", action="store_true",
+                        help="exit 1 after writing the report if any artifact differs")
     args = parser.parse_args()
-    args.output.write_text(json.dumps(compare(args.central, args.candidate), indent=2) + "\n")
+    publications = json.loads(args.publications.read_text()) if args.publications else None
+    result = compare(args.central, args.candidate, publications)
+    args.output.write_text(json.dumps(result, indent=2) + "\n")
+    raise SystemExit(1 if args.require_equal and not result["allEqual"] else 0)

@@ -1,5 +1,5 @@
 {
-  "schema": "jmlx-pure-java-reuse-audit-1",
+  "schema": "jmlx-pure-java-reuse-audit-2",
   "date": "2026-11-16",
   "baselineSha": "9bc85042df50ed3f979cb8d3e7c8767917c71483",
   "auditedSha": "98190d44fd725b484e98e5e8b7b41efa925e0b23",
@@ -147,7 +147,69 @@
     "environment": {
       "JAVA_HOME": "$AUDIT/toolchain/jdk-21.0.12.1.jdk",
       "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin"
-    }
+    },
+    "publicationCopies": [
+      {
+        "source": "checkout/jmlx-jinja/build/libs/jmlx-jinja-0.6.1.jar",
+        "target": "candidate/jmlx-jinja-0.6.1.jar"
+      },
+      {
+        "source": "checkout/jmlx-jinja/build/libs/jmlx-jinja-0.6.1-sources.jar",
+        "target": "candidate/jmlx-jinja-0.6.1-sources.jar"
+      },
+      {
+        "source": "checkout/jmlx-jinja/build/libs/jmlx-jinja-0.6.1-javadoc.jar",
+        "target": "candidate/jmlx-jinja-0.6.1-javadoc.jar"
+      },
+      {
+        "source": "checkout/jmlx-jinja/build/publications/maven/pom-default.xml",
+        "target": "candidate/jmlx-jinja-0.6.1.pom"
+      },
+      {
+        "source": "checkout/jmlx-jinja/build/publications/maven/module.json",
+        "target": "candidate/jmlx-jinja-0.6.1.module"
+      },
+      {
+        "source": "checkout/jmlx-tokenizer/build/libs/jmlx-tokenizer-0.1.1.jar",
+        "target": "candidate/jmlx-tokenizer-0.1.1.jar"
+      },
+      {
+        "source": "checkout/jmlx-tokenizer/build/libs/jmlx-tokenizer-0.1.1-sources.jar",
+        "target": "candidate/jmlx-tokenizer-0.1.1-sources.jar"
+      },
+      {
+        "source": "checkout/jmlx-tokenizer/build/libs/jmlx-tokenizer-0.1.1-javadoc.jar",
+        "target": "candidate/jmlx-tokenizer-0.1.1-javadoc.jar"
+      },
+      {
+        "source": "checkout/jmlx-tokenizer/build/publications/maven/pom-default.xml",
+        "target": "candidate/jmlx-tokenizer-0.1.1.pom"
+      },
+      {
+        "source": "checkout/jmlx-tokenizer/build/publications/maven/module.json",
+        "target": "candidate/jmlx-tokenizer-0.1.1.module"
+      },
+      {
+        "source": "checkout/jmlx-vision/build/libs/jmlx-vision-0.1.1.jar",
+        "target": "candidate/jmlx-vision-0.1.1.jar"
+      },
+      {
+        "source": "checkout/jmlx-vision/build/libs/jmlx-vision-0.1.1-sources.jar",
+        "target": "candidate/jmlx-vision-0.1.1-sources.jar"
+      },
+      {
+        "source": "checkout/jmlx-vision/build/libs/jmlx-vision-0.1.1-javadoc.jar",
+        "target": "candidate/jmlx-vision-0.1.1-javadoc.jar"
+      },
+      {
+        "source": "checkout/jmlx-vision/build/publications/maven/pom-default.xml",
+        "target": "candidate/jmlx-vision-0.1.1.pom"
+      },
+      {
+        "source": "checkout/jmlx-vision/build/publications/maven/module.json",
+        "target": "candidate/jmlx-vision-0.1.1.module"
+      }
+    ]
   },
   "comparisonVersionOverrides": {
     "jmlx-jinja": "0.6.1",
@@ -162,7 +224,7 @@
     "otherBuildChanges": "Shared native, adapter, test, style and release tooling; relevant source patch retained. No additional pure-Java artifact content changes observed."
   },
   "normalization": {
-    "jars": "Names sorted; identical uncompressed entry bytes serialized as ZIP_STORED with fixed 1980-01-01 timestamps. Directory entries preserved. Duplicate names rejected. No entry-content, Javadoc banner, bytecode, notice or generated-text normalization.",
+    "jars": "Sort names and fix DOS entry timestamps to 1980-01-01. Preserve uncompressed entry bytes, compression methods, permissions/attributes, extra fields, entry/archive comments. Compressed streams are regenerated. Compare original entry metadata directly as well, including flags and creator/extractor versions. Reject duplicate names; no content normalization.",
     "poms": "Exact byte comparison.",
     "moduleMetadata": "Validate original referenced JAR sizes and all recorded hashes, then replace only their size/checksum value tokens with canonical-JAR values. Preserve every other byte, including Gradle provenance, dependency values and formatting."
   },
@@ -193,8 +255,8 @@
         "candidate": "8c8846d4bed11a5bc4c36219f61b3345a753f6b646e3e438b0d9ef9c4cd3ab75"
       },
       "normalizedSha256": {
-        "central": "b66f6db91c3c02df122c95b83bcb0c8d873f5982e07403cc460660e0769c07a2",
-        "candidate": "b66f6db91c3c02df122c95b83bcb0c8d873f5982e07403cc460660e0769c07a2"
+        "central": "10a1a92f3637a6743bf095daa4ef85cbbf890283224019fa8991dfe9596377eb",
+        "candidate": "10a1a92f3637a6743bf095daa4ef85cbbf890283224019fa8991dfe9596377eb"
       },
       "equal": true,
       "changedEntries": []
@@ -205,8 +267,8 @@
         "candidate": "ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5"
       },
       "normalizedSha256": {
-        "central": "3bc9c4579160d0bcdbc9e552217292367c8f765cb74bd5e6c5aa6f1e9040ce72",
-        "candidate": "3bc9c4579160d0bcdbc9e552217292367c8f765cb74bd5e6c5aa6f1e9040ce72"
+        "central": "c0a9478e56a77b26b493a531ef216d9a06d59bfa1ba3a79f0d9e7f872673337e",
+        "candidate": "c0a9478e56a77b26b493a531ef216d9a06d59bfa1ba3a79f0d9e7f872673337e"
       },
       "equal": true,
       "changedEntries": []
@@ -217,8 +279,8 @@
         "candidate": "c4c6bd11cb552ceade3b30703b27c50bbf417eb3d7eb21a6663f94edb6d27565"
       },
       "normalizedSha256": {
-        "central": "7a3e9a193a0c1dcbe634b3403038639b8e297a576a6fe1782a4b068b1320aee2",
-        "candidate": "7a3e9a193a0c1dcbe634b3403038639b8e297a576a6fe1782a4b068b1320aee2"
+        "central": "3f75dd27fc2e1ec8b9fd0a6f81dcac82658374ba03b0f9a5171d85446ceb327c",
+        "candidate": "3f75dd27fc2e1ec8b9fd0a6f81dcac82658374ba03b0f9a5171d85446ceb327c"
       },
       "equal": true,
       "changedEntries": []
@@ -229,8 +291,8 @@
         "candidate": "456a9767afd41c262a1cc0c5d5cedc836c247a9adaf1a835f460ba7c0a0ffd12"
       },
       "normalizedSha256": {
-        "central": "4d06bd24a07c8e36115eee53c40d382b896ddcb3d0d2c2603ad84bda8c21dc48",
-        "candidate": "4b8d25fb4886bd54ed0a5c2361264f872dc7e00c1c944bf5376a9ea04325f6dd"
+        "central": "5810accae81139dd645a81ff526b32f62dbf785581a8f887acdbd2b5c8654ed2",
+        "candidate": "ebfbc051bed129f54ee1eff69106033fab25c86079a84a1f051b207ca37f7266"
       },
       "equal": false
     },
@@ -251,8 +313,8 @@
         "candidate": "0d570ba51590e8a26eb1cff929bb17d79c9511182817903977f96405e269488f"
       },
       "normalizedSha256": {
-        "central": "0060a38d6e1ea00f7f08ace65e9362d6e8d6deced1acf758a4732957498987b5",
-        "candidate": "0060a38d6e1ea00f7f08ace65e9362d6e8d6deced1acf758a4732957498987b5"
+        "central": "f40e89f3d563714d9f8b43c0588f11ff82ed8e279ec3db875c7c78044f720b70",
+        "candidate": "f40e89f3d563714d9f8b43c0588f11ff82ed8e279ec3db875c7c78044f720b70"
       },
       "equal": true,
       "changedEntries": []
@@ -263,8 +325,8 @@
         "candidate": "47d1de74c003c80d930aeb7906f5db81698108aea53a629d8c4fec020d608b79"
       },
       "normalizedSha256": {
-        "central": "7f08f2cf485b2f86401f9c26b80e6ab4524501e56cb6b89f7270b65d13b02d8d",
-        "candidate": "7f08f2cf485b2f86401f9c26b80e6ab4524501e56cb6b89f7270b65d13b02d8d"
+        "central": "6f5fb7ca4cee0fb3f5d24a5a1da9742a42555b416b3c3468cb3d82d535cb7e30",
+        "candidate": "6f5fb7ca4cee0fb3f5d24a5a1da9742a42555b416b3c3468cb3d82d535cb7e30"
       },
       "equal": true,
       "changedEntries": []
@@ -275,8 +337,8 @@
         "candidate": "3c660cd11ed54a5b047cdaf26a84ac9add0c51f25781fdb000336e4168546db0"
       },
       "normalizedSha256": {
-        "central": "797d78acb68282ddd0056bf11003d13bd7d4129e192d63f694d511cf776c5378",
-        "candidate": "797d78acb68282ddd0056bf11003d13bd7d4129e192d63f694d511cf776c5378"
+        "central": "33b20268333701b5e3fc9b1bf0314c10e614a37a721bf4df205e692e866804e7",
+        "candidate": "33b20268333701b5e3fc9b1bf0314c10e614a37a721bf4df205e692e866804e7"
       },
       "equal": true,
       "changedEntries": []
@@ -287,8 +349,8 @@
         "candidate": "cc5acdd1719638f573b5219e9da09c78309503e67e74868c58415ede122a8cd9"
       },
       "normalizedSha256": {
-        "central": "09e82c9e4b0b61831165d4ee82aa079aa384d89c0b27aaaa60b1bfe5e8527b2e",
-        "candidate": "81b015a1de23eb97ec9aedf40416d094b1df979d99d4a028f80c324677431732"
+        "central": "6b1dc5c9d4346876f8e732cc2446773e6ee9201aafff1df617d4b0685b0d4425",
+        "candidate": "9619aa08ed40d6649b719eac77f49da56a8fb4aa908c7349f05b2c6032f20425"
       },
       "equal": false
     },
@@ -309,8 +371,8 @@
         "candidate": "209e330e083e660c02546dfac4bcbdb63541cbd89a226cfe2c5b439e96d61028"
       },
       "normalizedSha256": {
-        "central": "af4109dfc0f5ea3c245ccdbaf814599b7913ecf8179f10cab6fa8aeb7f9f8db4",
-        "candidate": "af4109dfc0f5ea3c245ccdbaf814599b7913ecf8179f10cab6fa8aeb7f9f8db4"
+        "central": "7d26fd4c5f9846b6ecae6ffde05fd6fb795fffbb1b8db5b9437aa7ba6ceb8f20",
+        "candidate": "7d26fd4c5f9846b6ecae6ffde05fd6fb795fffbb1b8db5b9437aa7ba6ceb8f20"
       },
       "equal": true,
       "changedEntries": []
@@ -321,8 +383,8 @@
         "candidate": "6b931e3e7daee72b6947ff120efbb602f87901075ff09a637aa27d40442bae6c"
       },
       "normalizedSha256": {
-        "central": "15d154375232900ebe0d5dc26f79ba9d0e9304af09f3cf90c8a2d233ef9709ef",
-        "candidate": "15d154375232900ebe0d5dc26f79ba9d0e9304af09f3cf90c8a2d233ef9709ef"
+        "central": "8a4c5b7e12724b2e7b0645b37cbf6e2f85ab117297f9f799ab118f1a6c61444a",
+        "candidate": "8a4c5b7e12724b2e7b0645b37cbf6e2f85ab117297f9f799ab118f1a6c61444a"
       },
       "equal": true,
       "changedEntries": []
@@ -333,8 +395,8 @@
         "candidate": "c1d0c420ba23e3329fe74f51eb33f012820f8331a3f2222b883d8706f58b3c72"
       },
       "normalizedSha256": {
-        "central": "9ecee5dd4b6f57caa88572a6908cbb8a3fdeeb65ca2eab6b7f3a199b5625111e",
-        "candidate": "9ecee5dd4b6f57caa88572a6908cbb8a3fdeeb65ca2eab6b7f3a199b5625111e"
+        "central": "a4990648a9049eb51d08f2d8d0975d682c97dbe8ca7b6e96617c38dc73a4421d",
+        "candidate": "a4990648a9049eb51d08f2d8d0975d682c97dbe8ca7b6e96617c38dc73a4421d"
       },
       "equal": true,
       "changedEntries": []
@@ -345,8 +407,8 @@
         "candidate": "0a47c2e415c22c2787558f2e840c2fd6fdbbe0040ebdcdb449726516dc2e6b3f"
       },
       "normalizedSha256": {
-        "central": "3e27f0129e1554113aa0e27236311cccfa4dca5d7e9b88f2aec301c242490356",
-        "candidate": "e9d0bf22a96e3bacd2dd78e4e4e1187c5207e2745aa19d1e79511330b8968815"
+        "central": "039f9d42afdc30d469b5e29856a817ef4ca2f741f95cdb1d7a0591f9e09af1e4",
+        "candidate": "813bf56b80a7ecacd897f5193f890a92ff65ab04bc68fa31e7b135e61c0e294a"
       },
       "equal": false
     },
@@ -363,18 +425,27 @@
     }
   },
   "retainedEvidence": {
-    "directory": "build/releaseAll/pure-java-audit-2026-11-16 (ignored, local)",
+    "directory": "req/plans/evidence/pure-java-audit-2026-11-16",
+    "representation": "Committed small inputs and logs; machine-specific path prefixes normalized. Large artifacts/JDK remain disposable local outputs. Hashes refer to these committed representations. comparison-toolchains.log is the preliminary installed-JDK probe; build.log is the historical successful extracted-JDK build; review-build.log records the fresh reproduction and daemon JVM.",
     "sha256": {
-      "build.log": "d9eb0dfeb171c7d42d1c200ff3ecc43f9473bde0bd3696fdabfead8382934104",
-      "build-command.json": "ac4f79db7687a36662843f1a16fde28287e9d012b387b2901e752c8262610e70",
-      "toolchains.init.gradle": "4340d9157275c31e796739db8bff89bd2a07d0f6cecc31246848c097875fa0fe",
-      "normal-toolchains.log": "1c375c9c55942a4cd05e344fa376e985ebeddd9aab13dcd2bdcae7d15545b472",
+      "build-command.json": "940b28bacb3cbff83b8689be932f15b001748ec0bcf94e3a93d59bb4efb85c22",
+      "build.log": "d218ad25ef7c309b618aeeeafabdc6d140dfc4c36a86c1c2006141f7d8a01149",
+      "comparison-toolchains.log": "cb756f6c95404d505e5d5556df084d4feda3398928d6dcf3aa66aea89baecb3c",
       "comparison-version-overrides.patch": "ff3a494b3995706edcb25c1c8a9176668be9ae7a57190c376d74278689a295ff",
-      "relevant-source.patch": "cacd5eda51b794c9d1938c6730b164ae95243062858e4e0727b1eedd9dda67ec",
+      "comparison.json": "107e6deae6626f93b1ef8a24184f4e741a6dd284aa0b687fe19c4b8405e1430e",
+      "historical-release-verification.md": "e3f46326f595593c8e2c6f048e056a926715e6317da94f452f496c3ff5c089b5",
       "metadata.diff": "76391f84f0b82752426d92f0346aae58e41b49245215b9fe69012958841a2a65",
-      "historical-release-verification.md": "a00d976a6374c50617f22ef92cb2041908ee6ca5620ed58a2fb7e29e0ef3de04",
-      "tools/release-all/compare_publications.py": "00a653a7e92e202780f2322788b7f31a8ca42eb93a58e4c65866058d2ace8a81",
-      "selftest.log": "82e42288d4dc40ba4106f1cc15683338b204fe42073cd8a6a81d965e642d7624"
+      "normal-toolchains.log": "6be75a52d45d881fafa7e29ed34e3a84f89247eee59f345618d0ee37ccc376ad",
+      "publications.json": "f827ef57b8d003f68b842256b0a3deddcbff0003a37172d591f06baec14860a2",
+      "record-daemon.init.gradle": "96210667692943ef916969b2934bfc50f63fd74f998f9246d1aa21db899ed4dc",
+      "relevant-source-stat.txt": "43d56ba5c6756efbbe75048c532f7ab4fd5a0ec40c9dbad5efa0ed75f6ee4fa5",
+      "relevant-source.patch": "cacd5eda51b794c9d1938c6730b164ae95243062858e4e0727b1eedd9dda67ec",
+      "reproduce.py": "e010d7a259d37660525fd77af43d7bf3cb79f46e43058b7c443d18bb38cd8ddd",
+      "review-build.log": "dec6de555c90d6d536150e53ad87cfa1d3951a553572599423bdc4b65c5c7adf",
+      "review-selftest.log": "b1c3dc7733db57e316e119041fee709dbac80605a72163301655fd4a5be03a2b",
+      "selftest.log": "82e42288d4dc40ba4106f1cc15683338b204fe42073cd8a6a81d965e642d7624",
+      "toolchains.init.gradle": "4340d9157275c31e796739db8bff89bd2a07d0f6cecc31246848c097875fa0fe",
+      "tools/release-all/compare_publications.py": "11a21ddbc401531622573745d672214924955779057fc16f8ee7b8bb4c8e22d7"
     }
   },
   "validation": {
@@ -386,6 +457,28 @@
       "tasksExecuted": 27,
       "seconds": 7
     },
-    "gitDiffCheck": "passed"
-  }
+    "gitDiffCheck": "passed",
+    "review": {
+      "date": "2026-11-16",
+      "releaseSelftests": {
+        "passed": 39,
+        "seconds": 72.869
+      },
+      "comparisonTests": 15,
+      "freshReproduction": {
+        "tasksExecuted": 27,
+        "seconds": 37,
+        "matchesAllOriginalArtifactResults": true,
+        "rawIdenticalJars": 9,
+        "differentMetadataFiles": 5,
+        "daemon": {
+          "home": "$AUDIT/toolchain/jdk-21.0.12.1.jdk",
+          "vendor": "BellSoft",
+          "runtimeVersion": "21.0.12.1+1-LTS"
+        }
+      },
+      "gitDiffCheck": "passed"
+    }
+  },
+  "allEqual": false
 }

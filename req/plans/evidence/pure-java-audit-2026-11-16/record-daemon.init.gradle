@@ -1,0 +1,5 @@
+import groovy.json.JsonOutput
+println('AUDIT_DAEMON=' + JsonOutput.toJson([
+    home: System.getProperty('java.home'),
+    vendor: System.getProperty('java.vendor'),
+    runtimeVersion: System.getProperty('java.runtime.version')]))

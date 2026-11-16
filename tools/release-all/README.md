@@ -101,8 +101,10 @@ abandonment after archiving evidence, retaining the candidate tag.
 ## Guards and regression checks
 
 `compare_publications.py --central <flat-download-dir> --candidate <flat-rebuild-dir>
---output <report.json>` records raw/normalized hashes and exact JAR entry changes for the
-pure-Java reuse audit. Rebuild using the old published versions in an isolated checkout;
+--output <report.json>` records raw/normalized hashes, `allEqual`, and JAR content/metadata
+changes for the pure-Java reuse audit. `--require-equal` exits 1 on differences; `--publications <json>`
+requires five exact filenames per module/version in that JSON object. Rebuild using the old
+published versions in an isolated checkout;
 never replace versions in the release worktree to simulate 8.1. The
 [post-plugin audit](../../req/phase8-4-pure-java-audit.md) records toolchain identity,
 normalization rules, current results and the required final-candidate rerun.

@@ -1,0 +1,179 @@
+{
+  "allEqual": false,
+  "artifacts": {
+    "jmlx-jinja-0.6.1-javadoc.jar": {
+      "rawSha256": {
+        "central": "8c8846d4bed11a5bc4c36219f61b3345a753f6b646e3e438b0d9ef9c4cd3ab75",
+        "candidate": "8c8846d4bed11a5bc4c36219f61b3345a753f6b646e3e438b0d9ef9c4cd3ab75"
+      },
+      "normalizedSha256": {
+        "central": "10a1a92f3637a6743bf095daa4ef85cbbf890283224019fa8991dfe9596377eb",
+        "candidate": "10a1a92f3637a6743bf095daa4ef85cbbf890283224019fa8991dfe9596377eb"
+      },
+      "equal": true,
+      "changedEntries": []
+    },
+    "jmlx-jinja-0.6.1-sources.jar": {
+      "rawSha256": {
+        "central": "ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5",
+        "candidate": "ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5"
+      },
+      "normalizedSha256": {
+        "central": "c0a9478e56a77b26b493a531ef216d9a06d59bfa1ba3a79f0d9e7f872673337e",
+        "candidate": "c0a9478e56a77b26b493a531ef216d9a06d59bfa1ba3a79f0d9e7f872673337e"
+      },
+      "equal": true,
+      "changedEntries": []
+    },
+    "jmlx-jinja-0.6.1.jar": {
+      "rawSha256": {
+        "central": "c4c6bd11cb552ceade3b30703b27c50bbf417eb3d7eb21a6663f94edb6d27565",
+        "candidate": "c4c6bd11cb552ceade3b30703b27c50bbf417eb3d7eb21a6663f94edb6d27565"
+      },
+      "normalizedSha256": {
+        "central": "3f75dd27fc2e1ec8b9fd0a6f81dcac82658374ba03b0f9a5171d85446ceb327c",
+        "candidate": "3f75dd27fc2e1ec8b9fd0a6f81dcac82658374ba03b0f9a5171d85446ceb327c"
+      },
+      "equal": true,
+      "changedEntries": []
+    },
+    "jmlx-jinja-0.6.1.module": {
+      "rawSha256": {
+        "central": "0eab3d38943a4b51b6efef514b58d907357b94ae567534aacad059cc18f4fe82",
+        "candidate": "456a9767afd41c262a1cc0c5d5cedc836c247a9adaf1a835f460ba7c0a0ffd12"
+      },
+      "normalizedSha256": {
+        "central": "5810accae81139dd645a81ff526b32f62dbf785581a8f887acdbd2b5c8654ed2",
+        "candidate": "ebfbc051bed129f54ee1eff69106033fab25c86079a84a1f051b207ca37f7266"
+      },
+      "equal": false
+    },
+    "jmlx-jinja-0.6.1.pom": {
+      "rawSha256": {
+        "central": "4e707f241b2d222681186153f06653b4d722f2cf6f36a6dc3595032f8aa6c00e",
+        "candidate": "4e707f241b2d222681186153f06653b4d722f2cf6f36a6dc3595032f8aa6c00e"
+      },
+      "normalizedSha256": {
+        "central": "4e707f241b2d222681186153f06653b4d722f2cf6f36a6dc3595032f8aa6c00e",
+        "candidate": "4e707f241b2d222681186153f06653b4d722f2cf6f36a6dc3595032f8aa6c00e"
+      },
+      "equal": true
+    },
+    "jmlx-tokenizer-0.1.1-javadoc.jar": {
+      "rawSha256": {
+        "central": "0d570ba51590e8a26eb1cff929bb17d79c9511182817903977f96405e269488f",
+        "candidate": "0d570ba51590e8a26eb1cff929bb17d79c9511182817903977f96405e269488f"
+      },
+      "normalizedSha256": {
+        "central": "f40e89f3d563714d9f8b43c0588f11ff82ed8e279ec3db875c7c78044f720b70",
+        "candidate": "f40e89f3d563714d9f8b43c0588f11ff82ed8e279ec3db875c7c78044f720b70"
+      },
+      "equal": true,
+      "changedEntries": []
+    },
+    "jmlx-tokenizer-0.1.1-sources.jar": {
+      "rawSha256": {
+        "central": "47d1de74c003c80d930aeb7906f5db81698108aea53a629d8c4fec020d608b79",
+        "candidate": "47d1de74c003c80d930aeb7906f5db81698108aea53a629d8c4fec020d608b79"
+      },
+      "normalizedSha256": {
+        "central": "6f5fb7ca4cee0fb3f5d24a5a1da9742a42555b416b3c3468cb3d82d535cb7e30",
+        "candidate": "6f5fb7ca4cee0fb3f5d24a5a1da9742a42555b416b3c3468cb3d82d535cb7e30"
+      },
+      "equal": true,
+      "changedEntries": []
+    },
+    "jmlx-tokenizer-0.1.1.jar": {
+      "rawSha256": {
+        "central": "3c660cd11ed54a5b047cdaf26a84ac9add0c51f25781fdb000336e4168546db0",
+        "candidate": "3c660cd11ed54a5b047cdaf26a84ac9add0c51f25781fdb000336e4168546db0"
+      },
+      "normalizedSha256": {
+        "central": "33b20268333701b5e3fc9b1bf0314c10e614a37a721bf4df205e692e866804e7",
+        "candidate": "33b20268333701b5e3fc9b1bf0314c10e614a37a721bf4df205e692e866804e7"
+      },
+      "equal": true,
+      "changedEntries": []
+    },
+    "jmlx-tokenizer-0.1.1.module": {
+      "rawSha256": {
+        "central": "d5119e8b6002efff3a7c037d13986ebeaf871bd3d26cadda8f3dbf1cc9d2e8cb",
+        "candidate": "cc5acdd1719638f573b5219e9da09c78309503e67e74868c58415ede122a8cd9"
+      },
+      "normalizedSha256": {
+        "central": "6b1dc5c9d4346876f8e732cc2446773e6ee9201aafff1df617d4b0685b0d4425",
+        "candidate": "9619aa08ed40d6649b719eac77f49da56a8fb4aa908c7349f05b2c6032f20425"
+      },
+      "equal": false
+    },
+    "jmlx-tokenizer-0.1.1.pom": {
+      "rawSha256": {
+        "central": "45577dda4f147121788166b09173e5a10096af57c1ec68a734d3f15729d69ce9",
+        "candidate": "e6ce864485c4489195ee05407f00175311dd217999c1a1a5ab18d2d1bd004af8"
+      },
+      "normalizedSha256": {
+        "central": "45577dda4f147121788166b09173e5a10096af57c1ec68a734d3f15729d69ce9",
+        "candidate": "e6ce864485c4489195ee05407f00175311dd217999c1a1a5ab18d2d1bd004af8"
+      },
+      "equal": false
+    },
+    "jmlx-vision-0.1.1-javadoc.jar": {
+      "rawSha256": {
+        "central": "209e330e083e660c02546dfac4bcbdb63541cbd89a226cfe2c5b439e96d61028",
+        "candidate": "209e330e083e660c02546dfac4bcbdb63541cbd89a226cfe2c5b439e96d61028"
+      },
+      "normalizedSha256": {
+        "central": "7d26fd4c5f9846b6ecae6ffde05fd6fb795fffbb1b8db5b9437aa7ba6ceb8f20",
+        "candidate": "7d26fd4c5f9846b6ecae6ffde05fd6fb795fffbb1b8db5b9437aa7ba6ceb8f20"
+      },
+      "equal": true,
+      "changedEntries": []
+    },
+    "jmlx-vision-0.1.1-sources.jar": {
+      "rawSha256": {
+        "central": "6b931e3e7daee72b6947ff120efbb602f87901075ff09a637aa27d40442bae6c",
+        "candidate": "6b931e3e7daee72b6947ff120efbb602f87901075ff09a637aa27d40442bae6c"
+      },
+      "normalizedSha256": {
+        "central": "8a4c5b7e12724b2e7b0645b37cbf6e2f85ab117297f9f799ab118f1a6c61444a",
+        "candidate": "8a4c5b7e12724b2e7b0645b37cbf6e2f85ab117297f9f799ab118f1a6c61444a"
+      },
+      "equal": true,
+      "changedEntries": []
+    },
+    "jmlx-vision-0.1.1.jar": {
+      "rawSha256": {
+        "central": "c1d0c420ba23e3329fe74f51eb33f012820f8331a3f2222b883d8706f58b3c72",
+        "candidate": "c1d0c420ba23e3329fe74f51eb33f012820f8331a3f2222b883d8706f58b3c72"
+      },
+      "normalizedSha256": {
+        "central": "a4990648a9049eb51d08f2d8d0975d682c97dbe8ca7b6e96617c38dc73a4421d",
+        "candidate": "a4990648a9049eb51d08f2d8d0975d682c97dbe8ca7b6e96617c38dc73a4421d"
+      },
+      "equal": true,
+      "changedEntries": []
+    },
+    "jmlx-vision-0.1.1.module": {
+      "rawSha256": {
+        "central": "8ae7e4c05cc51352e26ea32d3f0c1af1e97d4d6abc3e4913c26fc8fc3a9b37a5",
+        "candidate": "0a47c2e415c22c2787558f2e840c2fd6fdbbe0040ebdcdb449726516dc2e6b3f"
+      },
+      "normalizedSha256": {
+        "central": "039f9d42afdc30d469b5e29856a817ef4ca2f741f95cdb1d7a0591f9e09af1e4",
+        "candidate": "813bf56b80a7ecacd897f5193f890a92ff65ab04bc68fa31e7b135e61c0e294a"
+      },
+      "equal": false
+    },
+    "jmlx-vision-0.1.1.pom": {
+      "rawSha256": {
+        "central": "3ee698f52522279aff89ba6a13ca2b09dc724cfe7e1db8854e7dc0474ac8bed0",
+        "candidate": "cd8061315f50a5b2bf90b689d775d3e963402c316de19f31c22eb6f054032c6f"
+      },
+      "normalizedSha256": {
+        "central": "3ee698f52522279aff89ba6a13ca2b09dc724cfe7e1db8854e7dc0474ac8bed0",
+        "candidate": "cd8061315f50a5b2bf90b689d775d3e963402c316de19f31c22eb6f054032c6f"
+      },
+      "equal": false
+    }
+  }
+}

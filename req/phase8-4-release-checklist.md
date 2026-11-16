@@ -1,6 +1,7 @@
 # Phase 8.4 release readiness
 
-Implementation in progress, 2026-11-14. No publication authorized or performed.
+Implementation in progress; readiness and artifact audit updated 2026-11-16.
+No publication authorized or performed.
 Plan: [phase8-4-plan.md](plans/phase8-4-plan.md).
 Local verification: [implementation report](phase8-4-implementation-report.md).
 

@@ -1,0 +1,561 @@
+diff --git a/build.gradle b/build.gradle
+index 7350250..21433d3 100644
+--- a/build.gradle
++++ b/build.gradle
+@@ -18,17 +18,34 @@ plugins {
+     id 'jvm-toolchains'
+     alias(libs.plugins.spotless) apply false
+     alias(libs.plugins.nexusRelease) apply false
++    alias(libs.plugins.benManesVersions)
++}
++
++// Ben Manes versions plugin: `./gradlew dependencyUpdates` reports newer versions of every
++// project's dependencies and plugins (applied at the root, it inspects all subprojects). A
++// pre-release candidate (alpha/beta/rc/milestone/...) is only reported when the current version
++// is itself a pre-release.
++def isNonStableVersion = { String version ->
++    def stableKeyword = ['RELEASE', 'FINAL', 'GA'].any { version.toUpperCase().contains(it) }
++    return !stableKeyword && !(version ==~ /^[0-9,.v-]+(-r)?$/)
++}
++tasks.named('dependencyUpdates').configure {
++    rejectVersionIf {
++        isNonStableVersion(it.candidate.version) && !isNonStableVersion(it.currentVersion)
++    }
+ }
+ 
+ // Combined release workflow (Phase 8.1): active only with -PreleaseAllMode=...; see
+ // tools/release-all/README.md. Applying the plugin at the root registers the combined tasks
+ // (releaseAllPlan, releaseAllSigningCheck, releaseAllGuard, bundleAll, releaseAll;
+ // releaseAllPrepareMaven is registered too but never runs: jmlx has no static Maven
+-// candidates). nexus-release-plugin 2.5.1 derives the candidate set, the per-module staging
++// candidates). nexus-release-plugin 2.6.0 derives the candidate set, the per-module staging
+ // publication (with signing and the module's check wired in), and every output path from
+-// combinedRelease.modules; jmlx only sets the module list, the committed Portal fixture and
+-// the report/resume overrides below. The subprojects get the plugin through the maven-publish
+-// wiring exactly as before, and ordinary builds never reach this block.
++// combinedRelease.modules. jmlx configures the module list, committed Portal fixture,
++// report/resume overrides and existing-bundle upload mode with both digest anchors, and
++// revalidates the final receipt before upload. The subprojects get the plugin through
++// maven-publish wiring as before, and ordinary builds never reach this block.
++// BEGIN JMLX COMBINED RELEASE
+ if (providers.gradleProperty('releaseAllMode').isPresent()) {
+     apply plugin: 'se.alipsa.nexus-release-plugin'
+     def credentialsUser = providers.gradleProperty('sonatypeUsername')
+@@ -53,14 +70,17 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
+         userName = credentialsUser.orNull
+         password = credentialsPassword.orNull
+         combinedRelease {
+-            // All seven published modules are named: the four native-chain modules keep
+-            // -SNAPSHOT versions until 8.4, so the plan excludes (and reports) them, and a
+-            // future native cut only needs the version lines.
++            // All nine publishable modules participate. The reviewed 8.4 source manifest
++            // determines which new coordinates may be bundled; reused coordinates stay on Central.
+             modules = [':jmlx-core', ':jmlx-ffi', ':jmlx-jinja', ':jmlx-models',
+-                    ':jmlx-native-macos-arm64', ':jmlx-tokenizer', ':jmlx-vision']
++                    ':jmlx-native-macos-arm64', ':jmlx-tokenizer', ':jmlx-vision',
++                    ':jmlx-spring-ai', ':jmlx-langchain4j']
+             portalFixture = rootProject.file('req/releaseAll-portal-fixture.json')
+             repositoryUrl = repoUrl
+             if (portalUrlOverride != null) portalUrl = portalUrlOverride
++            // The plugin's default name is bundle.zip; the deployment carries this name on the
++            // Portal, so it identifies the bundle as jmlx's.
++            bundleFile.set(layout.buildDirectory.file('releaseAll/jmlx-mega-bundle.zip'))
+         }
+     }
+     tasks.named('releaseAllPlan').configure {
+@@ -70,10 +90,57 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
+     tasks.named('releaseAllSigningCheck').configure {
+         strict = !providers.gradleProperty('releaseAllSigningReport').isPresent()
+     }
+-    tasks.named('releaseAll').configure {
++    def existingBundle = providers.gradleProperty('releaseAllUseExistingBundle').getOrElse('false') == 'true'
++    def verifiedReceipt = providers.gradleProperty('releaseAllVerifiedReceipt').getOrElse('')
++    def resumeRequested = !providers.gradleProperty('releaseAllResume').getOrElse('').isEmpty()
++    gradle.taskGraph.whenReady { graph ->
++        if (graph.hasTask(':releaseAll') && !resumeRequested && (!existingBundle || verifiedReceipt.isEmpty())) {
++            throw new GradleException('Use releaseAll.sh --publish-verified with a final receipt; ' +
++                    'refusing the upload graph before checking, signing or bundling.')
++        }
++    }
++    def receiptVerifier = rootProject.file('tools/release-all/final_receipt.py').absolutePath
++    def releaseRoot = rootProject.projectDir.absolutePath
++    def releaseExec = services.get(org.gradle.process.ExecOperations)
++    tasks.named('releaseAll').configure { releaseTask ->
+         resumeId = providers.gradleProperty('releaseAllResume').orElse('')
++        if (existingBundle) {
++            if (!['useExistingBundle', 'expectedBundleSha256', 'expectedManifestSha256'].every {
++                releaseTask.hasProperty(it)
++            }) {
++                throw new GradleException('The pinned release plugin cannot upload an existing bundle. ' +
++                        'Complete the separately reviewed upstream release and catalog pin bump first.')
++            }
++            useExistingBundle.set(true)
++            // The wrapper supplies anchors; the upload action binds them to the receipt again.
++            expectedBundleSha256.set(
++                    providers.gradleProperty('releaseAllExpectedBundleSha256').orElse(''))
++            expectedManifestSha256.set(
++                    providers.gradleProperty('releaseAllExpectedManifestSha256').orElse(''))
++        }
++        doFirst {
++            if (!resumeId.getOrElse('')) {
++                if (!existingBundle || verifiedReceipt.isEmpty()) {
++                    throw new GradleException('Use releaseAll.sh --publish-verified with a final receipt; ' +
++                            'ordinary releaseAll must not rebuild and upload unchecked bytes.')
++                }
++                def digestOutput = new ByteArrayOutputStream()
++                releaseExec.exec {
++                    commandLine 'python3', receiptVerifier, '--root', releaseRoot,
++                            '--verify', verifiedReceipt, '--plugin-digests'
++                    standardOutput = digestOutput
++                }
++                def reviewedAnchors = digestOutput.toString('UTF-8').trim().split('\t', -1).toList()
++                def uploadAnchors = [expectedBundleSha256.get().toLowerCase(Locale.ROOT),
++                        expectedManifestSha256.get().toLowerCase(Locale.ROOT)]
++                if (reviewedAnchors != uploadAnchors) {
++                    throw new GradleException('Receipt digest anchors differ from plugin upload inputs')
++                }
++            }
++        }
+     }
+ }
++// END JMLX COMBINED RELEASE
+ 
+ def projectJavaVersion = 25
+ 
+@@ -704,6 +771,294 @@ tasks.register('verifyQwen35ReferenceGoldens') {
+     }
+ }
+ 
++tasks.register('verifyDecodeBaselineManifest') {
++    group = 'verification'
++    description = 'Verifies the Phase 8.2 decode-baseline workload manifest without Python: ' +
++            'schema, frozen generation policy, stop-set/source agreement, identity claims, ' +
++            'SplitMix64 prompt re-derivation, canonical prompt digests, tier-b manifest ' +
++            'cross-checks, the Python lock (direct pins, complete hash coverage, no mlx-vlm), ' +
++            'the frozen run_policy limits (section 7.4) and the worker_sources digest freeze, ' +
++            'and the manifest self-digest of the frozen WP0/WP1 contract.'
++    def workloadsFile = layout.projectDirectory.file('tools/decode-baseline/workloads.json').asFile
++    def requirementsIn = layout.projectDirectory.file('tools/decode-baseline/requirements.in').asFile
++    def requirementsLock = layout.projectDirectory.file('tools/decode-baseline/requirements.lock').asFile
++    def denseTierBManifest = layout.projectDirectory.file('tools/tier-b/qwen3-0.6b.json').asFile
++    def qwen3vlTierBManifest = layout.projectDirectory.file('tools/tier-b/qwen3vl-2b-instruct.json').asFile
++    def phi3vTierBManifest = layout.projectDirectory.file('tools/tier-b/phi3v-4b-instruct.json').asFile
++    def workerPy = layout.projectDirectory.file('tools/decode-baseline/worker.py').asFile
++    def controlledPy = layout.projectDirectory.file('tools/decode-baseline/controlled.py').asFile
++    inputs.file(workloadsFile)
++    inputs.file(requirementsIn)
++    inputs.file(requirementsLock)
++    inputs.file(denseTierBManifest)
++    inputs.file(qwen3vlTierBManifest)
++    inputs.file(phi3vTierBManifest)
++    inputs.file(workerPy)
++    inputs.file(controlledPy)
++    doLast {
++        // SplitMix64 in JLS long arithmetic: the committed 2048 arrays are the oracle, so any
++        // arithmetic promotion bug fails the re-derivation rather than passing silently.
++        def goldenGamma = 0x9E3779B97F4A7C15L
++        def mix = { long z ->
++            z = (z ^ (z >>> 30)) * 0xBF58476D1CE4E5B9L
++            z = (z ^ (z >>> 27)) * 0x94D049BB133111EBL
++            return z ^ (z >>> 31)
++        }
++        def step = { long state ->
++            long next = state + goldenGamma
++            return [next, mix(next)]
++        }
++        def canonicalSha = { List<Integer> ids ->
++            def digest = MessageDigest.getInstance('SHA-256')
++            digest.update('['.getBytes('UTF-8'))
++            digest.update(ids.join(',').getBytes('UTF-8'))
++            digest.update(']'.getBytes('UTF-8'))
++            return digest.digest().encodeHex().toString()
++        }
++
++        def doc = new JsonSlurper().parse(workloadsFile)
++        if (doc.schema != 'jmlx-decode-baseline-workloads-1') {
++            throw new GradleException("Decode baseline manifest schema differs: ${doc.schema}")
++        }
++        if (!(doc.precision.headline.env == 'MLX_ENABLE_TF32=1'
++                && doc.precision.strict.env == 'MLX_ENABLE_TF32=0')) {
++            throw new GradleException('Decode baseline manifest precision env values differ')
++        }
++        def controlled = doc.controlled_generation
++        if (!(controlled.batch == 1 && controlled.retention == 'full'
++                && controlled.prefix_reuse == false && controlled.selection == 'greedy'
++                && controlled.penalties == 'none' && controlled.stop_termination == false
++                && controlled.max_new_tokens == 128
++                && controlled.prompt_lengths == [32, 512, 2048]
++                && controlled.prefill == 'single full-prompt forward, last-position-only output projection, no chunking, no next-token lookahead, no periodic cache clearing (both adapters)'
++                && controlled.cache == 'full retention, per-request cache, no prefix reuse; KV dtype follows the case stored dtype (F32 for all three text cases)'
++                && controlled.wired_limit == 'not set (neither runtime calls a setter)')) {
++            throw new GradleException('Decode baseline controlled generation policy differs')
++        }
++        def stock = doc.stock_generation
++        if (!(stock.selection == 'greedy' && stock.stop_termination == true
++                && stock.max_new_tokens == 128)) {
++            throw new GradleException('Decode baseline stock generation policy differs')
++        }
++
++        def textCases = doc.text_cases
++        def textNames = ['qwen3-0.6b', 'tinymistral-6x248m', 'qwen3-8b-4bit']
++        if (!(textCases instanceof List) || textCases*.name != textNames) {
++            throw new GradleException("Decode baseline text case set differs: ${textCases*.name}")
++        }
++        textCases.each { tc ->
++            if (!(tc.files instanceof Map) || tc.files.isEmpty()) {
++                throw new GradleException("Decode baseline case ${tc.name} has no pinned files")
++            }
++            tc.files.each { name, meta ->
++                if (!(meta.sha256 instanceof String) || !(meta.sha256 ==~ /[0-9a-f]{64}/)
++                        || !(meta.bytes instanceof Number) || ((Number) meta.bytes).longValue() <= 0) {
++                    throw new GradleException("Decode baseline case ${tc.name} file pin invalid: ${name}")
++                }
++            }
++            def prompts = tc.prompts
++            if (!(prompts.excluded instanceof List) || prompts.excluded.isEmpty()
++                    || new ArrayList(prompts.excluded).sort()
++                            != new ArrayList(tc.stop_token_ids).sort()) {
++                throw new GradleException(
++                        "Decode baseline case ${tc.name} stop set does not match its prompt exclusions")
++            }
++            long seedState = 0x20261105L ^ (prompts.index * goldenGamma)
++            long initial = step(seedState)[1]
++            if (Long.parseUnsignedLong(prompts.initial_state.replaceFirst('^0x', ''), 16) != initial) {
++                throw new GradleException("Decode baseline case ${tc.name} initial state differs")
++            }
++            // Unsigned 64-bit semantics throughout: the Python reference takes z % vocab_size over
++            // the full unsigned z, and the exclusion set is Integer-valued, so both the remainder
++            // and the retry check must match that exactly.
++            long state = initial
++            def excluded = new HashSet(prompts.excluded)
++            def stream = []
++            while (stream.size() < 2048) {
++                def pair = step(state)
++                state = pair[0]
++                def token = (int) Long.remainderUnsigned(pair[1], ((Number) prompts.vocab_size).longValue())
++                if (!excluded.contains(token)) {
++                    stream.add(token)
++                }
++            }
++            ['32', '512', '2048'].each { length ->
++                def entry = prompts.per_length[length]
++                def ids = entry.ids
++                if (!(ids instanceof List) || ids.size() != length.toInteger()
++                        || stream.subList(0, ids.size()) != ids) {
++                    throw new GradleException(
++                            "Decode baseline case ${tc.name} prompt length ${length} does not re-derive")
++                }
++                if (canonicalSha(ids) != entry.sha256) {
++                    throw new GradleException(
++                            "Decode baseline case ${tc.name} prompt length ${length} canonical SHA-256 differs")
++                }
++            }
++        }
++
++        def dense = textCases.find { it.name == 'qwen3-0.6b' }
++        if (dense.tier_b_manifest.path != 'tools/tier-b/qwen3-0.6b.json'
++                || sha256File(denseTierBManifest) != dense.tier_b_manifest.sha256) {
++            throw new GradleException('Decode baseline dense tier-b manifest pin differs')
++        }
++        def denseTierB = new JsonSlurper().parse(denseTierBManifest)
++        dense.tier_b_manifest.shared_files.each { name ->
++            if (denseTierB.files[name].sha256 != dense.files[name].sha256) {
++                throw new GradleException(
++                        "Decode baseline dense tier-b shared file pin differs: ${name}")
++            }
++        }
++
++        def vlmCases = doc.vlm_cases
++        def vlmNames = ['qwen3vl-2b-instruct', 'phi3v-4b-instruct']
++        if (!(vlmCases instanceof List) || vlmCases*.name != vlmNames) {
++            throw new GradleException("Decode baseline VLM case set differs: ${vlmCases*.name}")
++        }
++        def identityClaims = ['qwen3-0.6b': 'greedy', 'tinymistral-6x248m': 'greedy',
++                              'qwen3-8b-4bit': 'fixed-continuation']
++        textCases.each { tc ->
++            if (tc.identity_claim != identityClaims[tc.name]) {
++                throw new GradleException(
++                        "Decode baseline case ${tc.name} identity claim differs: ${tc.identity_claim}")
++            }
++        }
++        (textCases + vlmCases).each { c ->
++            def union = c.stop_token_sources.values().findAll { it != null }
++                    .flatten().unique().sort()
++            if (union != new ArrayList(c.stop_token_ids).sort()) {
++                throw new GradleException(
++                        "Decode baseline case ${c.name} stop set is not the union of its sources")
++            }
++        }
++        // The VLM manifest path must be exactly the declared, repository-confined task input;
++        // data-driven paths must never point elsewhere (../ escapes included).
++        def vlmManifestPaths = ['qwen3vl-2b-instruct': 'tools/tier-b/qwen3vl-2b-instruct.json',
++                                'phi3v-4b-instruct': 'tools/tier-b/phi3v-4b-instruct.json']
++        vlmCases.each { entry ->
++            if (entry.manifest.path != vlmManifestPaths[entry.name]) {
++                throw new GradleException(
++                        "Decode baseline VLM manifest path differs: ${entry.name}")
++            }
++            def manifestFile = layout.projectDirectory.file(entry.manifest.path).asFile
++            if (sha256File(manifestFile) != entry.manifest.sha256) {
++                throw new GradleException(
++                        "Decode baseline VLM manifest SHA-256 differs: ${entry.manifest.path}")
++            }
++            def manifest = new JsonSlurper().parse(manifestFile)
++            if (manifest.repository != entry.repository || manifest.revision != entry.revision) {
++                throw new GradleException(
++                        "Decode baseline VLM entry does not match ${entry.manifest.path}")
++            }
++        }
++
++        // PEP 503 name normalization: runs of '-', '_' and '.' fold into a single '-'.
++        def pinName = { String raw -> raw.toLowerCase().replaceAll(/[-_.]+/, '-') }
++        def pins = [:]
++        requirementsIn.readLines().each { line ->
++            line = line.trim()
++            if (line && !line.startsWith('#')) {
++                def parts = line.split('==', 2)
++                if (parts.length != 2 || parts[0].trim().isEmpty() || parts[1].trim().isEmpty()) {
++                    throw new GradleException("Decode baseline requirements.in pin malformed: ${line}")
++                }
++                pins[pinName(parts[0].trim())] = parts[1].trim()
++            }
++        }
++        if (pins.size() != 8) {
++            throw new GradleException(
++                    "Decode baseline requirements.in pin count differs: ${pins.size()}")
++        }
++        def locked = [:]
++        def current = null
++        requirementsLock.readLines().each { line ->
++            // The name may carry PEP 508 extras (pkg[extra]); the extra is not part of the
++            // normalized name, but the package and its hash lines must still be checked.
++            def header = (line =~ '^([A-Za-z0-9._-]+)(\\[[^]]*\\])?==([^ ;\\\\]+)( ;.+?)?\\s*\\\\?\\s*$')
++            if (header.matches()) {
++                current = pinName(header.group(1))
++                locked[current] = [version: header.group(3), hashed: false]
++            } else if (current != null && line.contains('--hash=sha256:')) {
++                locked[current].hashed = true
++            }
++        }
++        if (locked.containsKey('mlx-vlm')) {
++            throw new GradleException('Decode baseline lock includes mlx-vlm, which the plan excludes')
++        }
++        locked.each { name, meta ->
++            if (!meta.hashed) {
++                throw new GradleException("Decode baseline lock is missing a SHA-256 hash for ${name}")
++            }
++        }
++        pins.each { name, version ->
++            if (locked[name] == null || locked[name].version != version) {
++                throw new GradleException("Decode baseline lock does not pin ${name}==${version}")
++            }
++        }
++
++        // WP1 run policy: the finite worker/cell/session limits and frozen sample counts of
++        // reference findings section 7.4. The launcher and both workers reject
++        // missing/nonpositive values; this pins the committed numbers.
++        def policy = doc.run_policy
++        if (!(policy instanceof Map)) {
++            throw new GradleException('Decode baseline manifest is missing the run_policy block')
++        }
++        def policyLimits = ['worker_timeout_s': 1800, 'reference_pair_worker_timeout_s': 720,
++                            'cell_time_budget_s': 14400, 'session_time_budget_s': 43200,
++                            'pairs': 6, 'first_requests': 1, 'warmups': 5, 'measured_requests': 20,
++                            'emitted_tokens': 128]
++        policyLimits.each { key, expected ->
++            def value = policy[key]
++            if (!(value instanceof Integer) || value <= 0 || value != expected) {
++                throw new GradleException(
++                        "Decode baseline run_policy.${key} differs from the frozen value ${expected}: ${value}")
++            }
++        }
++        if (policy.cache_regime != 'primed-per-request') {
++            throw new GradleException(
++                    "Decode baseline run_policy.cache_regime differs: ${policy.cache_regime}")
++        }
++        if (new ArrayList(policy.io_affected_cells) != ['qwen3-8b-4bit/2048']) {
++            throw new GradleException(
++                    "Decode baseline run_policy.io_affected_cells differs: ${policy.io_affected_cells}")
++        }
++        if (policy.emitted_tokens != doc.controlled_generation.max_new_tokens) {
++            throw new GradleException(
++                    'Decode baseline run_policy.emitted_tokens disagrees with controlled_generation')
++        }
++
++        // Worker source freeze: the committed Python workers are digest-pinned in the manifest
++        // and re-hashed here, so editing a worker without regenerating the manifest fails.
++        def workerSources = doc.worker_sources
++        def expectedWorkerFiles = ['controlled.py', 'worker.py']
++        if (!(workerSources instanceof Map) || !workerSources.keySet().sort().equals(expectedWorkerFiles)) {
++            throw new GradleException(
++                    "Decode baseline worker_sources file set differs: ${workerSources?.keySet()}")
++        }
++        workerSources.each { name, pin ->
++            if (!(name instanceof String) || !name.endsWith('.py') || name.contains('/')
++                    || name.contains('\\') || name.contains('..')) {
++                throw new GradleException("Decode baseline worker source name differs: ${name}")
++            }
++            if (!(pin instanceof String) || !pin.matches('[0-9a-f]{64}')) {
++                throw new GradleException("Decode baseline worker source pin differs: ${name}=${pin}")
++            }
++            def workerFile = layout.projectDirectory.file("tools/decode-baseline/${name}").asFile
++            if (!workerFile.isFile() || sha256File(workerFile) != pin) {
++                throw new GradleException("Decode baseline worker source SHA-256 differs: ${name}")
++            }
++        }
++
++        // The manifest is the frozen WP0/WP1 contract: the structural checks above give specific
++        // error messages, and this digest backstop catches drift in any field none of them
++        // names (notes, evidence prose, file pins).
++        if (sha256File(workloadsFile) != 'e8c7730178a2e8f1bf1ace461db14119d2394fff4f60fa90deca34ef4857a270') {
++            throw new GradleException(
++                    'Decode baseline workload manifest SHA-256 differs from the frozen WP0/WP1 contract')
++        }
++    }
++}
++
+ tasks.named('check') {
+     // The root has no Java lifecycle plugin. Applying `base` creates this `check` lifecycle task
+     // so repository-wide verifications can run once from CI without pretending that a module-local
+@@ -712,6 +1067,7 @@ tasks.named('check') {
+             tasks.named('verifyHfReferenceGoldens'),
+             tasks.named('verifyImageOracleDependencyPins'),
+             tasks.named('verifyImageOracleFixtureDigests'),
++            tasks.named('verifyDecodeBaselineManifest'),
+             tasks.named('verifyQwenVlReferenceProvenance'),
+             tasks.named('verifyQwen35ReferenceGoldens')
+ }
+diff --git a/buildSrc/build.gradle b/buildSrc/build.gradle
+index a6b2389..f5eef20 100644
+--- a/buildSrc/build.gradle
++++ b/buildSrc/build.gradle
+@@ -9,7 +9,7 @@
+ plugins {
+     id 'java'
+     id 'checkstyle'
+-    id 'com.diffplug.spotless' version '8.9.0'
++    id 'com.diffplug.spotless' version '8.11.0'
+ }
+ 
+ // buildSrc is loaded by the Gradle daemon, which may run on Java 21 even though the forked
+@@ -29,7 +29,7 @@ repositories {
+ }
+ 
+ dependencies {
+-    testImplementation platform('org.junit:junit-bom:6.0.1')
++    testImplementation platform('org.junit:junit-bom:6.1.3')
+     testImplementation 'org.junit.jupiter:junit-jupiter'
+     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+ }
+@@ -39,7 +39,7 @@ test {
+ }
+ 
+ checkstyle {
+-    toolVersion = '13.10.0'
++    toolVersion = '14.4.0'
+     configFile = file('../config/checkstyle/checkstyle.xml')
+     // Same zero-tolerance policy as the main build's subprojects block.
+     maxWarnings = 0
+@@ -49,7 +49,7 @@ spotless {
+     java {
+         importOrder()
+         removeUnusedImports()
+-        googleJavaFormat('1.28.0').reflowLongStrings()
++        googleJavaFormat('1.36.1').reflowLongStrings()
+         trimTrailingWhitespace()
+         endWithNewline()
+     }
+diff --git a/gradle/libs.versions.toml b/gradle/libs.versions.toml
+index cd6d452..5ca05d4 100644
+--- a/gradle/libs.versions.toml
++++ b/gradle/libs.versions.toml
+@@ -2,15 +2,20 @@
+ # https://docs.gradle.org/current/userguide/version_catalogs.html#sec::toml-dependencies-format
+ 
+ [versions]
+-junit-jupiter = "6.0.1"
+-jackson = "3.1.2"
+-checkstyle = "13.10.0"
+-google-java-format = "1.28.0"
++spring-ai = "2.0.2"
++langchain4j = "1.23.0"
++junit-jupiter = "6.1.3"
++jackson = "3.3.0"
++checkstyle = "14.4.0"
++google-java-format = "1.36.1"
+ 
+ [libraries]
++spring-ai-model = { module = "org.springframework.ai:spring-ai-model", version.ref = "spring-ai" }
++langchain4j-core = { module = "dev.langchain4j:langchain4j-core", version.ref = "langchain4j" }
+ junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "junit-jupiter" }
+ jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }
+ 
+ [plugins]
+-spotless = { id = "com.diffplug.spotless", version = "8.9.0" }
+-nexusRelease = { id = "se.alipsa.nexus-release-plugin", version = "2.5.1" }
++spotless = { id = "com.diffplug.spotless", version = "8.11.0" }
++nexusRelease = { id = "se.alipsa.nexus-release-plugin", version = "2.6.0" }
++benManesVersions = { id = "io.github.ben-manes.versions", version = "0.67.0" }
+diff --git a/gradle/wrapper/gradle-wrapper.properties b/gradle/wrapper/gradle-wrapper.properties
+index 84c5a9c..0bb71f3 100644
+--- a/gradle/wrapper/gradle-wrapper.properties
++++ b/gradle/wrapper/gradle-wrapper.properties
+@@ -1,7 +1,7 @@
+ distributionBase=GRADLE_USER_HOME
+ distributionPath=wrapper/dists
+-distributionSha256Sum=84fbba45c7f4c64abc77460e1c00f541e9f960e3c7ed2538f1ede19eacd873ae
+-distributionUrl=https\://services.gradle.org/distributions/gradle-9.7.0-bin.zip
++distributionSha256Sum=0b00b0ffe07c4d4789c12d4935a44a7057d55774b7540bd4a3f76f336deb177a
++distributionUrl=https\://services.gradle.org/distributions/gradle-9.9.0-bin.zip
+ networkTimeout=10000
+ retries=0
+ retryBackOffMs=500
+diff --git a/jmlx-jinja/build.gradle b/jmlx-jinja/build.gradle
+index 28eda5d..8dfdda2 100644
+--- a/jmlx-jinja/build.gradle
++++ b/jmlx-jinja/build.gradle
+@@ -6,7 +6,7 @@ plugins {
+ // jmlx-jinja is a dependency-free Java 21 library; keep that promise even though
+ // the rest of jmlx currently targets Java 25. It is versioned independently of the
+ // other jmlx modules because it was migrated from the standalone hfjinja project.
+-version = '0.6.1'
++version = '0.6.2-SNAPSHOT'
+ 
+ java {
+     toolchain {
+diff --git a/jmlx-tokenizer/build.gradle b/jmlx-tokenizer/build.gradle
+index 3232c43..ea2311e 100644
+--- a/jmlx-tokenizer/build.gradle
++++ b/jmlx-tokenizer/build.gradle
+@@ -4,9 +4,9 @@ plugins {
+ }
+ 
+ // Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: an
+-// "independent release" that inherits the root version is not independent at all. Starts a
+-// fresh 0.1.0 line because jmlx-tokenizer has never been published.
+-version = '0.1.1'
++// "independent release" that inherits the root version is not independent at all. The line
++// started at 0.1.0 in Phase 8.1.
++version = '0.1.2-SNAPSHOT'
+ 
+ // Pure Java with no native dependency, so it is not bound to the root's Java 25 toolchain
+ // (which exists for jmlx-core/jmlx-ffi's Panama FFM). Targeting 21 matches jmlx-jinja and
+diff --git a/jmlx-vision/build.gradle b/jmlx-vision/build.gradle
+index 9f657ba..5ea5014 100644
+--- a/jmlx-vision/build.gradle
++++ b/jmlx-vision/build.gradle
+@@ -3,10 +3,10 @@ plugins {
+     id 'maven-publish'
+ }
+ 
+-// Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: jmlx-vision has
+-// never been published, so it starts a fresh 0.1.0 line -- same reasoning jmlx-tokenizer used for
+-// its own first version.
+-version = '0.1.1'
++// Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: jmlx-vision's
++// line started at 0.1.0 in Phase 8.1 -- same reasoning jmlx-tokenizer used for its own first
++// version.
++version = '0.1.2-SNAPSHOT'
+ 
+ // Pure Java with no native dependency, so it is not bound to the root's Java 25 toolchain (which
+ // exists for jmlx-core/jmlx-ffi's Panama FFM). Targeting 21 matches jmlx-jinja and

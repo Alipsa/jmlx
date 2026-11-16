@@ -1,0 +1,8 @@
+ build.gradle                             | 374 ++++++++++++++++++++++++++++++-
+ buildSrc/build.gradle                    |   8 +-
+ gradle/libs.versions.toml                |  17 +-
+ gradle/wrapper/gradle-wrapper.properties |   4 +-
+ jmlx-jinja/build.gradle                  |   2 +-
+ jmlx-tokenizer/build.gradle              |   6 +-
+ jmlx-vision/build.gradle                 |   8 +-
+ 7 files changed, 390 insertions(+), 29 deletions(-)

@@ -1,0 +1,124 @@
+{
+  "argv": [
+    "$GRADLE_9_9_0",
+    "-p",
+    "$AUDIT/checkout",
+    "--gradle-user-home",
+    "$AUDIT/gradle-home",
+    "--no-daemon",
+    "--no-configuration-cache",
+    "--no-build-cache",
+    "--console=plain",
+    ":jmlx-jinja:jar",
+    ":jmlx-jinja:sourcesJar",
+    ":jmlx-jinja:javadocJar",
+    ":jmlx-jinja:generatePomFileForMavenPublication",
+    ":jmlx-jinja:generateMetadataFileForMavenPublication",
+    ":jmlx-tokenizer:jar",
+    ":jmlx-tokenizer:sourcesJar",
+    ":jmlx-tokenizer:javadocJar",
+    ":jmlx-tokenizer:generatePomFileForMavenPublication",
+    ":jmlx-tokenizer:generateMetadataFileForMavenPublication",
+    ":jmlx-vision:jar",
+    ":jmlx-vision:sourcesJar",
+    ":jmlx-vision:javadocJar",
+    ":jmlx-vision:generatePomFileForMavenPublication",
+    ":jmlx-vision:generateMetadataFileForMavenPublication",
+    "-I",
+    "$AUDIT/toolchains.init.gradle",
+    "auditToolchains",
+    "--rerun-tasks",
+    "-Dorg.gradle.java.installations.auto-detect=false",
+    "-Dorg.gradle.java.installations.auto-download=false",
+    "-Dorg.gradle.java.installations.fromEnv=",
+    "-Dorg.gradle.java.installations.paths=$AUDIT/toolchain/jdk-21.0.12.1.jdk"
+  ],
+  "environment": {
+    "JAVA_HOME": "$AUDIT/toolchain/jdk-21.0.12.1.jdk",
+    "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin"
+  },
+  "publicationCopies": [
+    {
+      "source": "checkout/jmlx-jinja/build/libs/jmlx-jinja-0.6.1.jar",
+      "target": "candidate/jmlx-jinja-0.6.1.jar"
+    },
+    {
+      "source": "checkout/jmlx-jinja/build/libs/jmlx-jinja-0.6.1-sources.jar",
+      "target": "candidate/jmlx-jinja-0.6.1-sources.jar"
+    },
+    {
+      "source": "checkout/jmlx-jinja/build/libs/jmlx-jinja-0.6.1-javadoc.jar",
+      "target": "candidate/jmlx-jinja-0.6.1-javadoc.jar"
+    },
+    {
+      "source": "checkout/jmlx-jinja/build/publications/maven/pom-default.xml",
+      "target": "candidate/jmlx-jinja-0.6.1.pom"
+    },
+    {
+      "source": "checkout/jmlx-jinja/build/publications/maven/module.json",
+      "target": "candidate/jmlx-jinja-0.6.1.module"
+    },
+    {
+      "source": "checkout/jmlx-tokenizer/build/libs/jmlx-tokenizer-0.1.1.jar",
+      "target": "candidate/jmlx-tokenizer-0.1.1.jar"
+    },
+    {
+      "source": "checkout/jmlx-tokenizer/build/libs/jmlx-tokenizer-0.1.1-sources.jar",
+      "target": "candidate/jmlx-tokenizer-0.1.1-sources.jar"
+    },
+    {
+      "source": "checkout/jmlx-tokenizer/build/libs/jmlx-tokenizer-0.1.1-javadoc.jar",
+      "target": "candidate/jmlx-tokenizer-0.1.1-javadoc.jar"
+    },
+    {
+      "source": "checkout/jmlx-tokenizer/build/publications/maven/pom-default.xml",
+      "target": "candidate/jmlx-tokenizer-0.1.1.pom"
+    },
+    {
+      "source": "checkout/jmlx-tokenizer/build/publications/maven/module.json",
+      "target": "candidate/jmlx-tokenizer-0.1.1.module"
+    },
+    {
+      "source": "checkout/jmlx-vision/build/libs/jmlx-vision-0.1.1.jar",
+      "target": "candidate/jmlx-vision-0.1.1.jar"
+    },
+    {
+      "source": "checkout/jmlx-vision/build/libs/jmlx-vision-0.1.1-sources.jar",
+      "target": "candidate/jmlx-vision-0.1.1-sources.jar"
+    },
+    {
+      "source": "checkout/jmlx-vision/build/libs/jmlx-vision-0.1.1-javadoc.jar",
+      "target": "candidate/jmlx-vision-0.1.1-javadoc.jar"
+    },
+    {
+      "source": "checkout/jmlx-vision/build/publications/maven/pom-default.xml",
+      "target": "candidate/jmlx-vision-0.1.1.pom"
+    },
+    {
+      "source": "checkout/jmlx-vision/build/publications/maven/module.json",
+      "target": "candidate/jmlx-vision-0.1.1.module"
+    }
+  ],
+  "environmentNote": "Original invocation: only these overrides were recorded; other caller environment variables were inherited and not captured. The controlled environment applies only to reproduce.py runs.",
+  "reproductionEnvironment": {
+    "inherit": [
+      "HOME",
+      "PATH",
+      "TMPDIR",
+      "USER"
+    ],
+    "fixed": {
+      "LC_ALL": "C",
+      "LANG": "C",
+      "LANGUAGE": "C",
+      "TZ": "UTC"
+    },
+    "JAVA_HOME": "selected comparison JDK",
+    "PATH_prefix": "selected comparison JDK/bin",
+    "allOtherInheritedVariables": "discarded",
+    "gitOverrides": {
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null"
+    }
+  }
+}

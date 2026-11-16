@@ -5,8 +5,10 @@ bundle digest and verified receipt will be filled from the approved release reco
 
 The proposed tuple is native/models/adapters 0.1.0, ffi/core 0.5.0, jinja 0.6.2,
 tokenizer/vision 0.1.2. See the [readiness checklist](phase8-4-release-checklist.md) and
-[manifest](../tools/release-smoke/released-8.4.json); decisions remain provisional until
-post-plugin audit and tuple review. The original 8.1 coordinates remain available unchanged.
+[manifest](../tools/release-smoke/released-8.4.json). The
+[post-plugin artifact audit](phase8-4-pure-java-audit.md) supports new pure-Java versions;
+tuple review and final candidate verification remain open. The original 8.1 coordinates
+remain available unchanged.
 
 Native inference requires Java 25 and Apple Silicon macOS 26.2 or later. This minimum reflects
 bundled dylib metadata; physical minimum-host execution must pass before publication. No claim

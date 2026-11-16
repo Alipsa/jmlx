@@ -1,0 +1,15 @@
+Python 3.9.6
+test_archive_filter_requirement_is_reported_before_io (test_reproduce_audit.ReproduceAuditTest) ... ok
+test_archive_requires_one_jdk_and_rejects_path_traversal (test_reproduce_audit.ReproduceAuditTest) ... skipped 'requires tarfile.data_filter backport'
+test_central_download_hash_is_checked (test_reproduce_audit.ReproduceAuditTest) ... ok
+test_environment_removes_injection_and_controls_locale (test_reproduce_audit.ReproduceAuditTest) ... ok
+test_every_daemon_and_compiler_javadoc_identity_is_checked (test_reproduce_audit.ReproduceAuditTest) ... ok
+test_git_ignores_caller_config_and_environment_injection (test_reproduce_audit.ReproduceAuditTest) ... ok
+test_gradle_version_is_checked (test_reproduce_audit.ReproduceAuditTest) ... ok
+test_jdk_archive_is_verified_before_extraction (test_reproduce_audit.ReproduceAuditTest) ... skipped 'requires tarfile.data_filter backport'
+test_result_requires_exact_artifacts_and_verdict (test_reproduce_audit.ReproduceAuditTest) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.011s
+
+OK (skipped=2)

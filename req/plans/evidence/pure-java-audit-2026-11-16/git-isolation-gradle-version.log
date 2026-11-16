@@ -1,0 +1,26 @@
+
+Welcome to Gradle 9.9.0!
+
+Here are the highlights of this release:
+ - Performance improvements for Kotlin DSL compilation
+ - Test filtering for non-method JUnit Platform tests
+ - Wrapper settings preserved on upgrade
+ - Predefined groups in the Problems API
+
+For more details see https://docs.gradle.org/9.9.0/release-notes.html
+
+
+------------------------------------------------------------
+Gradle 9.9.0
+------------------------------------------------------------
+
+Build time:    2026-11-06 15:49:35 UTC
+Revision:      dabfe84a6c2590fa6ecaab03ff6fefe5b838d558
+
+Kotlin:        2.4.21
+Groovy:        4.0.33
+Ant:           Apache Ant(TM) version 1.10.17 compiled on April 6 2026
+Launcher JVM:  21.0.12.1 (BellSoft 21.0.12.1+1-LTS)
+Daemon JVM:    $REPRODUCTION/toolchain/jdk-21.0.12.1.jdk (no Daemon JVM specified, using current Java home)
+OS:            Mac OS X 27.2.1 aarch64
+

@@ -1,0 +1,15 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.9.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+
+> Task :auditToolchains
+AUDIT_TOOLCHAINS={"jmlx-jinja":{"compiler":{"home":"$INSTALLED_JDKS/21.0.12+1.1-librca","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"},"javadoc":{"home":"$INSTALLED_JDKS/21.0.12+1.1-librca","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"}},"jmlx-tokenizer":{"compiler":{"home":"$INSTALLED_JDKS/21.0.12+1.1-librca","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"},"javadoc":{"home":"$INSTALLED_JDKS/21.0.12+1.1-librca","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"}},"jmlx-vision":{"compiler":{"home":"$INSTALLED_JDKS/21.0.12+1.1-librca","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"},"javadoc":{"home":"$INSTALLED_JDKS/21.0.12+1.1-librca","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"}}}
+
+[Incubating] Problems report is available at: file://$AUDIT/checkout/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 2s
+3 actionable tasks: 1 executed, 2 up-to-date

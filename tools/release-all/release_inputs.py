@@ -148,11 +148,12 @@ def native_report(directory, bootstrap, forbidden):
     target = (target + (0, 0, 0))[:3]
     minimum_match = re.search(r'^MACOS_SUPPORTED_MINIMUM="([0-9]+\.[0-9]+)"$', script, re.M)
     if not minimum_match:
-        raise ValueError("bootstrap supported minimum missing")
+        raise ValueError('bootstrap supported minimum missing: expected top-level '
+                         'MACOS_SUPPORTED_MINIMUM="X.Y"')
     minimum = tuple(map(int, minimum_match[1].split("."))) + (0,)
     if target > minimum:
         raise ValueError("deployment target exceeds supported minimum")
-    result = {"pins": pin, "minimum": minimum, "deploymentTarget": target, "files": {}}
+    result = {"pins": pin, "supportedMinimum": minimum, "deploymentTarget": target, "files": {}}
     for name in NATIVE_FILES:
         path = directory / name
         if not path.is_file() or not path.stat().st_size:
@@ -178,6 +179,32 @@ def native_report(directory, bootstrap, forbidden):
                 raise ValueError(f"{name}: unreviewed /Users/ path")
         result["files"][name] = entry
     return result
+
+
+def verify_smoke_environment(kind, env, supported_minimum, run_id=None):
+    """Require supported macOS acceptance hosts and physical minimum-series execution."""
+    if kind == "linux-pure":
+        if (env.get("system") != "Linux" or env.get("architecture") != "aarch64"
+                or not env.get("containerImage") or not env.get("osRelease")):
+            raise ValueError("expected local Linux ARM64 evidence")
+        return
+    if kind not in ("minimum-host", "macos-full", "macos-pure"):
+        raise ValueError(f"unknown smoke kind: {kind}")
+    error = ("minimum-host evidence is incomplete or incompatible" if kind == "minimum-host"
+             else "expected supported macOS evidence")
+    version = env.get("osVersion")
+    if (env.get("system") != "Darwin" or env.get("architecture") != "arm64"
+            or not isinstance(version, str)
+            or not re.fullmatch(r"[0-9]+\.[0-9]+(?:\.[0-9]+)?", version)):
+        raise ValueError(error)
+    actual = tuple(map(int, version.split(".")[:2]))
+    minimum = tuple(supported_minimum[:2])
+    if kind == "minimum-host":
+        if (actual != minimum or env.get("virtualized") is not False or not run_id
+                or not env.get("chip") or not env.get("swVers")):
+            raise ValueError(error)
+    elif actual < minimum:
+        raise ValueError(error)
 
 
 def native_jar_report(jar, bootstrap, forbidden):

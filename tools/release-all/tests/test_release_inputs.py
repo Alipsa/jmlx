@@ -88,7 +88,7 @@ class ReleaseInputsTest(unittest.TestCase):
             (root / name).write_bytes(header + command)
         (root / "mlx.metallib").write_bytes(b'fixture')
         report = R.native_report(root, bootstrap, ["/Users/release"])
-        self.assertEqual(report["minimum"], (27, 2, 0))
+        self.assertEqual(report["supportedMinimum"], (27, 2, 0))
         self.assertEqual(report["deploymentTarget"], (26, 2, 0))
         original = bootstrap.read_text()
         bootstrap.write_text(original.replace('MACOS_SUPPORTED_MINIMUM="27.2"', ''))

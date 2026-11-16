@@ -15,8 +15,8 @@ not evidence that an arbitrary Hugging Face artifact will load.
 | Mixtral / MoE | implemented | verified-with-synthetic-fixture against Hugging Face tiny-checkpoint logits | Synthetic family tokenizer with Mistral template; text/ID golden | float safetensors with expert tensors | float weights only | FULL cache by default; sliding eviction requires a checkpoint window; gathered top-k expert compute | Tier-B artifact/runner pending |
 | Gemma 2/3, Phi-2, LongRoPE, shared-expert MoE | planned | no verification | — | — | — | unsupported capability named during config parsing | — |
 
-The supported runtime is macOS 27.2 or later on Apple Silicon with Java 25 and the MLX pins in
-`scripts/bootstrap-native.sh`. Artifact licensing and access requirements are recorded alongside
+The native runtime is supported on macOS 27.2 or later on Apple Silicon with Java 25 and
+the MLX pins in `scripts/bootstrap-native.sh`. Artifact licensing and access requirements are recorded alongside
 each future Tier-B fixture; this matrix intentionally makes no claim that every public Hugging Face
 checkpoint is compatible.
 

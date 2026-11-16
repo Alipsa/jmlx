@@ -5,7 +5,8 @@ The core (`req/plans/initial-plan.md`) is a v0.1 vertical slice — native boots
 
 ## Requirements
 
-- macOS on Apple Silicon, macOS 27.2 or later (27.2.x is the minimum supported release series).
+- Native runtime supported on Apple Silicon macOS 27.2 or later. Binaries retain a 26.2
+  deployment target and may load on older systems; versions below 27.2 are unsupported.
 - Java 25 (JDK 25 toolchain; Gradle's toolchain support will provision it if you don't already have one).
 - Xcode Command Line Tools (`xcode-select --install`), which provide `git`, `cc` (clang) and `otool`.
 - `cmake`: `brew install cmake` (or the cmake.org installer).

@@ -34,6 +34,8 @@ MLX_C_COMMIT="a26f2d584a14ec619ae8db9a09be03becd47598a"
 
 # Supported native floor: all macOS 27.2 patch releases and later. Release acceptance
 # must execute the packaged candidate on physical 27.2.x hardware.
+# Machine-read by release verification; keep this top-level, quoted X.Y assignment.
+# Bootstrap itself uses only the independent deployment target below.
 MACOS_SUPPORTED_MINIMUM="27.2"
 # Keep the binary target at the wheel's 26.2 floor for hosted CI compatibility.
 # This build setting does not extend the supported OS range.

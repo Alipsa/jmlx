@@ -19,7 +19,7 @@ inherited `fromEnv` discovery. Bundle preparation requires macOS ARM64 and a com
 `native/install/lib` matching bootstrap pins, with validated dylib minimum OS/path hygiene.
 The supported native floor is macOS 27.2 (any 27.2.x patch release); physical minimum-host
 kernel execution remains a release gate. `MACOS_SUPPORTED_MINIMUM` in bootstrap supplies
-the receipt minimum independently of the 26.2 binary deployment target. Hosted `macos-26`
+the receipt `supportedMinimum` independently of the 26.2 binary deployment target. Hosted `macos-26`
 checks provide additional coverage; they do not satisfy the physical 27.2.x release gate. Ordinary contributor builds retain their unstaged-runtime skip behavior.
 
 Signing and Portal credentials use the existing Gradle properties/environment contract.

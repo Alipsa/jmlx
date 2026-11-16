@@ -36,8 +36,10 @@ release) is built in milestones, each with its own plan under `req/plans/`:
 the Phase 6 state and lists the remaining release steps. The pure-Java 8.1 tuple is
 on Central; native modules and adapters have not been published.
 
-Requires macOS on Apple Silicon, macOS 27.2+, and a Java 25 toolchain. The native bootstrap also needs
-the Xcode Command Line Tools (`git`, `cc`, `otool`) and `cmake` (`brew install cmake`); see
+The supported native runtime is Apple Silicon macOS 27.2+ with Java 25. Binaries retain a
+26.2 deployment target and may load on older hosts; versions below 27.2 are unsupported.
+Development and hosted CI may use macOS 26.2+ for additional regression coverage.
+The native bootstrap also needs the Xcode Command Line Tools (`git`, `cc`, `otool`) and `cmake` (`brew install cmake`); see
 `README.md`.
 
 ## One-time native bootstrap
@@ -89,7 +91,9 @@ verify the recorded environment and canonical fixtures:
 ```
 
 Oracle commands automatically select compatible profiles: macOS 26 runs all families; newer hosts
-run Phase 7.1 CPU fixtures and report Phase 6 GPU fixtures as skipped. Phase 6 requires macOS 26.
+run Phase 7.1 CPU fixtures and report Phase 6 GPU fixtures as skipped. Only the historical
+Phase 6 GPU oracle profile is restricted to macOS 26; this is a reference-tool constraint,
+not the supported native runtime. Supported 27.2+ hosts intentionally skip that profile.
 
 Only `./gradlew generateMlxOracleFixtures` rewrites the committed oracle JSON. Review that diff and
 the recorded provenance whenever native pins change. Tier-A inputs and Java goldens are documented
@@ -682,7 +686,9 @@ Task-specific Tier-B suites are selected by manifest task, independently of mode
 Java downloadTierBArtifact owns SHA verification and does not declare Gradle outputs. Its buildSrc
 tests remain explicitly separate from root check. Python execution remains opt-in for reference
 and oracle tools; ordinary builds gain no Python prerequisite. See the Phase 7.2 implementation
-report for local evidence and the pending new macOS 26 CI gate. Versions and publication are unchanged.
+report for local evidence. Its historical pending macOS 26 CI item is now extra coverage
+below the 27.2 support floor, not a current minimum-host release gate. Versions and publication
+are unchanged.
 
 ## Phase 7.3a additions
 
@@ -716,7 +722,8 @@ SmolVLM-256M CPU logits, licensed local image, expanded IDs, stable greedy IDs a
 measurements. `verifyHfReferenceGoldens` also verifies the vision Tier-B manifest/image/generator
 digests; neural regeneration remains manual via `tools/hf-reference/vision_tier_b.py`. Local WP7
 evidence passes. WP8 is implemented via PR #47, with local consumer/capability evidence in
-`req/phase7-3a-implementation-report.md`; the macOS 26 hosted CI/Tier-B acceptance remains pending.
+`req/phase7-3a-implementation-report.md`; its pending macOS 26 hosted CI/Tier-B item is
+historical extra coverage below the 27.2 support floor, not a minimum-host release gate.
 
 ## Phase 7.3b additions
 
@@ -866,7 +873,8 @@ runs with persistent model storage completed 2026-10-26 (run 40403387275, merged
 confirmation 40409087523, `tools/tier-b/README.md`) with maximum logit error, native
 allocator peak, greedy IDs and decoded output matching the local runs (wall times differ),
 accepting the CI pipeline — not independent host, OS or memory-fit evidence — and the
-macOS 26 hosted execution remains pending, not verified. The manual 8B
+historical macOS 26 hosted execution remains unverified extra coverage below the 27.2
+support floor, not a minimum-host release gate. The manual 8B
 4-bit run (`Qwen3Vl8bManualProbeTest`, opt-in via `JMLX_8B_PROBE_DIR`) recorded its
 image+text output, the artifact's stale-index finding, the full-dump
 `preprocessor_config.json` acceptance in `Qwen3VlProcessorConfig` and asserts the
@@ -1033,8 +1041,9 @@ per minute even in public repos, so the row does not target it); the runner exec
 dedicated non-privileged macOS user with a per-job `GRADLE_USER_HOME`, the repo requires
 approval for every external fork-PR run, and the runner is the same M5 Max host (macOS
 27.0.1) as the local evidence. The row's first self-hosted run accepts the CI pipeline — not
-independent host, OS or memory-fit evidence — and the macOS 26 hosted execution remains
-pending, not verified. The documentation pass updated `req/phase6-compatibility.md` (a
+independent host, OS or memory-fit evidence. Its historical macOS 26 hosted execution
+remains unverified extra coverage below the 27.2 support floor, not a minimum-host release gate.
+The documentation pass updated `req/phase6-compatibility.md` (a
 per-phase 7.3c section — VLMs get per-phase sections, not matrix rows — while the text
 `phi3` row's `longrope rejected` wording stays true: `longrope` is a rope_type still
 rejected, `phi3_v`'s NTK-Su being implemented as `RopeSpec.Su`), `req/phase6-inference-

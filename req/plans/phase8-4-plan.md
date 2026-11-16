@@ -16,8 +16,8 @@ Owner decision raises the supported native floor to macOS 27.2 (all 27.2.x patch
 and later). This supersedes the 26.2 support/resource assumption below. The available physical
 Apple Silicon host runs 27.2.1; use a dedicated credential-free runner account for the exact
 signed-candidate workflow. That execution gate remains open until the candidate exists.
-`MACOS_SUPPORTED_MINIMUM` supplies the receipt and minimum-host OS checks; retain the
-separate 26.2 binary deployment target for hosted `macos-26` regression coverage. Earlier
+`MACOS_SUPPORTED_MINIMUM` supplies the receipt `supportedMinimum` and minimum-host OS checks;
+retain the separate 26.2 binary deployment target for hosted `macos-26` regression coverage. Earlier
 26.2 metadata findings remain historical evidence, not the support policy. No native pins,
 bindings or binary build flags change with this amendment.
 

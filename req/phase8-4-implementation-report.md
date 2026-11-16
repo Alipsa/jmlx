@@ -137,3 +137,26 @@ native reports pass with supported minimum 27.2 and all three dylib minos values
 Bootstrap shell syntax and `git diff --check` pass. This verifies policy and existing payload
 metadata; dedicated physical-runner setup and exact signed-candidate Metal execution remain
 release gates.
+
+
+## Support-policy review corrections (2026-11-16)
+
+Documentation now distinguishes the supported macOS 27.2+ runtime from the 26.2 binary
+deployment target and extra hosted CI coverage. Older binaries may load below the supported
+floor; no loader OS check was added. AGENTS.md scopes the macOS 26-only Phase 6 oracle
+profile and the historical pending hosted items as reference tooling or additional coverage.
+
+Native reports explicitly name `supportedMinimum` separately from `deploymentTarget`,
+replacing the ambiguous `minimum` field. Old records must be regenerated. The bootstrap
+assignment is documented as machine-read, with an error that names its required X.Y format.
+A shared producer/receipt environment validator requires all macOS acceptance reports to
+run at or above the support floor, while the physical minimum-host report must match its
+major/minor exactly and retain the physical-host and workflow identity checks.
+
+All 56 release selftests passed locally in 56.821 seconds. New producer tests cover 27.2.x
+patch releases, older/newer minor versions, malformed versions and incomplete physical-host
+identity, plus rejection before a consumer or output log is created. Receipt tests cover
+both macOS report kinds below, at and above the supported floor. Native module `check` and
+`verifyNativeReleasePayload` passed (11 tasks, 2 executed). Shell syntax and `git diff --check`
+pass. These results supersede the earlier 51-test validation for the current implementation;
+physical exact-candidate acceptance remains pending.

@@ -211,5 +211,5 @@ archive-mode reproduction with isolated Git settings executed all 27 publication
 
 The tuple still needs human review and minimum-host readiness before a candidate is frozen.
 Repeat this comparison at the final candidate SHA, and rerun it after dependency, wrapper,
-plugin or publication changes. This audit supplies neither physical macOS 26.2 execution nor
+plugin or publication changes. This audit supplies neither physical macOS 27.2.x execution nor
 native-license/account-capacity review, final release verification or publication authorization.

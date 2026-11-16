@@ -61,9 +61,11 @@ signing, release or SSH credentials before using the manual minimum-host workflo
 
 Bootstrap records `MACOS_SUPPORTED_MINIMUM="27.2"` independently of
 `MACOS_DEPLOYMENT_TARGET="26.2"`. Receipts and both minimum-host validators consume the
-supported minimum; per-dylib checks still enforce the binary target. The latter remains at
+`supportedMinimum`; per-dylib checks still enforce the binary target. The latter remains at
 the upstream wheel floor so hosted `macos-26` PR checks can continue. Those checks are
-additional coverage and do not establish supported-minimum acceptance.
+additional coverage and do not establish supported-minimum acceptance. Both macOS report
+kinds must run at or above `supportedMinimum`; the physical minimum-host report must match
+its major/minor exactly. Reports explicitly separate `supportedMinimum` from `deploymentTarget`.
 
 Runner availability checked 2026-11-16: GitHub's
 [`xcode-27` ARM64 image](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md)

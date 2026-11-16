@@ -6,7 +6,8 @@ import json
 import subprocess
 from pathlib import Path
 
-from release_inputs import check_bundle, native_report, read_json, read_runtime, sha256
+from release_inputs import (check_bundle, native_report, read_json, read_runtime, sha256,
+                            verify_smoke_environment)
 from verify_native_tests import verify_events
 
 REQUIRED = {"macos-full", "macos-pure", "linux-pure", "minimum-host"}
@@ -75,17 +76,7 @@ def verify(root, receipt_path):
         if (not runtime_file or runtime_file not in report["outputs"]
                 or read_runtime(Path(report_file["path"]).parent / runtime_file) != runtime):
             raise ValueError("consumer runtime measurement differs from its evidence file")
-        if kind == "minimum-host":
-            target = ".".join(map(str, record["native"]["minimum"][:2]))
-            if (env.get("system") != "Darwin" or env.get("osVersion", "").split(".")[:2] != target.split(".")
-                    or env.get("architecture") != "arm64" or env.get("virtualized") is not False
-                    or not report.get("runId") or not env.get("chip") or not env.get("swVers")):
-                raise ValueError("minimum-host evidence is incomplete or incompatible")
-        elif kind == "linux-pure" and (env.get("system") != "Linux" or env.get("architecture") != "aarch64"
-                                       or not env.get("containerImage") or not env.get("osRelease")):
-            raise ValueError("expected local Linux ARM64 evidence")
-        elif kind.startswith("macos-") and (env.get("system") != "Darwin" or env.get("architecture") != "arm64"):
-            raise ValueError("expected macOS evidence")
+        verify_smoke_environment(kind, env, record["native"]["supportedMinimum"], report.get("runId"))
     return receipt, record
 
 

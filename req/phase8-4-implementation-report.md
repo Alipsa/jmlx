@@ -55,8 +55,8 @@ On the Apple Silicon macOS 27.2.1 host with rebuilt/staged native runtime:
   succeeds. This fixture establishes the unconditional task-type guard; it is not a signed
   end-to-end combined plugin deployment.
 - Final-receipt regressions reject preliminary input, missing/changed logs, changed plans and
-  cached tasks claiming success. Current plugin pin rejects existing-bundle upload during
-  configuration, before any Portal request.
+  cached tasks claiming success. The 2.6.0 integration additionally verifies reviewed digest
+  forwarding and exact uploaded bytes against a local HTTPS Portal fixture.
 
 Ubuntu ARM64: in an isolated source copy, parser/release regressions and fresh-cache pure-Java
 artifact smoke passed. The container lacked Python, so validation used a temporary standalone
@@ -67,17 +67,17 @@ not candidate-tag/exact-signed-bundle evidence. No Windows behavior was changed 
 
 ## Upstream dependency and remaining gates
 
-The existing-bundle API change is committed locally as `47f7a36` in
-`Alipsa/nexus-release-plugin`, based on `d942747026bbe8bb22fdd38c6f768264d96284e0`.
-Its ModuleReleaseTest and CombinedReleaseDslTest suites passed in an isolated work copy,
-including multipart ZIP byte identity, no rebuild and tamper rejection. Source publication
-to the separate repository needs explicit approval after automatic review rejected the push.
-No plugin release is claimed; the jmlx catalog remains at 2.5.1 and upload fails closed.
+The separately reviewed API is now published as nexus-release-plugin 2.6.0 and integrated
+in the catalog. The wrapper passes both reviewed digest anchors after final-receipt
+validation; the root action revalidates that receipt before plugin upload. The clean,
+unpushed historical 8.1 scratch commit passes both published-empty and fixture-eligible
+selection checks. The HTTPS integration fixture verifies byte-identical upload and failure
+gates with synthetic producer/evidence inputs. See the
+[compatibility report](phase8-4-plugin-2.6.0-compatibility.md) for exact identities and limits.
 
-WP2 cannot close until that separate review/release, catalog bump and the scratch-commit 8.1
-compatibility matrix pass. The physical minimum-host resource is not secured. The manual
-workflow, exact signed-bundle consumers, TLS Portal integration, final receipt and Central
-postpublication path still require their actual candidate execution after those prerequisites.
+The physical minimum-host resource is not secured. Exact signed-bundle consumers, the manual
+workflow, final receipt and Central postpublication path still require actual candidate
+execution. No jmlx release has been performed.
 The proposed all-new tuple needs post-plugin audit/review; license inventory and current
 account publishing capacity need release review. No earlier/local report substitutes for
 these gates. Phase 8.4 is not complete.
@@ -115,5 +115,5 @@ and shell runner reject the actual system Python 3.9 without a traceback; the ru
 its pre-cleanup sentinel. The current workflows pass actionlint, while linting the previous
 workflow confirms its forbidden job-level context is detected.
 
-These corrections do not close the plugin release, physical minimum-host or signed-candidate
-execution gates above. No publication or tag was created.
+The later 2.6.0 integration closes the external plugin prerequisite; physical minimum-host
+and signed-candidate execution gates remain open. No jmlx publication or tag was created.

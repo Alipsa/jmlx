@@ -1,11 +1,14 @@
 """Final upload authorization rejects preliminary records and changed verification evidence."""
 
 import copy
+import io
 import json
+import runpy
 import sys
 import tempfile
 import unittest
 import zipfile
+from contextlib import redirect_stdout
 from xml.etree import ElementTree
 from pathlib import Path
 from unittest.mock import patch
@@ -88,8 +91,28 @@ class FinalReceiptTest(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
+    def test_plugin_digests_are_reviewed_record_anchors_after_full_verification(self):
+        self.assertEqual(F.plugin_digests(self.root, self.path),
+                         (self.record["bundleSha256"], self.record["pluginReceipt"]["manifestHash"]))
+        self.bundle.write_bytes(b"changed")
+        with self.assertRaises(ValueError):
+            F.plugin_digests(self.root, self.path)
+
+    def test_plugin_digests_cli_stdout_contract(self):
+        stdout = io.StringIO()
+        with patch("release_inputs.check_bundle", return_value=self.record), \
+                patch("release_inputs.native_report", return_value=self.record["native"]), \
+                patch.object(sys, "argv", [str(Path(F.__file__)), "--root", str(self.root),
+                                          "--verify", str(self.path), "--plugin-digests"]), \
+                redirect_stdout(stdout):
+            runpy.run_path(F.__file__, run_name="__main__")
+        self.assertRegex(stdout.getvalue(), r"\A[0-9a-f]{64}\t[0-9a-f]{64}\n\Z")
+        self.assertEqual(stdout.getvalue(),
+                         self.record["bundleSha256"] + "\t" +
+                         self.record["pluginReceipt"]["manifestHash"] + "\n")
+
     def test_final_valid_and_preliminary_rejected(self):
-        F.verify(self.root, self.path)
+        self.assertEqual(F.verify(self.root, self.path), (self.receipt, self.record))
         self.write("final.json", {"schema": "jmlx-preliminary-bundle-1"})
         with self.assertRaisesRegex(ValueError, "only a final"):
             F.verify(self.root, self.path)

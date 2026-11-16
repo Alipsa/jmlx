@@ -292,6 +292,10 @@ on receipt/source/test/hash mismatch, and uploaded ZIP bytes exactly equal the v
 The mock Portal must use HTTPS with a test certificate/truststore configured for the test
 process. Preserve root `build.gradle`'s HTTPS URL guard; do not relax it for integration tests.
 
+**Status (2026-11-15):** delivered through released plugin 2.6.0; see the
+[historical compatibility and integration evidence](../phase8-4-plugin-2.6.0-compatibility.md).
+The candidate artifact/tuple audit and actual signed-bundle gates remain open.
+
 **External prerequisite:** nexus-release-plugin 2.5.1 always depends on `bundleAll` for a new
 upload, and that task never reports up-to-date. Neither verified-ZIP submission nor this
 verification boundary can be implemented by shell arguments alone. Deliver a separate reviewed
@@ -311,6 +315,17 @@ selection; record this expected dry-run refusal rather than weakening the guard 
 success. Use sanitized repository/Portal fixtures for the original eligible-three scenario.
 Do not rewrite current versions to simulate 8.1 in the 8.4 worktree. WP2 cannot close until
 this external release, catalog bump and backwards-compatibility evidence exist.
+
+**Separate follow-up — release dependency verification:** add reviewed Gradle verification
+metadata (`gradle/verification-metadata.xml`) covering the release plugin's marker,
+implementation JAR/POM and transitive dependencies. Establish expected hashes from reviewed
+provenance rather than blindly accepting generated checksums; the implementation JAR hash
+in the compatibility report currently identifies the artifact but is not enforced. Define
+how verification applies to the remaining build dependencies without broad trust bypasses.
+Acceptance requires successful cold-cache resolution in CI and a tampered-artifact regression
+that fails during resolution before any Portal request or upload. Preserve ordinary builds
+and the existing release/smoke checks. Deliver this as a separate reviewed change; it is not
+part of the plugin 2.6.0 integration or its completed compatibility prerequisite.
 
 Keep `publishingType=AUTOMATIC` only with these pre-upload gates: the exact signed bundle is
 reviewed and verified locally, making a Portal inspection interval unnecessary. Record this

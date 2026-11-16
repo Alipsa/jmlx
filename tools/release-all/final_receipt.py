@@ -86,13 +86,20 @@ def verify(root, receipt_path):
             raise ValueError("expected local Linux ARM64 evidence")
         elif kind.startswith("macos-") and (env.get("system") != "Darwin" or env.get("architecture") != "arm64"):
             raise ValueError("expected macOS evidence")
-    return receipt
+    return receipt, record
+
+
+def plugin_digests(root, receipt_path):
+    _, record = verify(root, receipt_path)
+    return record["bundleSha256"], record["pluginReceipt"]["manifestHash"]
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--verify", type=Path)
+    parser.add_argument("--plugin-digests", action="store_true",
+                        help="with --verify, print reviewed ZIP and manifest hashes separated by a tab")
     parser.add_argument("--preliminary", type=Path)
     parser.add_argument("--bundle", type=Path)
     parser.add_argument("--report", action="append", default=[])
@@ -100,8 +107,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     try:
         if args.verify:
-            verify(args.root.resolve(), args.verify)
+            if args.plugin_digests:
+                print("\t".join(plugin_digests(args.root.resolve(), args.verify)))
+            else:
+                verify(args.root.resolve(), args.verify)
         else:
+            if args.plugin_digests:
+                raise ValueError("--plugin-digests requires --verify")
             if not args.preliminary or not args.bundle or not args.output:
                 raise ValueError("creation requires preliminary, bundle and output")
             reports = {}

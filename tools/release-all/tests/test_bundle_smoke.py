@@ -1,11 +1,14 @@
 """Producer acceptance rejects unsupported hosts before launching the consumer."""
 
 import copy
+import io
+import json
 import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from contextlib import redirect_stdout
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -91,6 +94,43 @@ class BundleSmokeTest(unittest.TestCase):
                     environment.assert_not_called()
                     consumer.assert_not_called()
                     self.assertFalse(output.exists())
+
+    def test_main_records_workflow_identity_and_rejects_branch_before_consumer(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "report.json"
+            runtime = root / "tools/release-smoke/app/build/reports/consumer-runtime.xml"
+            runtime.parent.mkdir(parents=True)
+            runtime.write_text("fixture runtime measurement")
+            record = {"native": {"supportedMinimum": self.minimum},
+                      "tag": {"sha": "c" * 40}, "bundleSha256": "a" * 64}
+            argv = ["bundle_smoke.py", "--root", temp, "--bundle", str(root / "bundle.zip"),
+                    "--preliminary", str(root / "preliminary.json"),
+                    "--preliminary-sha256", "b" * 64, "--kind", "minimum-host",
+                    "--output", str(output)]
+            env = {"GITHUB_RUN_ID": "42", "GITHUB_REF": "refs/heads/main",
+                   "GITHUB_EVENT_NAME": "workflow_dispatch", "GITHUB_WORKFLOW_SHA": "d" * 40,
+                   "GITHUB_WORKFLOW_REF":
+                   "Alipsa/jmlx/.github/workflows/release-candidate.yml@refs/heads/main"}
+            with patch.object(sys, "argv", argv), \
+                    patch.object(B, "check_bundle", return_value=record), \
+                    patch.object(B, "environment", return_value=self.env), \
+                    patch.object(B, "read_runtime", return_value={"java.feature": "25"}), \
+                    patch.object(B.subprocess, "run") as consumer:
+                for ref in ("refs/heads/feature", "refs/tags/candidate", ""):
+                    with self.subTest(ref=ref), patch.dict(os.environ, dict(env, GITHUB_REF=ref), clear=True):
+                        with self.assertRaisesRegex(ValueError, "minimum-host workflow"):
+                            B.main()
+                        consumer.assert_not_called()
+                        self.assertFalse(output.exists())
+                        self.assertFalse(output.with_suffix(".log").exists())
+                with patch.dict(os.environ, env, clear=True), redirect_stdout(io.StringIO()):
+                    B.main()
+                consumer.assert_called_once()
+            report = json.loads(output.read_text())
+            self.assertEqual(report["workflow"], {
+                "ref": env["GITHUB_REF"], "event": env["GITHUB_EVENT_NAME"],
+                "sha": env["GITHUB_WORKFLOW_SHA"], "workflowRef": env["GITHUB_WORKFLOW_REF"]})
 
 
 if __name__ == "__main__":

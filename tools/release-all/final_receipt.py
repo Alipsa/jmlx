@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 from release_inputs import (check_bundle, native_report, read_json, read_runtime, sha256,
-                            verify_smoke_environment)
+                            verify_smoke_environment, verify_minimum_host_workflow)
 from verify_native_tests import verify_events
 
 REQUIRED = {"macos-full", "macos-pure", "linux-pure", "minimum-host"}
@@ -77,6 +77,8 @@ def verify(root, receipt_path):
                 or read_runtime(Path(report_file["path"]).parent / runtime_file) != runtime):
             raise ValueError("consumer runtime measurement differs from its evidence file")
         verify_smoke_environment(kind, env, record["native"]["supportedMinimum"], report.get("runId"))
+        if kind == "minimum-host":
+            verify_minimum_host_workflow(report.get("workflow"))
     return receipt, record
 
 

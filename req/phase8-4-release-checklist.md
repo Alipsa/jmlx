@@ -35,8 +35,13 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [x] Hosted PR #94 [CI run 43628489480](https://github.com/Alipsa/jmlx/actions/runs/43628489480)
   passed both Java and native jobs, including required-native-suite execution and artifact smoke.
 - [x] Owner approved raising the supported native minimum to macOS 27.2.x (2026-11-16).
-  The local physical Apple Silicon Mac runs 27.2.1; exact-candidate execution and the
-  dedicated credential-free runner setup remain required before release acceptance.
+  The local physical Apple Silicon Mac runs 27.2.1; exact-candidate execution remains
+  required before release acceptance. The dedicated
+  `jmlxrunner` account and runner registration were provisioned and connectivity checked
+  on 2026-11-16; the worker is stopped until the reviewed verification window.
+- [ ] Revalidate minimum-host registration, saved environment, tool/runner versions and
+  queued jobs immediately before the window. ID 23 is historical: GitHub removes persistent
+  registrations after more than 14 offline days; re-register and record a new ID if necessary.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
   The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
   inventory to 26 entries. Two provenance findings (Juffa `erf`/`erfinv` and Cephes)
@@ -63,8 +68,13 @@ The owner approved macOS 27.2 as the native support floor, including every 27.2.
 release and later versions. The available physical Apple Silicon host runs macOS 27.2.1
 (build 26B131). The release job must still record chip/GPU identity, virtualization status,
 full OS version and successful Metal execution of the exact signed candidate. No candidate
-has been frozen or tested yet. Provision its dedicated non-privileged runner account without
-signing, release or SSH credentials before using the manual minimum-host workflow.
+has been frozen or tested yet. The dedicated non-privileged `jmlxrunner` account has been
+created without signing, release or SSH credentials. The
+[runner setup and evidence](phase8-4-minimum-host-setup.md) records account isolation checks,
+runner ID 23 and a successful connection under that account. Its label is
+`jmlx-release-minimum`; it is stopped until a reviewed candidate is ready. The existing
+`ghrunner` PR/Tier-B runner remains separate. Connectivity does not establish candidate
+Metal execution or consumer acceptance.
 
 Bootstrap records `MACOS_SUPPORTED_MINIMUM="27.2"` independently of
 `MACOS_DEPLOYMENT_TARGET="26.2"`. Receipts and both minimum-host validators consume the

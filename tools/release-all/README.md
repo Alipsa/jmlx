@@ -42,6 +42,10 @@ are ignored for status-only recovery. Protect the journal against modification.
    bump. Record the new plugin's historical 8.1 regressions on an unpushed throwaway commit.
 2. Merge the reviewed release-version PR. Anchor an annotated immutable `jmlx-phase8.4-rc.N`
    tag at that SHA and work from a clean detached checkout. Never move the tag.
+   Cut the candidate only after the minimum-host workflow-identity check
+   (`verify_minimum_host_workflow`) is on `main` and included in the tagged commit:
+   `bundle_smoke.py` runs from the candidate checkout.
+   An older tag cannot produce the workflow block now required by final-receipt verification.
 3. Run root checks, shared-build checks and `bash tools/release-all/selftest.sh`. Normal candidate
    smoke publishes only manifest-local entries and resolves reused entries solely from Central.
 4. Run `./releaseAll.sh --dry-run`, inspect the exact selected set, then set
@@ -63,12 +67,20 @@ are ignored for status-only recovery. Protect the journal against modification.
    `JMLX_LINUX_CONTAINER_IMAGE_ID`. It requires network access for the pinned wrapper/toolchains.
 8. Upload **both ZIP and preliminary JSON** as assets of a temporary draft GitHub Release on
    the candidate tag, after authorization for that external write. Dispatch
-   `release-candidate.yml` with both asset IDs/digests, Release ID and tag/peeled SHA. The transfer
-   job has draft-access permissions and never executes the bundle. The dedicated physical
-   minimum-host job has read-only repository access and checks tag object, HEAD, digests,
+   `release-candidate.yml` from `main` with both asset IDs/digests, Release ID and tag/peeled SHA.
+   The transfer job has draft-access permissions and never executes the bundle. The dedicated
+   physical minimum-host job has read-only repository access and checks tag object, HEAD, digests,
    native OS floor and actual packaged kernels. Provision its `jmlx-release-minimum` runner
    label before attempting this gate; a VM or moving hosted image cannot establish the floor.
-9. Download minimum-host JSON/log evidence, then create the final receipt:
+   Use the [dedicated-account setup procedure](../../req/phase8-4-minimum-host-setup.md);
+   the existing `self-macos-xl` PR/Tier-B runner does not satisfy that isolation requirement.
+   Revalidate registration, saved environment, runner/tool versions and queued label-matching
+   jobs before starting the worker. Offline registrations can expire after more than 14 days.
+9. Download minimum-host JSON/log evidence, including the actual run's **Set up job** log.
+   Compare its `Current runner version` with
+   the pre-dispatch measurement; resolve any update and record the actual version before
+   accepting the report, as described in the dedicated-account procedure. Then create the
+   final receipt:
 
 ```sh
 python3 tools/release-all/final_receipt.py --root "$PWD" \
@@ -80,7 +92,10 @@ python3 tools/release-all/final_receipt.py --root "$PWD" \
 
 Each report's log and measured `.runtime.xml` must remain beside its JSON. The consumer JVM
 itself writes feature/version/runtime build/vendor/home; its file and digest are verified,
-independently of the Java launcher on PATH. Only a **final** receipt can be submitted:
+independently of the Java launcher on PATH. The minimum-host report also records the manual
+workflow's main ref and SHA; review these against the actual GitHub run and reviewed workflow
+commit. Job guards and recorded identity do not restrict other workflows from using its labels.
+Only a **final** receipt can be submitted:
 
 ```sh
 ./releaseAll.sh --publish-verified build/releaseAll/verified.json

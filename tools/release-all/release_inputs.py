@@ -182,6 +182,17 @@ def native_report(directory, bootstrap, forbidden):
     return result
 
 
+def verify_minimum_host_workflow(identity):
+    """Validate the reported manual workflow identity; review the actual run independently."""
+    if (not isinstance(identity, dict) or identity.get("ref") != "refs/heads/main"
+            or identity.get("event") != "workflow_dispatch"
+            or identity.get("workflowRef") !=
+            "Alipsa/jmlx/.github/workflows/release-candidate.yml@refs/heads/main"
+            or not isinstance(identity.get("sha"), str)
+            or not re.fullmatch(r"[0-9a-f]{40}", identity["sha"])):
+        raise ValueError("minimum-host workflow must identify the manual main-branch release workflow")
+
+
 def verify_smoke_environment(kind, env, supported_minimum, run_id=None):
     """Require supported macOS acceptance hosts and physical minimum-series execution."""
     if kind == "linux-pure":

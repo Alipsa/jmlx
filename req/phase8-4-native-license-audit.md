@@ -124,11 +124,11 @@ that the code is prohibited or GPL-licensed.
 
 ## Verification and reproduction
 
-Local verification on 2026-11-16 passed all 63 release selftests (51.987 seconds) and the
-native Gradle checks (15 actionable tasks: 6 executed, 9 up-to-date). An empty-cache source
-audit checked all 26 notice entries, 34 additional source evidence records and the three
-JARs. `--require-clear` exited 1 for the two open findings, as intended. These results and
-the artifact hashes are recorded in the JSON and retained logs.
+The original 2026-11-16 verification passed 63 release selftests and the native Gradle checks.
+Its digest-only cache checked the declared contents of 26 notice entries and 34 additional
+source records, but fetched only 56 of the 57 distinct URL/digest pairs: two PyTorch sources
+shared a cache entry. The review correction below supersedes that network-verification evidence.
+The unprefixed retained logs remain historical records of that original implementation.
 
 Use Python 3.11+ and the existing Java toolchains. Bootstrap first if the native files and
 verified wheel are absent. From the repository root:
@@ -148,12 +148,19 @@ python3 tools/release-all/audit_native_licenses.py \
 ```
 
 The script verifies the wheel digest, fetches/hash-checks the recorded primary sources on a
-cache miss, checks every extracted notice against its source and the packaged text, and
-checks all supplied JARs. Cached objects are rehashed before use. Notice matching ignores
-line-end whitespace only. Source/header excerpts keep their full permission conditions and
+cache miss, checks every extracted notice against its source and the component's own section
+of the packaged text, and checks all supplied JARs. Notice headings match inventory component
+names exactly. The inventory independently requires all four legal files in every JAR.
+Cache keys bind both the original URL and the declared digest, so two different URLs with
+identical contents are fetched separately. Cached objects are rehashed before use, never
+rewritten on a hit, and new objects are installed atomically after validation.
+Notice files are decoded explicitly as UTF-8. Matching ignores line-end whitespace only.
+Source/header excerpts keep their full permission conditions and
 disclaimers; the JSON attribution record lists each distinct original copyright line.
 With an empty cache the check also reproduces the recorded source hashes from the network.
 Mutable Cephes/Stack Overflow sources fail the digest check if their reviewed content changes.
+The Cephes readme has no commit-pinned URL: an ordinary upstream edit can cause this failure;
+it is not by itself evidence of tampering. Review the new content before changing its recorded hash.
 
 The default command verifies consistency and writes `releaseReady: false` with both finding
 IDs. Add `--require-clear` to make those findings produce a nonzero exit, after writing the
@@ -165,3 +172,25 @@ Small reports and logs are retained outside `build/` under
 [`req/plans/evidence/native-license-audit-2026-11-16/`](plans/evidence/native-license-audit-2026-11-16/).
 The wheel, source cache and large native artifacts remain ignored/reproducible inputs.
 The JSON records their digests; `./gradlew clean` does not remove the committed reports.
+
+## Review corrections (2026-11-16)
+
+Review adds URL-bound atomic caching, explicit UTF-8 notice decoding, component section
+matching, strict excerpt bounds, contextual Stack Exchange response errors and an independent
+four-file legal inventory requirement. Companion source/Javadoc entries are now scanned for
+the forbidden home/checkout prefixes by `release_inputs.py native --documentation-jar`, as
+invoked by the explicit Gradle release check. Those path checks do not depend on file extensions.
+
+New regressions exercise a non-UTF-8 subprocess, independent requests for equal-digest URLs,
+mocked network/URL rewriting, atomic cache replacement/failure and read-only hits, JSON body
+extraction/error responses, excerpt validation and section binding, inventory omission,
+main-JAR missing notices and the companion-JAR CLI/path checks. Review evidence uses the
+`review-` filename prefix and records its locale and fresh cache separately from the original run.
+The two legal provenance findings remain unresolved.
+
+The corrected run passed all 72 release selftests (64.873 seconds), including 15 focused
+license tests, and the native Gradle checks (15 tasks: 6 executed, 9 up-to-date). Under
+`LC_ALL=en_US.ISO8859-1`, `PYTHONUTF8=0` and `PYTHONCOERCECLOCALE=0`, Python measured its
+preferred encoding as `ISO8859-1`; the real audit still verified all 26 entries and 34 source
+records. Its initially empty cache gained 57 entries for 57 distinct URL/digest pairs, and
+all three JARs passed. `--require-clear` again exited 1 for the two unresolved legal findings.

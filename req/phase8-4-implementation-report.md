@@ -101,6 +101,16 @@ bytes and upstream pins are unchanged. Juffa `erf`/`erfinv` licensing and the Ce
 chain remain explicit provenance findings, so the license release gate is still open.
 No signed candidate or publication is claimed by these checks.
 
+PR #100 review corrections (2026-11-16) add explicit UTF-8 decoding, URL/digest cache keys,
+atomic cache installation without hit rewrites, component-section notice binding, excerpt
+validation, required legal files independent of the inventory, contextual Stack Exchange
+errors and companion-JAR personal-path checks. The nine additional regressions bring the
+release suite to 72 tests (all passed in 64.873 seconds). The real audit passed with Python's
+preferred encoding measured as ISO8859-1 and a fresh cache containing 57 distinct URL/digest
+entries; both legal findings still produce the intended nonzero `--require-clear` exit.
+Native Gradle checks passed again (15 tasks: 6 executed, 9 up-to-date). Review-prefixed evidence
+supersedes the earlier cache/network verification; the original logs remain identified as history.
+
 ## Review corrections (2026-11-15)
 
 The minimum-host workflow now creates its Gradle home through `GITHUB_ENV` at step scope;

@@ -206,6 +206,82 @@
     "componentCount": 26,
     "packagedTexts": {
       "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+      "THIRD-PARTY-NOTICES": "ef25c942cd907e22c0177d1726facffca4be894f848e31e92464e5d80ffaadda",
+      "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
+      "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
+    },
+    "result": "Source/notice consistency and companion path checks pass; legal findings remain open.",
+    "releaseSelftests": {
+      "tests": 72,
+      "seconds": 64.873,
+      "result": "passed"
+    },
+    "gradle": {
+      "result": "passed",
+      "tasks": 15,
+      "executed": 6,
+      "upToDate": 9
+    },
+    "sourceCheck": {
+      "components": 26,
+      "sourceEvidenceRecords": 34,
+      "sourceUrlDigestPairs": 57,
+      "newCacheEntries": 57,
+      "networkCacheInitiallyEmpty": true,
+      "locale": "en_US.ISO8859-1",
+      "preferredEncoding": "ISO8859-1",
+      "pythonUtf8Mode": false,
+      "checkedJars": [
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar"
+      ],
+      "requireClearExitCode": 1,
+      "releaseReady": false
+    }
+  },
+  "artifacts": {
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar": {
+      "sha256": "8cbd8ceff0d126b435b9b57634c4c49c89f4f1392efe18dce74b14835419c37e",
+      "size": 77821143
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar": {
+      "sha256": "6d8752626fcefff509c489d52ca20995ba58d5e81a14d81493ac89ceb1d2e490",
+      "size": 15594
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar": {
+      "sha256": "df47c556060393ac65fe10381386e0fba5ea1446658c767c734afb204cb32a81",
+      "size": 4167648
+    },
+    "jmlx-native-macos-arm64/build/publications/maven/pom-default.xml": {
+      "sha256": "84d86eecdea022cdd63b5dcac25ae0586a627ee3f722bf9c972b4170ff11ae35",
+      "size": 1793
+    }
+  },
+  "retainedEvidence": {
+    "req/plans/evidence/native-license-audit-2026-11-16/commands.json": "bb7405bae0fc42201d644b8a7196ccf188d3529b6e49f458f863a90604b57fa8",
+    "req/plans/evidence/native-license-audit-2026-11-16/dylib-dependencies.txt": "6a89c22df5bd2df1233ac72062eaa3c0ed43877e5d4a95650be221f7bc105cdc",
+    "req/plans/evidence/native-license-audit-2026-11-16/gradle.log": "b6c4f673c6ec2344860aa5f7f9f2777ee48875c6875c8db83483a1ab823451d0",
+    "req/plans/evidence/native-license-audit-2026-11-16/release-selftests.log": "8349212051702036b0a08fe9d45375449db51005eded98d20a8b32be680fa27a",
+    "req/plans/evidence/native-license-audit-2026-11-16/require-clear.log": "790b5abfba72fb67f90bf1b69735aad801d2f57ac2dcb73cf38a9e98d435b36e",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-commands.json": "0c40721f8cd70de57734efb7165cb7fe92f9a8b7e3bab1220930520e1ddb5a56",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-environment.json": "3e891906644fb6679d6c79c0bd80bc69cd6ee045cf70b2018cb5aa0e458fb634",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-gradle.log": "b6c4f673c6ec2344860aa5f7f9f2777ee48875c6875c8db83483a1ab823451d0",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-release-selftests.log": "278dd7abab947eabfc83b5d7bc507426f86edf5a5f92b45fbda32097c12533e3",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-require-clear.log": "790b5abfba72fb67f90bf1b69735aad801d2f57ac2dcb73cf38a9e98d435b36e",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-source-verification.json": "5b6b1befe93eec262d2aad5cd811468bab02eda7a3afb772de657eb0665e6a6a",
+    "req/plans/evidence/native-license-audit-2026-11-16/source-verification.json": "d997ffe28d000a2fbc6fff5fd94d4e1331e038750131826b70c9b24bce01e1ac"
+  },
+  "verificationTools": {
+    "tools/release-all/audit_native_licenses.py": "df78dee92318e25ea75def6180ce066403a1ba43a161d54711d04aa793e8eee8",
+    "tools/release-all/release_inputs.py": "63905ff3704a99d4b82314e0e40647018c8cc32b6e75c68916c5bc431a00cd4f",
+    "tools/release-all/tests/test_native_licenses.py": "a0db1f0ff2d891e3eb438ecfe26e0e7003734c2af7439fd5f1ad7c170fac99dc",
+    "tools/release-all/tests/test_release_inputs.py": "b6154e90f6cf0ab136f2458d56cd9c669b06a5e7c999e91b06419cb26b8165ac"
+  },
+  "originalVerification": {
+    "componentCount": 26,
+    "packagedTexts": {
+      "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
       "THIRD-PARTY-NOTICES": "163204e769e4db89cb29aaffb4ef125839f298ae71372ee1591df3a2fe5c7ba6",
       "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
       "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
@@ -235,7 +311,7 @@
       "releaseReady": false
     }
   },
-  "artifacts": {
+  "originalArtifacts": {
     "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar": {
       "sha256": "3aebc865da1b4f72d6b4d770c9dce743f418ddf07511d910250cf8751fd27b9f",
       "size": 77821135
@@ -253,17 +329,6 @@
       "size": 1793
     }
   },
-  "retainedEvidence": {
-    "req/plans/evidence/native-license-audit-2026-11-16/commands.json": "bb7405bae0fc42201d644b8a7196ccf188d3529b6e49f458f863a90604b57fa8",
-    "req/plans/evidence/native-license-audit-2026-11-16/dylib-dependencies.txt": "6a89c22df5bd2df1233ac72062eaa3c0ed43877e5d4a95650be221f7bc105cdc",
-    "req/plans/evidence/native-license-audit-2026-11-16/gradle.log": "b6c4f673c6ec2344860aa5f7f9f2777ee48875c6875c8db83483a1ab823451d0",
-    "req/plans/evidence/native-license-audit-2026-11-16/release-selftests.log": "8349212051702036b0a08fe9d45375449db51005eded98d20a8b32be680fa27a",
-    "req/plans/evidence/native-license-audit-2026-11-16/require-clear.log": "790b5abfba72fb67f90bf1b69735aad801d2f57ac2dcb73cf38a9e98d435b36e",
-    "req/plans/evidence/native-license-audit-2026-11-16/source-verification.json": "d997ffe28d000a2fbc6fff5fd94d4e1331e038750131826b70c9b24bce01e1ac"
-  },
-  "verificationTools": {
-    "tools/release-all/audit_native_licenses.py": "876ed27804612535ac348a25f35fe77a0f0b204b8d99db9f0f907f3e928abee3",
-    "tools/release-all/release_inputs.py": "dd6ddd20e635e03f10b52a842b03b57880d61be8aac2766486f6ed31d0f61e88",
-    "tools/release-all/tests/test_native_licenses.py": "de401d94c59cc3dc0be6a3c6c57523b0f931aed61847a28aab9effdb6eada796"
-  }
+  "reviewOfCommit": "fb6ff7430399203deef77598b9db99ea53078572",
+  "historicalEvidenceNote": "Unprefixed evidence and originalVerification/originalArtifacts record the first PR #100 implementation. Its digest-only cache fetched 56 of 57 distinct URL/digest pairs. The review-prefixed evidence supersedes that verification and binds every source URL independently."
 }

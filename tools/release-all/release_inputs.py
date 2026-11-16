@@ -33,6 +33,7 @@ MODULE_KEYS = {
 PURE = set(list(MODULE_KEYS)[:3])
 NATIVE_FILES = ("libmlxc.dylib", "libmlx.dylib", "libjaccl.dylib", "mlx.metallib",
                 "native-pin.properties")
+REQUIRED_NATIVE_LEGAL_TEXTS = {"LICENSE", "NOTICE", "LICENSE-APACHE-2.0", "THIRD-PARTY-NOTICES"}
 UPSTREAM_PATH = (b"/Users/runner/work/mlx/mlx/build/temp.macosx-11.0-arm64-cpython-310/"
                  b"mlx.core/mlx/backend/metal/kernels//mlx.metallib")
 UPSTREAM_MLX_HASH = "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6"
@@ -207,8 +208,15 @@ def verify_smoke_environment(kind, env, supported_minimum, run_id=None):
         raise ValueError(error)
 
 
-def native_notice_report(jar, inventory):
+def validate_native_legal_inventory(inventory):
+    texts = inventory.get("packagedTexts")
+    if not isinstance(texts, dict) or not REQUIRED_NATIVE_LEGAL_TEXTS <= texts.keys():
+        raise ValueError("native license inventory lacks required packaged texts")
+
+
+def native_notice_report(jar, inventory, forbidden=()):
     """Check reviewed legal texts in either the runtime or documentation artifact."""
+    validate_native_legal_inventory(inventory)
     with zipfile.ZipFile(jar) as archive:
         names = archive.namelist()
         if len(names) != len(set(names)):
@@ -222,6 +230,11 @@ def native_notice_report(jar, inventory):
             if not data.strip() or hashlib.sha256(data).hexdigest() != digest:
                 raise ValueError(f"{jar}: native legal text differs from reviewed inventory: {name}")
             result[name] = digest
+        for entry in archive.infolist():
+            if not entry.is_dir() and forbidden:
+                data = archive.read(entry)
+                if any(prefix and prefix.encode("utf-8") in data for prefix in forbidden):
+                    raise ValueError(f"{jar}: personal path leaked in {entry.filename}")
         return result
 
 
@@ -385,7 +398,7 @@ def main():
         if args.documentation_jar:
             inventory = read_json(args.bootstrap.resolve().parents[1] / "req/native-license-inventory.json")
             for jar in args.documentation_jar:
-                native_notice_report(jar, inventory)
+                native_notice_report(jar, inventory, args.forbid)
         print(json.dumps(report, indent=2))
 
 

@@ -12,10 +12,11 @@
       "postId": 190213,
       "postVersion": 2,
       "updatedAt": "2021-11-12T23:16:50.729Z",
-      "projection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded",
-      "sha256": "cf24268b5b339f51c4e271223354fcf6906369f3bec318d0f19e841187cceded",
+      "projection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded; strip trailing whitespace from each line and keep one final LF",
+      "sha256": "2bb462ea7debd5deb0b069b6218061e8dcd37cc9dc020e790338082a1fbff09c",
       "retainedPath": "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt",
-      "disposition": "BSD-2-Clause grant in this sample; not established as applicable to the different shipped function"
+      "disposition": "BSD-2-Clause grant in this sample; not established as applicable to the different shipped function",
+      "rawCodeSha256": "cf24268b5b339f51c4e271223354fcf6906369f3bec318d0f19e841187cceded"
     },
     {
       "id": "bsd-forum-erfinv",
@@ -24,10 +25,11 @@
       "postId": 300099,
       "postVersion": 1,
       "updatedAt": "2020-05-06T17:35:53.152Z",
-      "projection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded",
-      "sha256": "d477d7ecfc31535ae74560c87d04713b749ea2750654845233f368f4ab81cbe6",
+      "projection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded; strip trailing whitespace from each line and keep one final LF",
+      "sha256": "8f1c6fa6aabff58fd6138bb8b2b8e9e6cef2598966ac49dd8f05a592309063c3",
       "retainedPath": "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt",
-      "disposition": "BSD-2-Clause grant in this sample; not established as applicable to the different shipped function"
+      "disposition": "BSD-2-Clause grant in this sample; not established as applicable to the different shipped function",
+      "rawCodeSha256": "d477d7ecfc31535ae74560c87d04713b749ea2750654845233f368f4ab81cbe6"
     },
     {
       "id": "cephes-email",
@@ -85,7 +87,7 @@
     }
   ],
   "codeComparison": "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json",
-  "codeComparisonSha256": "b6497c840640ed9069b50e23f6e464b1a434f737fa623cb96686f975fa31d7dd",
+  "codeComparisonSha256": "4dcd736c873b74a26597b3be0a8a56316771788a3cecf1676f3fa0b6fb68cfe5",
   "unresolvedFindingIds": [
     "NATIVE-LICENSE-1",
     "NATIVE-LICENSE-2"
@@ -130,9 +132,9 @@
     "disposition": "The latest PR describes a numerical substitution, not a grant for the other functions; public file history alone does not establish a separate permission record."
   },
   "retainedFiles": {
-    "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json": "b6497c840640ed9069b50e23f6e464b1a434f737fa623cb96686f975fa31d7dd",
-    "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt": "cf24268b5b339f51c4e271223354fcf6906369f3bec318d0f19e841187cceded",
-    "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt": "d477d7ecfc31535ae74560c87d04713b749ea2750654845233f368f4ab81cbe6",
+    "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json": "4dcd736c873b74a26597b3be0a8a56316771788a3cecf1676f3fa0b6fb68cfe5",
+    "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt": "2bb462ea7debd5deb0b069b6218061e8dcd37cc9dc020e790338082a1fbff09c",
+    "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt": "8f1c6fa6aabff58fd6138bb8b2b8e9e6cef2598966ac49dd8f05a592309063c3",
     "req/plans/evidence/native-license-resolution-2026-11-16/upstream-request-draft.md": "cf27edbab32784ece7938ed9fb5a6e29ec39b756334d0677b004a40ad8ae32a6"
   }
 }

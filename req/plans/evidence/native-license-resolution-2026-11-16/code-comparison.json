@@ -151,10 +151,10 @@
     {
       "id": "bsd-forum-erf",
       "source": "https://forums.developer.nvidia.com/t/40977/1",
-      "inputSha256": "cf24268b5b339f51c4e271223354fcf6906369f3bec318d0f19e841187cceded",
-      "inputProjection": "longest HTML code element decoded as UTF-8",
+      "inputSha256": "2bb462ea7debd5deb0b069b6218061e8dcd37cc9dc020e790338082a1fbff09c",
+      "inputProjection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded; strip trailing whitespace from each line and keep one final LF",
       "function": "my_erff",
-      "functionSha256": "3496fe833efeb5128f4f2b9babd5a73dadc1f0bf463380b1fddfacbca18d954a",
+      "functionSha256": "7ee5db9c2e6f12b81d400f9577970fd69800c84a5a281b6c826997eadc597b1f",
       "decimalFloatingLiterals": [
         "1.0",
         "0.0000258907676",
@@ -176,10 +176,10 @@
     {
       "id": "bsd-forum-erfinv",
       "source": "https://forums.developer.nvidia.com/t/61961/1",
-      "inputSha256": "d477d7ecfc31535ae74560c87d04713b749ea2750654845233f368f4ab81cbe6",
-      "inputProjection": "longest HTML code element decoded as UTF-8",
+      "inputSha256": "8f1c6fa6aabff58fd6138bb8b2b8e9e6cef2598966ac49dd8f05a592309063c3",
+      "inputProjection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded; strip trailing whitespace from each line and keep one final LF",
       "function": "my_erfinvf",
-      "functionSha256": "c036166484743da16caa5282cf88af487cd5d81c94f2cb74275d641f304c3a39",
+      "functionSha256": "4ab5badc979ec2e31c22aef0491834dcc85226ce4fa636c1e493c86f44c9b715",
       "decimalFloatingLiterals": [
         "1.0",
         "-8.8359375",

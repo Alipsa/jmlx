@@ -20,6 +20,8 @@ Juffa published explicit BSD-2-Clause code in his NVIDIA forum posts for
 and [`erfinvf`](https://forums.developer.nvidia.com/t/a-very-compact-implementation-of-the-inverse-error-function-erfinvf/61961/1).
 The captured code samples retain their complete copyright, conditions and disclaimer under
 the [evidence directory](plans/evidence/native-license-resolution-2026-11-16/).
+Only trailing whitespace is removed and a final LF is retained; the manifest records the
+raw extracted-code hash separately from each normalized retained sample's hash.
 
 | Material | Shipped MLX version | BSD forum sample | Result |
 | --- | --- | --- | --- |

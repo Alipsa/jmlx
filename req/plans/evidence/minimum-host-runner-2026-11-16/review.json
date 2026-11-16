@@ -98,7 +98,7 @@
       "command": "bash tools/release-all/check-workflows.sh",
       "result": "passed"
     },
-    "queueCommand": "Refreshed successfully with action_required included; exact output retained in queueInspection.output. A synthetic approval-required run with no visible jobs was reported in both status and conclusion forms."
+    "queueCommand": "Refreshed successfully with action_required included; exact output retained in queueInspection.output. Operator attestation: a synthetic approval-required run with no visible jobs was reported in both status and conclusion forms; its test and output were not retained in the repository."
   },
   "baseCommit": "7c9a057066e2777f664989382cd9256d8d7fe4ed",
   "validatedWorkingTree": "Release selftests and actionlint ran on the working tree containing the code changes subsequently committed as 407c7be7ddcb7729ae0932e55a8c2de833454038. Queue inspection is refreshed separately under queueInspection."

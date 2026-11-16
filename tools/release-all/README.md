@@ -42,8 +42,9 @@ are ignored for status-only recovery. Protect the journal against modification.
    bump. Record the new plugin's historical 8.1 regressions on an unpushed throwaway commit.
 2. Merge the reviewed release-version PR. Anchor an annotated immutable `jmlx-phase8.4-rc.N`
    tag at that SHA and work from a clean detached checkout. Never move the tag.
-   Cut the candidate only after PR #103's workflow-identity changes have merged, with those
-   changes included in the tagged commit: `bundle_smoke.py` runs from the candidate checkout.
+   Cut the candidate only after the minimum-host workflow-identity check
+   (`verify_minimum_host_workflow`) is on `main` and included in the tagged commit:
+   `bundle_smoke.py` runs from the candidate checkout.
    An older tag cannot produce the workflow block now required by final-receipt verification.
 3. Run root checks, shared-build checks and `bash tools/release-all/selftest.sh`. Normal candidate
    smoke publishes only manifest-local entries and resolves reused entries solely from Central.
@@ -75,11 +76,11 @@ are ignored for status-only recovery. Protect the journal against modification.
    the existing `self-macos-xl` PR/Tier-B runner does not satisfy that isolation requirement.
    Revalidate registration, saved environment, runner/tool versions and queued label-matching
    jobs before starting the worker. Offline registrations can expire after more than 14 days.
-9. Download minimum-host JSON/log evidence, then create the final receipt:
-
-   Also retain the actual run's **Set up job** log. Compare its `Current runner version` with
+9. Download minimum-host JSON/log evidence, including the actual run's **Set up job** log.
+   Compare its `Current runner version` with
    the pre-dispatch measurement; resolve any update and record the actual version before
-   accepting the report, as described in the dedicated-account procedure.
+   accepting the report, as described in the dedicated-account procedure. Then create the
+   final receipt:
 
 ```sh
 python3 tools/release-all/final_receipt.py --root "$PWD" \

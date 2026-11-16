@@ -61,8 +61,7 @@ Neither contains the owner's home or an inherited `JAVA_HOME`. Configuration use
 not the owner's shell environment. Both `RunAtLoad` and `KeepAlive` are disabled.
 The definition remains installed but unloaded; it will not start the worker on reboot.
 GitHub's own runner authentication files are private to the account. Reinspect these saved
-files before each release window; the plist alone
-does not control the effective environment.
+files before each release window; the plist alone does not control the effective environment.
 
 Python and Git resolve to **owner-managed Homebrew** installations under `/opt/homebrew`.
 The review records selected/resolved executable paths, owners, groups, modes and versions.

@@ -115,6 +115,9 @@ class LicenseResolutionTest(unittest.TestCase):
                 ({"sources": []}, {"records": None}, "not iterable"),
                 ({"sources": []}, {"records": [None]}, "comparison record must have a string id"),
                 ({"sources": []}, {"records": [{"id": 1}]}, "comparison record must have a string id"),
+                ({"sources": []}, {"records": [
+                    {"id": "mlx-source", "source": 123, "inputSha256": "0" * 64}]},
+                 "source url must be a string"),
             ]
             for research, comparison, message in cases:
                 with self.subTest(research=research, comparison=comparison):
@@ -128,6 +131,16 @@ class LicenseResolutionTest(unittest.TestCase):
                     self.assertIn("license comparison: ", result.stderr)
                     self.assertIn(message, result.stderr)
                     self.assertNotIn("Traceback", result.stderr)
+
+    def test_non_string_source_urls_fail_before_cache_or_network_access(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            inputs = Path(temporary) / "inputs"
+            with patch.object(C.urllib.request, "urlopen") as fetch:
+                for url in (123, None, [], {}, b"https://example.invalid/source"):
+                    with self.subTest(url=url), self.assertRaisesRegex(ValueError, "source url must be a string"):
+                        C.read_source(url, "0" * 64, lambda raw: raw, inputs, True)
+                fetch.assert_not_called()
+            self.assertFalse(inputs.exists())
 
     def test_cli_reports_incomplete_http_read_without_caching_partial_response(self):
         with tempfile.TemporaryDirectory() as temporary:

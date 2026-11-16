@@ -174,6 +174,12 @@ not claim to reproduce a live truncated transfer. The validation record lists th
 evidence cases actually tested rather than claiming to cover all possible evidence edits.
 All 81 release selftests passed (68.461 seconds), including seven focused recipe tests.
 
+The URL-type follow-up rejects non-string URLs in `read_source` before encoding, cache or
+network access. Both a comment source's `url: 123` and a comparison record's `source: 123`
+were exercised through the real CLI with the recorded cached inputs: each produces
+`license comparison: source url must be a string` without a traceback or output report.
+All 82 release selftests passed (50.286 seconds), including eight focused recipe tests.
+
 Validation checks source hashes against the existing audit, the five recorded comparison
 results and every retained sample/report digest. The unchanged audit command still produces
 the same result as PR #100's follow-up evidence, including `releaseReady: false` and both

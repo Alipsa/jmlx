@@ -123,10 +123,10 @@
     "nativeAndArtifactHashesMatchMergedAudit": true,
     "reproduction": "Committed verifier reproduced both original comment-list digests, seven function records and five recorded comparison results from fresh primary-source downloads.",
     "releaseSelftests": {
-      "tests": 81,
-      "seconds": 68.461,
+      "tests": 82,
+      "seconds": 50.286,
       "result": "passed",
-      "log": "req/plans/evidence/native-license-resolution-2026-11-16/input-validation-release-selftests.log"
+      "log": "req/plans/evidence/native-license-resolution-2026-11-16/url-validation-release-selftests.log"
     },
     "literalLimit": {
       "requiresDecimalPoint": true,
@@ -148,7 +148,9 @@
         "research sources not a list",
         "comparison record not an object",
         "comparison record id not a string",
-        "comparison records not iterable"
+        "comparison records not iterable",
+        "numeric comment source URL (cached-input CLI)",
+        "numeric MLX comparison source (cached-input CLI)"
       ],
       "result": "Each tested case exits with a license comparison prefix and no traceback."
     },
@@ -162,6 +164,17 @@
       "seconds": 50.066,
       "result": "passed",
       "log": "req/plans/evidence/native-license-resolution-2026-11-16/followup-release-selftests.log"
+    },
+    "priorSourceValidationReleaseSelftests": {
+      "tests": 81,
+      "seconds": 68.461,
+      "result": "passed",
+      "log": "req/plans/evidence/native-license-resolution-2026-11-16/input-validation-release-selftests.log"
+    },
+    "urlTypeGuard": {
+      "result": "req/plans/evidence/native-license-resolution-2026-11-16/url-validation-result.json",
+      "message": "source url must be a string",
+      "validatedBefore": "URL encoding, cache access and network access"
     }
   },
   "upstreamHistory": {
@@ -191,7 +204,7 @@
   },
   "retainedFiles": {
     "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json": "a2dec69a5b92599ef94723025a1b4c91d7cb13a9823ab815f55d74e652bc9086",
-    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "53238f6df2733d1662cfadb3e874a38877c92d5374e7cb672997f249a93faff1",
+    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "d8298ae1b8801c1453760bce3a7b731cbf95c9402e66e8f9ce9297cf85b16f2c",
     "req/plans/evidence/native-license-resolution-2026-11-16/followup-release-selftests.log": "485ebdd39ccfcf2f5c3c02a5973d2de2d3ea7133054e14653381600792fd84f8",
     "req/plans/evidence/native-license-resolution-2026-11-16/input-validation-release-selftests.log": "54faf2252c503680b0255ef849bd4f47577fedb17a88a2b860ef23fdf163b39c",
     "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt": "2bb462ea7debd5deb0b069b6218061e8dcd37cc9dc020e790338082a1fbff09c",
@@ -199,7 +212,9 @@
     "req/plans/evidence/native-license-resolution-2026-11-16/reproduction-result.json": "873f948dc1f4f7bc45e09ae28b2c3aa7b1b2b992f6dbcb3c51adce1aee2ef5d1",
     "req/plans/evidence/native-license-resolution-2026-11-16/review-release-selftests.log": "f04df07b931df3dcb0f9f75fbb951111a7ca215bbfbbcc963f35a57f4078e61b",
     "req/plans/evidence/native-license-resolution-2026-11-16/upstream-issue.json": "7fedbe67a65c707f1497c92f5bd8767e5400d7a7eb572819143ef898690b298b",
-    "req/plans/evidence/native-license-resolution-2026-11-16/upstream-request-draft.md": "bacd91b6ba82ea6b64f350eadffa9b2e1844e7328081dc594874e5a0249aaa55"
+    "req/plans/evidence/native-license-resolution-2026-11-16/upstream-request-draft.md": "bacd91b6ba82ea6b64f350eadffa9b2e1844e7328081dc594874e5a0249aaa55",
+    "req/plans/evidence/native-license-resolution-2026-11-16/url-validation-release-selftests.log": "e773ffaf8d034889d220e880f9f8f209793f4ba5be24ea1538e8ab1e8f9c11ea",
+    "req/plans/evidence/native-license-resolution-2026-11-16/url-validation-result.json": "b0c0be2f0f36f052e2d3fb7e4af9495675dc542eb5ecc05f222adb9f77d5f73e"
   },
   "thirdPartyContact": {
     "url": "https://github.com/ml-explore/mlx/issues/4902",
@@ -214,7 +229,7 @@
   },
   "reproduction": {
     "script": "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
-    "sha256": "53238f6df2733d1662cfadb3e874a38877c92d5374e7cb672997f249a93faff1",
+    "sha256": "d8298ae1b8801c1453760bce3a7b731cbf95c9402e66e8f9ce9297cf85b16f2c",
     "command": [
       "python3",
       "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
@@ -233,8 +248,8 @@
     "originalCommentHashesPreserved": true
   },
   "verificationTools": {
-    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "53238f6df2733d1662cfadb3e874a38877c92d5374e7cb672997f249a93faff1",
-    "tools/release-all/tests/test_license_resolution.py": "5336b3e53034eede9465d1a9d48efd3886742d16af8ae5ccb03af32477ebe506"
+    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "d8298ae1b8801c1453760bce3a7b731cbf95c9402e66e8f9ce9297cf85b16f2c",
+    "tools/release-all/tests/test_license_resolution.py": "42e470dc2fcb06b90528dde50aca87daa13ac1f49627995f6de1d268b7cd708d"
   },
   "initialReproduction": {
     "script": "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",

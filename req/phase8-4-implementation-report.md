@@ -154,6 +154,12 @@ The recorded latest command now exactly matches the offline invocation without
 recipe tests. Results and both legal findings remain unchanged; no live truncated transfer
 is claimed by the fault-injection test.
 
+The URL-type follow-up adds a narrow string check before `read_source` encodes a URL.
+Actual cached-input CLI runs for both a numeric comment `url` and a numeric MLX comparison
+`source` now return the prefixed validation error without a traceback or output report.
+All 82 release selftests passed (50.286 seconds), including eight focused recipe tests.
+Valid-input reproduction remains byte-identical; no native or legal finding changed.
+
 ## Review corrections (2026-11-15)
 
 The minimum-host workflow now creates its Gradle home through `GITHUB_ENV` at step scope;

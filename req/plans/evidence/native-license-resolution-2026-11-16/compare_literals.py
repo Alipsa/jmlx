@@ -114,6 +114,8 @@ def literals(text):
 
 
 def read_source(url, expected_digest, project, inputs, fetch_missing):
+    if not isinstance(url, str):
+        raise ValueError("source url must be a string")
     cached = inputs / (digest(url.encode("utf-8")) + "-" + expected_digest)
     fetched = not cached.is_file()
     if fetched:

@@ -8,10 +8,12 @@ The next release step is an owner/legal decision on the two findings in the
 sources, but did not establish an applicable additional grant for the shipped code.
 Both findings and the license release gate remain open.
 
-The recommended next action is to ask MLX maintainers for the relevant provenance and
-permission records, using the [prepared request](plans/evidence/native-license-resolution-2026-11-16/upstream-request-draft.md)
-after owner review. No request has been posted or sent. Native code, pins, bindings, notices,
-artifact hashes and the publication flow are unchanged.
+The owner submitted [MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902) on
+2026-11-16, covering both provenance questions. It is open with no comments at this check;
+the next action is to review any upstream response against the exact code and license terms.
+The [prepared request](plans/evidence/native-license-resolution-2026-11-16/upstream-request-draft.md)
+is retained as a historical draft; the owner posted an adapted version. Native code, pins,
+bindings, notices, artifact hashes and the publication flow are unchanged.
 
 ## Juffa implementations: the BSD samples differ
 
@@ -116,7 +118,7 @@ results and every retained sample/report digest. The unchanged audit command sti
 the same result as PR #100's follow-up evidence, including `releaseReady: false` and both
 finding IDs; `--require-clear` exits 1. No new runtime test or legal clearance is claimed.
 
-Posting the prepared request is a separate third-party communication and requires the owner's
-explicit instruction. The draft asks for provenance rather than asserting an upstream license
-violation. A subsequent response must be reviewed against the actual code and bundle before
-either finding is removed from the release gate.
+The owner posted the provenance request as `perNyfelt` at `2026-11-16T16:54:53Z`.
+The assistant did not post an issue or comment. The request asks for provenance rather than
+asserting an upstream license violation. A subsequent response must be reviewed against the
+actual code and bundle before either finding is removed from the release gate.

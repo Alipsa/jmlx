@@ -2,7 +2,7 @@
   "schema": 1,
   "date": "2026-11-16",
   "baselineSha": "ee807c99e89f06f63ef326e2bbb976b7cb247989",
-  "status": "owner-legal-review-required",
+  "status": "awaiting-upstream-response-and-owner-legal-review",
   "releaseGateClosed": false,
   "sources": [
     {
@@ -93,7 +93,7 @@
     "NATIVE-LICENSE-2"
   ],
   "nativePinsAndPayloadChanged": false,
-  "thirdPartyContactMade": false,
+  "thirdPartyContactMade": true,
   "validation": {
     "lexicalComparisons": "five expected true/false results confirmed",
     "sourceScope": "Pinned MLX files hash-match the committed audit; source comments fetched completely for both specific Stack Overflow answers. Forum code samples retain their explicit BSD text.",
@@ -135,6 +135,18 @@
     "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json": "4dcd736c873b74a26597b3be0a8a56316771788a3cecf1676f3fa0b6fb68cfe5",
     "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt": "2bb462ea7debd5deb0b069b6218061e8dcd37cc9dc020e790338082a1fbff09c",
     "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt": "8f1c6fa6aabff58fd6138bb8b2b8e9e6cef2598966ac49dd8f05a592309063c3",
-    "req/plans/evidence/native-license-resolution-2026-11-16/upstream-request-draft.md": "cf27edbab32784ece7938ed9fb5a6e29ec39b756334d0677b004a40ad8ae32a6"
+    "req/plans/evidence/native-license-resolution-2026-11-16/upstream-issue.json": "7fedbe67a65c707f1497c92f5bd8767e5400d7a7eb572819143ef898690b298b",
+    "req/plans/evidence/native-license-resolution-2026-11-16/upstream-request-draft.md": "bacd91b6ba82ea6b64f350eadffa9b2e1844e7328081dc594874e5a0249aaa55"
+  },
+  "thirdPartyContact": {
+    "url": "https://github.com/ml-explore/mlx/issues/4902",
+    "number": 4902,
+    "title": "Licensing provenance for error-function and CPU SIMD adaptations",
+    "author": "perNyfelt",
+    "createdAt": "2026-11-16T16:54:53Z",
+    "stateAtCheck": "open",
+    "commentsAtCheck": 0,
+    "actor": "owner",
+    "assistantPosted": false
   }
 }

@@ -1,7 +1,8 @@
 # Draft provenance request to MLX maintainers
 
-Prepared 2026-11-16 for owner review; not posted or sent. Review the current upstream
-contribution guidance and adapt the wording before submission.
+Historical draft prepared 2026-11-16 for owner review. The owner submitted an adapted version
+as [MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902) at 16:54:53 UTC that day.
+This file preserves the preparation draft, not the posted issue's exact wording.
 
 Suggested title: Licensing provenance for error-function and CPU SIMD adaptations
 

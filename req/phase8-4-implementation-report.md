@@ -146,6 +146,14 @@ tracebacks; the live selftest dependency on the dated recipe path is explicitly 
 All 80 release selftests passed (50.066 seconds), including six focused recipe tests.
 Cached-input replay preserves the original seven records, five checks and both comment hashes.
 
+The source-ID/HTTP follow-up validates all research source IDs before using them and catches
+`http.client.HTTPException` during fetches. CLI regressions include null/non-string source
+IDs and an injected `IncompleteRead` from response reading, with no partial cache/report.
+The recorded latest command now exactly matches the offline invocation without
+`--fetch-missing`. All 81 release selftests passed (68.461 seconds), including seven focused
+recipe tests. Results and both legal findings remain unchanged; no live truncated transfer
+is claimed by the fault-injection test.
+
 ## Review corrections (2026-11-15)
 
 The minimum-host workflow now creates its Gradle home through `GITHUB_ENV` at step scope;

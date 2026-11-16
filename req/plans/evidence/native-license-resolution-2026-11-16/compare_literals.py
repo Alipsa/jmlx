@@ -5,6 +5,7 @@ import argparse
 from collections import Counter
 from decimal import Decimal
 import hashlib
+import http.client
 from html.parser import HTMLParser
 import json
 import os
@@ -156,12 +157,18 @@ def verify(root, inputs, fetch_missing=False):
     expected = json.loads((folder / "code-comparison.json").read_bytes())
     audit = json.loads((root / "req/phase8-4-native-license-audit.json").read_bytes())
     audit_sources = {entry["source"]: entry["sha256"] for entry in audit["sourceEvidence"]}
+    sources = research["sources"]
+    if not isinstance(sources, list):
+        raise ValueError("research sources must be a list")
+    for source in sources:
+        if not isinstance(source, dict) or not isinstance(source.get("id"), str):
+            raise ValueError("research source must have a string id")
     records, comments = [], []
     for entry in expected["records"]:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
             raise ValueError("comparison record must have a string id")
         if entry["id"].startswith("bsd-forum-"):
-            source = next((item for item in research["sources"] if item["id"] == entry["id"]), None)
+            source = next((item for item in sources if item["id"] == entry["id"]), None)
             if source is None:
                 raise ValueError(f"research source missing for comparison record: {entry['id']}")
             data = (root / source["retainedPath"]).read_bytes()
@@ -183,7 +190,7 @@ def verify(root, inputs, fetch_missing=False):
     checks = comparison_checks(records)
     if checks != expected["checks"]:
         raise ValueError("literal comparison results differ from the recorded five checks")
-    for entry in research["sources"]:
+    for entry in sources:
         if entry["id"].endswith("-answer-comments"):
             data = read_source(entry["url"], entry["sha256"], comment_projection, inputs, fetch_missing)
             count = len(json.loads(data))
@@ -208,5 +215,5 @@ def main():
 if __name__ == "__main__":
     try:
         main()
-    except (ValueError, OSError, KeyError, TypeError) as error:
+    except (ValueError, OSError, KeyError, TypeError, http.client.HTTPException) as error:
         raise SystemExit(f"license comparison: {error}") from error

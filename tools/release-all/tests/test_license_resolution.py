@@ -6,15 +6,17 @@ paths in the same change, or retaining the recipe at its current path.
 """
 
 import hashlib
+import http.client
 import importlib.util
 import io
 import json
 from pathlib import Path
+import runpy
 import subprocess
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 RECIPE = (Path(__file__).resolve().parents[3]
           / "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py")
@@ -106,7 +108,11 @@ class LicenseResolutionTest(unittest.TestCase):
                 ({"sources": []}, {"records": [{"id": "bsd-forum-missing"}]},
                  "research source missing for comparison record: bsd-forum-missing"),
                 ({"sources": None}, {"records": [{"id": "bsd-forum-erf"}]},
-                 "not iterable"),
+                 "research sources must be a list"),
+                ({"sources": [{"id": None}]}, {"records": []}, "research source must have a string id"),
+                ({"sources": [{"id": 1}]}, {"records": []}, "research source must have a string id"),
+                ({"sources": [None]}, {"records": []}, "research source must have a string id"),
+                ({"sources": []}, {"records": None}, "not iterable"),
                 ({"sources": []}, {"records": [None]}, "comparison record must have a string id"),
                 ({"sources": []}, {"records": [{"id": 1}]}, "comparison record must have a string id"),
             ]
@@ -122,6 +128,32 @@ class LicenseResolutionTest(unittest.TestCase):
                     self.assertIn("license comparison: ", result.stderr)
                     self.assertIn(message, result.stderr)
                     self.assertNotIn("Traceback", result.stderr)
+
+    def test_cli_reports_incomplete_http_read_without_caching_partial_response(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            folder = root / "req/plans/evidence/fixture"
+            folder.mkdir(parents=True)
+            recipe = folder / "compare_literals.py"
+            recipe.write_bytes(RECIPE.read_bytes())
+            (root / "req/phase8-4-native-license-audit.json").write_text('{"sourceEvidence":[]}')
+            (folder / "research.json").write_text('{"sources":[]}')
+            (folder / "code-comparison.json").write_text(json.dumps({"records": [
+                {"id": "mlx-source", "source": "https://example.invalid/truncated", "inputSha256": "0" * 64}]}))
+            response = MagicMock()
+            response.__enter__.return_value = response
+            response.read.side_effect = http.client.IncompleteRead(b"partial", 10)
+            args = [str(recipe), "--root", str(root), "--inputs", str(root / "inputs"),
+                    "--fetch-missing", "--output", str(root / "output.json")]
+            with patch.object(sys, "argv", args):
+                with patch.object(C.urllib.request, "urlopen", return_value=response):
+                    with self.assertRaises(SystemExit) as stopped:
+                        runpy.run_path(str(recipe), run_name="__main__")
+            response.read.assert_called_once_with()
+            self.assertTrue(str(stopped.exception.code).startswith("license comparison: "))
+            self.assertIn("IncompleteRead", str(stopped.exception.code))
+            self.assertFalse((root / "inputs").exists())
+            self.assertFalse((root / "output.json").exists())
 
 
 if __name__ == "__main__":

@@ -123,10 +123,10 @@
     "nativeAndArtifactHashesMatchMergedAudit": true,
     "reproduction": "Committed verifier reproduced both original comment-list digests, seven function records and five recorded comparison results from fresh primary-source downloads.",
     "releaseSelftests": {
-      "tests": 80,
-      "seconds": 50.066,
+      "tests": 81,
+      "seconds": 68.461,
       "result": "passed",
-      "log": "req/plans/evidence/native-license-resolution-2026-11-16/followup-release-selftests.log"
+      "log": "req/plans/evidence/native-license-resolution-2026-11-16/input-validation-release-selftests.log"
     },
     "literalLimit": {
       "requiresDecimalPoint": true,
@@ -139,7 +139,30 @@
       "result": "passed",
       "log": "req/plans/evidence/native-license-resolution-2026-11-16/review-release-selftests.log"
     },
-    "malformedEvidenceCli": "Missing research source, non-iterable sources and invalid comparison record types all exit with a license comparison prefix and no traceback."
+    "malformedEvidenceCli": {
+      "coveredCases": [
+        "missing research source match",
+        "null research source id",
+        "non-string research source id",
+        "research source not an object",
+        "research sources not a list",
+        "comparison record not an object",
+        "comparison record id not a string",
+        "comparison records not iterable"
+      ],
+      "result": "Each tested case exits with a license comparison prefix and no traceback."
+    },
+    "httpResponseFailure": {
+      "testedCase": "Injected http.client.IncompleteRead from response.read() during --fetch-missing",
+      "result": "CLI exits with a license comparison prefix; no input cache entry or output report is created.",
+      "liveTruncatedDownloadReproduced": false
+    },
+    "priorRecipeErrorReleaseSelftests": {
+      "tests": 80,
+      "seconds": 50.066,
+      "result": "passed",
+      "log": "req/plans/evidence/native-license-resolution-2026-11-16/followup-release-selftests.log"
+    }
   },
   "upstreamHistory": {
     "source": "https://api.github.com/repos/ml-explore/mlx/commits?path=mlx/backend/metal/kernels/erf.h&per_page=100&sha=36969c094354086e15d2a327a9c50feb20b9cf11",
@@ -168,8 +191,9 @@
   },
   "retainedFiles": {
     "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json": "a2dec69a5b92599ef94723025a1b4c91d7cb13a9823ab815f55d74e652bc9086",
-    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "9c96aec5fc79d1fd0a3068188185a74f8978ef55f98ee3faab45a9a7e8efa4f8",
+    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "53238f6df2733d1662cfadb3e874a38877c92d5374e7cb672997f249a93faff1",
     "req/plans/evidence/native-license-resolution-2026-11-16/followup-release-selftests.log": "485ebdd39ccfcf2f5c3c02a5973d2de2d3ea7133054e14653381600792fd84f8",
+    "req/plans/evidence/native-license-resolution-2026-11-16/input-validation-release-selftests.log": "54faf2252c503680b0255ef849bd4f47577fedb17a88a2b860ef23fdf163b39c",
     "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt": "2bb462ea7debd5deb0b069b6218061e8dcd37cc9dc020e790338082a1fbff09c",
     "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt": "8f1c6fa6aabff58fd6138bb8b2b8e9e6cef2598966ac49dd8f05a592309063c3",
     "req/plans/evidence/native-license-resolution-2026-11-16/reproduction-result.json": "873f948dc1f4f7bc45e09ae28b2c3aa7b1b2b992f6dbcb3c51adce1aee2ef5d1",
@@ -190,19 +214,18 @@
   },
   "reproduction": {
     "script": "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
-    "sha256": "9c96aec5fc79d1fd0a3068188185a74f8978ef55f98ee3faab45a9a7e8efa4f8",
+    "sha256": "53238f6df2733d1662cfadb3e874a38877c92d5374e7cb672997f249a93faff1",
     "command": [
       "python3",
       "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
       "--inputs",
       "build/releaseAll/license-resolution-inputs",
-      "--fetch-missing",
       "--output",
       "build/releaseAll/license-resolution-reproduction.json"
     ],
     "result": "req/plans/evidence/native-license-resolution-2026-11-16/reproduction-result.json",
     "networkInputsInitiallyEmpty": false,
-    "cache": "Prior URL/digest-bound inputs revalidated offline; no fresh source fetch was needed for limits/error-handling changes.",
+    "cache": "Previously validated URL/digest-bound cached responses were copied to the recorded --inputs path before this offline command; no --fetch-missing flag or network requests.",
     "functionRecords": 7,
     "comparisonChecks": 5,
     "commentHashMatches": 2,
@@ -210,8 +233,8 @@
     "originalCommentHashesPreserved": true
   },
   "verificationTools": {
-    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "9c96aec5fc79d1fd0a3068188185a74f8978ef55f98ee3faab45a9a7e8efa4f8",
-    "tools/release-all/tests/test_license_resolution.py": "037cae1eb341f2ffdd50eac672d49ea6f885a726223b24d1348466e57e9e84ff"
+    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "53238f6df2733d1662cfadb3e874a38877c92d5374e7cb672997f249a93faff1",
+    "tools/release-all/tests/test_license_resolution.py": "5336b3e53034eede9465d1a9d48efd3886742d16af8ae5ccb03af32477ebe506"
   },
   "initialReproduction": {
     "script": "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",

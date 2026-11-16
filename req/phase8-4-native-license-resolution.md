@@ -141,6 +141,8 @@ to verify the cached responses offline. It checks the original audit's complete 
 answer-body hashes before extracting their longest HTML-decoded code blocks, and validates
 every function input/hash/literal record against `code-comparison.json`. The retained BSD
 samples need no download. Changed projected content fails with a contextual error.
+The latest offline command in `research.json` omits `--fetch-missing` and was executed with
+its recorded input/output paths. `initialReproduction` retains the earlier first-download command.
 
 For each comment response, preserve the API `items` array order. Project each item to exactly
 `{"comment_id": item["comment_id"], "creation_date": item["creation_date"],
@@ -163,6 +165,14 @@ regression for missing research source IDs and unexpected evidence value types. 
 now report `license comparison: …` without a traceback. Cached-input replay preserves all
 seven function records, five checks and both original comment hashes; the legal findings stay open.
 All 80 release selftests passed (50.066 seconds), including six focused recipe tests.
+
+The source-ID/HTTP follow-up validates every research source as an object with a string ID
+before comparison or comment processing. The CLI also catches `http.client.HTTPException`,
+including `IncompleteRead`. A fault-injection test raises `IncompleteRead` from response
+reading and verifies the prefixed error and absence of a partial cache entry/report; it does
+not claim to reproduce a live truncated transfer. The validation record lists the malformed
+evidence cases actually tested rather than claiming to cover all possible evidence edits.
+All 81 release selftests passed (68.461 seconds), including seven focused recipe tests.
 
 Validation checks source hashes against the existing audit, the five recorded comparison
 results and every retained sample/report digest. The unchanged audit command still produces

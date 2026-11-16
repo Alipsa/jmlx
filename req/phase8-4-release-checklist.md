@@ -41,6 +41,10 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
   inventory to 26 entries. Two provenance findings (Juffa `erf`/`erfinv` and Cephes)
   still prevent closing this gate; successful notice checks do not resolve them.
+  The [resolution review](phase8-4-native-license-resolution.md) compares alternative BSD
+  samples and original permission correspondence. The owner submitted
+  [MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902); awaiting an upstream response
+  and review of any applicable grant or compliance decision.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
 - [x] Integrate released upstream plugin 2.6.0 and verify the clean historical 8.1 fixture.
   [Compatibility evidence](phase8-4-plugin-2.6.0-compatibility.md) records the unpushed scratch

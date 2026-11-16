@@ -1,0 +1,60 @@
+/*
+  Copyright (c) 2017-2018, Norbert Juffa
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+/* compute the inverse of the error function. Maximum error = 2.446816 ulp */
+__device__ float my_erfinvf (float a)
+{
+    float p, r, t;
+    t = fmaf (a, -a, 1.0f);
+    asm ("lg2.approx.ftz.f32 %0,%0;" : "+f"(t));
+    if (t < -8.8359375f) { // max ulp err = 2.446816
+        p =              1.50166858e-11f;  //  0x1.082d24p-36
+        p = fmaf (p, t,  2.10561724e-09f); //  0x1.2164d2p-29
+        p = fmaf (p, t,  1.27291500e-07f); //  0x1.115b3ep-23
+        p = fmaf (p, t,  4.29223974e-06f); //  0x1.200c1ep-18
+        p = fmaf (p, t,  8.60039654e-05f); //  0x1.68ba0ep-14
+        p = fmaf (p, t,  9.49774636e-04f); //  0x1.f1f498p-11
+        p = fmaf (p, t,  1.88959786e-03f); //  0x1.ef58c4p-10
+        p = fmaf (p, t, -1.85239315e-01f); // -0x1.7b5ec0p-3
+        p = fmaf (p, t,  8.36782515e-01f); //  0x1.ac6ec2p-1
+        r = fmaf (p, a, 0.0f);
+    } else { // max ulp err = 2.443247
+        p =              2.00998329e-10f;  //  0x1.ba0000p-33
+        p = fmaf (p, t,  7.63788321e-09f); //  0x1.066f88p-27
+        p = fmaf (p, t,  9.44120231e-08f); //  0x1.957f1ep-24
+        p = fmaf (p, t,  1.27279494e-08f); //  0x1.b5543ap-27
+        p = fmaf (p, t, -8.98369126e-06f); // -0x1.2d7152p-17
+        p = fmaf (p, t, -3.40910883e-05f); // -0x1.1dfa0ep-15
+        p = fmaf (p, t,  7.70850747e-04f); //  0x1.9425d6p-11
+        p = fmaf (p, t,  5.54407062e-03f); //  0x1.6b5612p-8
+        p = fmaf (p, t, -1.60820886e-01f); // -0x1.495c76p-3
+        p = fmaf (p, t,  8.86226892e-01f); //  0x1.c5bf88p-1
+        r = a * p;
+    }
+    return r;
+}

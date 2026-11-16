@@ -1,0 +1,62 @@
+/*
+  Copyright (c) 2016-2021, Norbert Juffa
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions
+  are met:
+
+  1. Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+
+  2. Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the distribution.
+
+  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+  HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
+/* compute error function. max ulp error = 1.29532 */
+__device__ float my_erff (float a)
+{
+    float r, s, t, u;
+
+    t = fabsf (a);
+    s = a * a;
+    if (t > 1.0f) {
+        // ulp error = 1.03872
+        r =              2.58907676e-5f;  //  0x1.b26000p-16
+        r = fmaf (r, t, -5.64874616e-4f); // -0x1.282830p-11
+        u =              5.66795561e-3f;  //  0x1.737484p-8
+        u = fmaf (u, t, -3.51759829e-2f); // -0x1.202962p-5
+        r = fmaf (r, s, u);
+        r = fmaf (r, t,  1.54329389e-1f); //  0x1.3c110cp-3
+        r = fmaf (r, t,  9.15674746e-1f); //  0x1.d4d352p-1
+        r = fmaf (r, t,  6.28459513e-1f); //  0x1.41c572p-1
+        r = fmaf (r, t, t);
+        r = -r;
+        asm ("ex2.approx.ftz.f32 %0,%0;" : "+f"(r));
+        r = 1.0f - r;
+        r = __int_as_float (__float_as_int(a) & 0x80000000 | __float_as_int(r));
+    } else {
+        // ulp error = 1.29532
+        r =             -5.58853149e-4f;  // -0x1.250000p-11
+        r = fmaf (r, s,  4.90735564e-3f); //  0x1.419bc4p-8
+        r = fmaf (r, s, -2.67030653e-2f); // -0x1.b580c6p-6
+        r = fmaf (r, s,  1.12799220e-1f); //  0x1.ce068ep-4
+        r = fmaf (r, s, -3.76123011e-1f); // -0x1.812664p-2
+        r = fmaf (r, s,  1.28379121e-1f); //  0x1.06eba2p-3
+        r = fmaf (r, a, a);
+    }
+    return r;
+}

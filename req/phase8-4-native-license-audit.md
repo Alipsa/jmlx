@@ -93,6 +93,11 @@ libraries to the reviewed bundle.
 
 ## Open findings
 
+The [resolution investigation](phase8-4-native-license-resolution.md) records primary-source
+follow-up, comparisons with Juffa's BSD samples and the owner's submitted
+[upstream provenance request #4902](https://github.com/ml-explore/mlx/issues/4902).
+It supplies review material; both findings below remain open.
+
 ### NATIVE-LICENSE-1: Juffa `erf` / `erfinv` provenance
 
 The pinned Metal `erf.h` explicitly says its error function is based on

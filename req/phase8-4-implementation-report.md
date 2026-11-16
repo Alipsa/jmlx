@@ -120,6 +120,46 @@ URL-bound cache and verified all 57 URL/digest pairs plus three rebuilt JARs. Fo
 evidence records this warm-cache check separately from the prior cold run. Both legal findings
 remain open and `--require-clear` still exits 1.
 
+The [license resolution investigation](phase8-4-native-license-resolution.md) follows
+PR #100's merge on 2026-11-16. It retains Juffa's explicitly BSD-licensed forum samples,
+records their differences from the shipped implementations, reviews the original Cephes
+correspondence and prepares a provenance request. The owner subsequently submitted
+[MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902), which has no comments at this
+check. The investigation and submission do not establish an additional
+grant or close either legal finding. Validation confirms the comparison inputs and retained
+file hashes and reproduces the unchanged audit result (57 URL/digest pairs, releaseReady false,
+expected exit 1). The initial investigation changed only documentation and research evidence;
+the 74-test
+and native Gradle results above remain evidence for PR #100's implementation, not a new run.
+
+PR #101 review corrections commit the dated `compare_literals.py` verifier and record its
+digest, exact comment record shape/JSON serialization and function/literal extraction rules.
+Fresh downloads reproduce the original two comment hashes and all five comparison results;
+offline replay produces the identical report. The scope now explicitly excludes PyTorch-derived
+CPU `erf` from the Juffa comparison. Five new regressions bring release selftests to 79, all
+passing in 49.296 seconds. Native code/notices and both open legal findings are unchanged.
+
+The recipe follow-up documents that exponent-only floating forms are excluded by the
+decimal-point pattern, with no such forms in the seven recorded function inputs. Missing
+research sources and unexpected evidence types now produce contextual CLI errors without
+tracebacks; the live selftest dependency on the dated recipe path is explicitly documented.
+All 80 release selftests passed (50.066 seconds), including six focused recipe tests.
+Cached-input replay preserves the original seven records, five checks and both comment hashes.
+
+The source-ID/HTTP follow-up validates all research source IDs before using them and catches
+`http.client.HTTPException` during fetches. CLI regressions include null/non-string source
+IDs and an injected `IncompleteRead` from response reading, with no partial cache/report.
+The recorded latest command now exactly matches the offline invocation without
+`--fetch-missing`. All 81 release selftests passed (68.461 seconds), including seven focused
+recipe tests. Results and both legal findings remain unchanged; no live truncated transfer
+is claimed by the fault-injection test.
+
+The URL-type follow-up adds a narrow string check before `read_source` encodes a URL.
+Actual cached-input CLI runs for both a numeric comment `url` and a numeric MLX comparison
+`source` now return the prefixed validation error without a traceback or output report.
+All 82 release selftests passed (50.286 seconds), including eight focused recipe tests.
+Valid-input reproduction remains byte-identical; no native or legal finding changed.
+
 ## Review corrections (2026-11-15)
 
 The minimum-host workflow now creates its Gradle home through `GITHUB_ENV` at step scope;

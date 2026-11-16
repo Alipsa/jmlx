@@ -1,0 +1,275 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "baselineSha": "ee807c99e89f06f63ef326e2bbb976b7cb247989",
+  "status": "awaiting-upstream-response-and-owner-legal-review",
+  "releaseGateClosed": false,
+  "sources": [
+    {
+      "id": "bsd-forum-erf",
+      "url": "https://forums.developer.nvidia.com/t/40977/1",
+      "apiUrl": "https://forums.developer.nvidia.com/t/40977.json",
+      "postId": 190213,
+      "postVersion": 2,
+      "updatedAt": "2021-11-12T23:16:50.729Z",
+      "projection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded; strip trailing whitespace from each line and keep one final LF",
+      "sha256": "2bb462ea7debd5deb0b069b6218061e8dcd37cc9dc020e790338082a1fbff09c",
+      "retainedPath": "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt",
+      "disposition": "BSD-2-Clause grant in this sample; not established as applicable to the different shipped function",
+      "rawCodeSha256": "cf24268b5b339f51c4e271223354fcf6906369f3bec318d0f19e841187cceded"
+    },
+    {
+      "id": "bsd-forum-erfinv",
+      "url": "https://forums.developer.nvidia.com/t/61961/1",
+      "apiUrl": "https://forums.developer.nvidia.com/t/61961.json",
+      "postId": 300099,
+      "postVersion": 1,
+      "updatedAt": "2020-05-06T17:35:53.152Z",
+      "projection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded; strip trailing whitespace from each line and keep one final LF",
+      "sha256": "8f1c6fa6aabff58fd6138bb8b2b8e9e6cef2598966ac49dd8f05a592309063c3",
+      "retainedPath": "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt",
+      "disposition": "BSD-2-Clause grant in this sample; not established as applicable to the different shipped function",
+      "rawCodeSha256": "d477d7ecfc31535ae74560c87d04713b749ea2750654845233f368f4ab81cbe6"
+    },
+    {
+      "id": "cephes-email",
+      "url": "https://lists.debian.org/debian-legal/2004/12/msg00295.html",
+      "projection": "complete HTML response bytes at review time",
+      "sha256": "3a9f8b9032e320544df870e7706b7fc69184c1058c187aaddd74dc0302a071d7",
+      "retainedPath": null,
+      "note": "Live page may change; hash identifies the reviewed response, not an immutable upstream URL. Full HTML is not committed; retain citations rather than a new redistribution of correspondence or site content."
+    },
+    {
+      "id": "cephes-followup",
+      "url": "https://lists.debian.org/debian-legal/2004/12/msg00297.html",
+      "projection": "complete HTML response bytes at review time",
+      "sha256": "5339e44536e481f05e7717527625f43464f9b1600f07a5f13e5d2aed6843f9cb",
+      "retainedPath": null,
+      "note": "Live page may change; hash identifies the reviewed response, not an immutable upstream URL. Full HTML is not committed; retain citations rather than a new redistribution of correspondence or site content."
+    },
+    {
+      "id": "cc-legalcode",
+      "url": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.en",
+      "projection": "complete HTML response bytes at review time",
+      "sha256": "47c0a954c88d793bdefe92fb007ae3c038fb3807f1a27083433d01aa7542c0d8",
+      "retainedPath": null,
+      "note": "Live page may change; hash identifies the reviewed response, not an immutable upstream URL. Full HTML is not committed; retain citations rather than a new redistribution of correspondence or site content."
+    },
+    {
+      "id": "cc-faq",
+      "url": "https://creativecommons.org/faq/",
+      "projection": "complete HTML response bytes at review time",
+      "sha256": "d4ffb015ad13ce12eb060979abf835caa5c2ce2ef5d928e6af1885845db99c02",
+      "retainedPath": null,
+      "note": "Live page may change; hash identifies the reviewed response, not an immutable upstream URL. Full HTML is not committed; retain citations rather than a new redistribution of correspondence or site content."
+    },
+    {
+      "id": "erf-answer-comments",
+      "url": "https://api.stackexchange.com/2.3/answers/35148199/comments?site=stackoverflow&filter=withbody&pagesize=100",
+      "projection": "API items array order; one flat record per item; raw body HTML retained without decoding",
+      "sha256": "6e71966d58d42b16ab61817b37ea595fe03e2acfb33f66129842af459787b45b",
+      "count": 16,
+      "hasMore": false,
+      "licenseKeywordMatch": false,
+      "retainedPath": null,
+      "disposition": "No licensing keyword matched in these fetched comments; this is a bounded observation, not proof that no grant exists elsewhere.",
+      "recordShape": {
+        "comment_id": "item[\"comment_id\"]",
+        "creation_date": "item[\"creation_date\"]",
+        "body": "item[\"body\"]",
+        "ownerUserId": "item.get(\"owner\", {}).get(\"user_id\")"
+      },
+      "serialization": "json.dumps(records, sort_keys=True, separators=(\",\", \":\"), ensure_ascii=True).encode(\"utf-8\")",
+      "trailingNewline": false
+    },
+    {
+      "id": "erfinv-answer-comments",
+      "url": "https://api.stackexchange.com/2.3/answers/49743348/comments?site=stackoverflow&filter=withbody&pagesize=100",
+      "projection": "API items array order; one flat record per item; raw body HTML retained without decoding",
+      "sha256": "a3d35031fe28152f103a3cfc43c51e95220e32a3500f1bbd90f269fc723dbbdc",
+      "count": 6,
+      "hasMore": false,
+      "licenseKeywordMatch": false,
+      "retainedPath": null,
+      "disposition": "No licensing keyword matched in these fetched comments; this is a bounded observation, not proof that no grant exists elsewhere.",
+      "recordShape": {
+        "comment_id": "item[\"comment_id\"]",
+        "creation_date": "item[\"creation_date\"]",
+        "body": "item[\"body\"]",
+        "ownerUserId": "item.get(\"owner\", {}).get(\"user_id\")"
+      },
+      "serialization": "json.dumps(records, sort_keys=True, separators=(\",\", \":\"), ensure_ascii=True).encode(\"utf-8\")",
+      "trailingNewline": false
+    }
+  ],
+  "codeComparison": "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json",
+  "codeComparisonSha256": "a2dec69a5b92599ef94723025a1b4c91d7cb13a9823ab815f55d74e652bc9086",
+  "unresolvedFindingIds": [
+    "NATIVE-LICENSE-1",
+    "NATIVE-LICENSE-2"
+  ],
+  "nativePinsAndPayloadChanged": false,
+  "thirdPartyContactMade": true,
+  "validation": {
+    "lexicalComparisons": "five expected true/false results confirmed",
+    "sourceScope": "Pinned MLX files hash-match the committed audit; source comments fetched completely for both specific Stack Overflow answers. Forum code samples retain their explicit BSD text.",
+    "auditExitCode": 1,
+    "auditResultEqualsFollowupEvidence": true,
+    "auditEvidencePath": "req/plans/evidence/native-license-audit-2026-11-16/followup-source-verification.json",
+    "auditEvidenceSha256": "e6f34e6d83d1e387956728cf14eda4f6fe46fd1e9d8f9bfc6eb6fd759f37e1c9",
+    "releaseReady": false,
+    "sourceUrlDigestPairs": 57,
+    "sourceChecks": "All MLX comparison input file hashes and both Stack Overflow body hashes match the committed audit.",
+    "nativeAndArtifactHashesMatchMergedAudit": true,
+    "reproduction": "Committed verifier reproduced both original comment-list digests, seven function records and five recorded comparison results from fresh primary-source downloads.",
+    "releaseSelftests": {
+      "tests": 82,
+      "seconds": 50.286,
+      "result": "passed",
+      "log": "req/plans/evidence/native-license-resolution-2026-11-16/url-validation-release-selftests.log"
+    },
+    "literalLimit": {
+      "requiresDecimalPoint": true,
+      "exponentOnlyLiteralsInRecordedFunctions": 0,
+      "functionRecordsChecked": 7
+    },
+    "initialRecipeReleaseSelftests": {
+      "tests": 79,
+      "seconds": 49.296,
+      "result": "passed",
+      "log": "req/plans/evidence/native-license-resolution-2026-11-16/review-release-selftests.log"
+    },
+    "malformedEvidenceCli": {
+      "coveredCases": [
+        "missing research source match",
+        "null research source id",
+        "non-string research source id",
+        "research source not an object",
+        "research sources not a list",
+        "comparison record not an object",
+        "comparison record id not a string",
+        "comparison records not iterable",
+        "numeric comment source URL (cached-input CLI)",
+        "numeric MLX comparison source (cached-input CLI)"
+      ],
+      "result": "Each tested case exits with a license comparison prefix and no traceback."
+    },
+    "httpResponseFailure": {
+      "testedCase": "Injected http.client.IncompleteRead from response.read() during --fetch-missing",
+      "result": "CLI exits with a license comparison prefix; no input cache entry or output report is created.",
+      "liveTruncatedDownloadReproduced": false
+    },
+    "priorRecipeErrorReleaseSelftests": {
+      "tests": 80,
+      "seconds": 50.066,
+      "result": "passed",
+      "log": "req/plans/evidence/native-license-resolution-2026-11-16/followup-release-selftests.log"
+    },
+    "priorSourceValidationReleaseSelftests": {
+      "tests": 81,
+      "seconds": 68.461,
+      "result": "passed",
+      "log": "req/plans/evidence/native-license-resolution-2026-11-16/input-validation-release-selftests.log"
+    },
+    "urlTypeGuard": {
+      "result": "req/plans/evidence/native-license-resolution-2026-11-16/url-validation-result.json",
+      "message": "source url must be a string",
+      "validatedBefore": "URL encoding, cache access and network access"
+    }
+  },
+  "upstreamHistory": {
+    "source": "https://api.github.com/repos/ml-explore/mlx/commits?path=mlx/backend/metal/kernels/erf.h&per_page=100&sha=36969c094354086e15d2a327a9c50feb20b9cf11",
+    "commits": [
+      {
+        "sha": "634b148dd4203f80b8cc8db3e33452a91785fad8",
+        "subject": "Optimize erf function with expm1f in Metal backend (#3025)"
+      },
+      {
+        "sha": "226748b3e7f280e204c1af61b031588853e4ad88",
+        "subject": "JIT compile option for binary minimization (#1091)"
+      },
+      {
+        "sha": "46a39e5b1ff92d93833d9710ef64db207ce274ea",
+        "subject": "copyright + ack"
+      },
+      {
+        "sha": "d1f86272a27b5a0729378ac75bb03727c7c0e553",
+        "subject": "angelos's commit files"
+      }
+    ],
+    "latestPullRequest": "https://github.com/ml-explore/mlx/pull/3025",
+    "latestPullRequestCommentsChecked": "https://api.github.com/repos/ml-explore/mlx/issues/3025/comments",
+    "latestPullRequestCommentCountAtReview": 0,
+    "disposition": "The latest PR describes a numerical substitution, not a grant for the other functions; public file history alone does not establish a separate permission record."
+  },
+  "retainedFiles": {
+    "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json": "a2dec69a5b92599ef94723025a1b4c91d7cb13a9823ab815f55d74e652bc9086",
+    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "d8298ae1b8801c1453760bce3a7b731cbf95c9402e66e8f9ce9297cf85b16f2c",
+    "req/plans/evidence/native-license-resolution-2026-11-16/followup-release-selftests.log": "485ebdd39ccfcf2f5c3c02a5973d2de2d3ea7133054e14653381600792fd84f8",
+    "req/plans/evidence/native-license-resolution-2026-11-16/input-validation-release-selftests.log": "54faf2252c503680b0255ef849bd4f47577fedb17a88a2b860ef23fdf163b39c",
+    "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt": "2bb462ea7debd5deb0b069b6218061e8dcd37cc9dc020e790338082a1fbff09c",
+    "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt": "8f1c6fa6aabff58fd6138bb8b2b8e9e6cef2598966ac49dd8f05a592309063c3",
+    "req/plans/evidence/native-license-resolution-2026-11-16/reproduction-result.json": "873f948dc1f4f7bc45e09ae28b2c3aa7b1b2b992f6dbcb3c51adce1aee2ef5d1",
+    "req/plans/evidence/native-license-resolution-2026-11-16/review-release-selftests.log": "f04df07b931df3dcb0f9f75fbb951111a7ca215bbfbbcc963f35a57f4078e61b",
+    "req/plans/evidence/native-license-resolution-2026-11-16/upstream-issue.json": "7fedbe67a65c707f1497c92f5bd8767e5400d7a7eb572819143ef898690b298b",
+    "req/plans/evidence/native-license-resolution-2026-11-16/upstream-request-draft.md": "bacd91b6ba82ea6b64f350eadffa9b2e1844e7328081dc594874e5a0249aaa55",
+    "req/plans/evidence/native-license-resolution-2026-11-16/url-validation-release-selftests.log": "e773ffaf8d034889d220e880f9f8f209793f4ba5be24ea1538e8ab1e8f9c11ea",
+    "req/plans/evidence/native-license-resolution-2026-11-16/url-validation-result.json": "b0c0be2f0f36f052e2d3fb7e4af9495675dc542eb5ecc05f222adb9f77d5f73e"
+  },
+  "thirdPartyContact": {
+    "url": "https://github.com/ml-explore/mlx/issues/4902",
+    "number": 4902,
+    "title": "Licensing provenance for error-function and CPU SIMD adaptations",
+    "author": "perNyfelt",
+    "createdAt": "2026-11-16T16:54:53Z",
+    "stateAtCheck": "open",
+    "commentsAtCheck": 0,
+    "actor": "owner",
+    "assistantPosted": false
+  },
+  "reproduction": {
+    "script": "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
+    "sha256": "d8298ae1b8801c1453760bce3a7b731cbf95c9402e66e8f9ce9297cf85b16f2c",
+    "command": [
+      "python3",
+      "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
+      "--inputs",
+      "build/releaseAll/license-resolution-inputs",
+      "--output",
+      "build/releaseAll/license-resolution-reproduction.json"
+    ],
+    "result": "req/plans/evidence/native-license-resolution-2026-11-16/reproduction-result.json",
+    "networkInputsInitiallyEmpty": false,
+    "cache": "Previously validated URL/digest-bound cached responses were copied to the recorded --inputs path before this offline command; no --fetch-missing flag or network requests.",
+    "functionRecords": 7,
+    "comparisonChecks": 5,
+    "commentHashMatches": 2,
+    "resultIdenticalToInitialReproduction": true,
+    "originalCommentHashesPreserved": true
+  },
+  "verificationTools": {
+    "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py": "d8298ae1b8801c1453760bce3a7b731cbf95c9402e66e8f9ce9297cf85b16f2c",
+    "tools/release-all/tests/test_license_resolution.py": "42e470dc2fcb06b90528dde50aca87daa13ac1f49627995f6de1d268b7cd708d"
+  },
+  "initialReproduction": {
+    "script": "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
+    "sha256": "34aeee398535b364c11c9e28b17db00e9a11d8a85d78872697520e90dc4f715c",
+    "command": [
+      "python3",
+      "req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py",
+      "--inputs",
+      "build/releaseAll/license-resolution-inputs",
+      "--fetch-missing",
+      "--output",
+      "build/releaseAll/license-resolution-reproduction.json"
+    ],
+    "result": "req/plans/evidence/native-license-resolution-2026-11-16/reproduction-result.json",
+    "networkInputsInitiallyEmpty": true,
+    "functionRecords": 7,
+    "comparisonChecks": 5,
+    "commentHashMatches": 2,
+    "offlineResultIdentical": true,
+    "downloadedInputResponses": 6,
+    "originalCommentHashesPreserved": true
+  }
+}

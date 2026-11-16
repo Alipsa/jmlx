@@ -1,0 +1,21 @@
+{
+  "schema": 1,
+  "inputCache": "build/releaseAll/license-resolution-inputs",
+  "networkUsed": false,
+  "cases": [
+    {
+      "field": "comment-url",
+      "value": 123,
+      "exitCode": 1,
+      "message": "license comparison: source url must be a string",
+      "traceback": false
+    },
+    {
+      "field": "comparison-source",
+      "value": 123,
+      "exitCode": 1,
+      "message": "license comparison: source url must be a string",
+      "traceback": false
+    }
+  ]
+}

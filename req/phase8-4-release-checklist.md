@@ -13,8 +13,8 @@ The committed 8.4 manifest is provisional until the post-plugin artifact compari
 | Module | Proposed decision | Evidence / remaining work |
 | --- | --- | --- |
 | jinja | new 0.6.2 (tuple review reopened) | Central `.module` records Gradle 9.7.0; current publication records 9.9.0, a metadata difference outside the permitted normalization |
-| tokenizer | new 0.1.2 | Published Jackson dependency changed 3.1.2 → 3.2.4 |
-| vision | new 0.1.2 | Published Jackson dependency changed 3.1.2 → 3.2.4 |
+| tokenizer | new 0.1.2 | Published Jackson dependency changed 3.1.2 → 3.3.0 |
+| vision | new 0.1.2 | Published Jackson dependency changed 3.1.2 → 3.3.0 |
 | native/ffi/core/models/adapters | first releases per manifest | All remain SNAPSHOT until reviewed candidate cut |
 
 Any reuse-to-new change reopens tuple review. Module checks use checkout dependencies;

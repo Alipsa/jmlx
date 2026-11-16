@@ -162,7 +162,7 @@ class ReleaseInputsTest(unittest.TestCase):
         wheel_hash = "e"*64
         bootstrap.write_text('MLX_METAL_WHEEL_SHA256="' + wheel_hash + '"\n')
         pins = {"mlxMetalVersion": "0.32.4", "mlxcCommit": "a"*40}
-        legal = {"LICENSE": b"MIT", "LICENSE-APACHE-2.0": b"Apache-2.0",
+        legal = {"LICENSE": b"MIT", "LICENSE-APACHE-2.0": b"Apache-2.0", "THIRD-PARTY-NOTICES": b"dependencies",
                  "NOTICE": ("0.32.4 " + "a"*40 + " " + wheel_hash).encode()}
         inventory_file = root / "req/native-license-inventory.json"
         inventory_file.parent.mkdir()

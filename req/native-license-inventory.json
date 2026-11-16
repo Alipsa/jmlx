@@ -36,38 +36,194 @@
     {
       "component": "pocketfft (BSD-3-Clause)",
       "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/3rdparty/pocketfft.h",
-      "sha256": "0eaea21304bf324639ff11022ee63faf48a8fab64afe5c3c2d1efefbe1d7dfa6"
+      "sha256": "0eaea21304bf324639ff11022ee63faf48a8fab64afe5c3c2d1efefbe1d7dfa6",
+      "noticeLines": [
+        1,
+        36
+      ]
     },
     {
       "component": "V8 small_vector adaptation (BSD-3-Clause)",
       "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/small_vector.h",
-      "sha256": "2fd7d2a423a74b7857ae886ddae0b6c4183f5b9f1d6b8f8d3ba8db38a5ad4677"
+      "sha256": "2fd7d2a423a74b7857ae886ddae0b6c4183f5b9f1d6b8f8d3ba8db38a5ad4677",
+      "noticeLines": [
+        1,
+        29
+      ]
     },
     {
       "component": "ThreadPool modifications in MLX/JACCL (zlib)",
       "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/threadpool.h",
-      "sha256": "e22e3eb7a2ee0b06b0ea69e8a49375761de9b799dd96b06e7ae9e778d9820667"
+      "sha256": "e22e3eb7a2ee0b06b0ea69e8a49375761de9b799dd96b06e7ae9e778d9820667",
+      "noticeLines": [
+        1,
+        22
+      ]
     },
     {
       "component": "Norbert Juffa expm1f (BSD-2-Clause)",
       "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/expm1f.h",
-      "sha256": "dbdf551f45723639da54d72e327008bde6ef01a2f1ed561bb065e251ab6c9f1a"
+      "sha256": "dbdf551f45723639da54d72e327008bde6ef01a2f1ed561bb065e251ab6c9f1a",
+      "noticeLines": [
+        1,
+        33
+      ]
     },
     {
       "component": "NVIDIA/Filipe RNC Maia cexpf adaptation (Apache-2.0)",
       "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/cexpf.h",
-      "sha256": "88b6e15a52a5800d98d9bc6da840ca5cf70bf572fda136409580c1f17b1e0aab"
+      "sha256": "88b6e15a52a5800d98d9bc6da840ca5cf70bf572fda136409580c1f17b1e0aab",
+      "noticeLines": [
+        1,
+        19
+      ]
     },
     {
       "component": "nlohmann/json single-header transitive MIT attributions",
       "source": "https://github.com/nlohmann/json/blob/9cca280a4d0ccf0c08f47a99aa71d1b0e52f8d03/single_include/nlohmann/json.hpp",
-      "sha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6"
+      "sha256": "9bea4c8066ef4a1c206b2be5a36302f8926f7fdc6087af5d20b417d0cf103ea6",
+      "noticeFragments": [
+        "// SPDX-FileCopyrightText: 2008-2009 Bj\u00f6rn Hoehrmann <bjoern@hoehrmann.de>",
+        "// SPDX-FileCopyrightText: 2009 Florian Loitsch <https://florian.loitsch.com/>",
+        "// SPDX-FileCopyrightText: 2013-2023 Niels Lohmann <https://nlohmann.me>",
+        "// SPDX-FileCopyrightText: 2016-2021 Evan Nemerson <evan@nemerson.com>",
+        "// SPDX-FileCopyrightText: 2018 The Abseil Authors"
+      ]
+    },
+    {
+      "component": "NumPy einsum adaptation (BSD-3-Clause)",
+      "source": "https://github.com/numpy/numpy/blob/1d49c7f7ff527c696fc26ab2278ad51632a66660/LICENSE.txt",
+      "sha256": "01fb016849aa427edb1bbbbd55f91c26ca6cadb32a5b20e7f000655dd05b0760",
+      "mlxPaths": [
+        "mlx/einsum.cpp"
+      ]
+    },
+    {
+      "component": "opt_einsum algorithm attribution (MIT)",
+      "source": "https://github.com/dgasmith/opt_einsum/blob/c15aec2c7dbbcaf5b9790b980f699bf295baa7d9/LICENSE",
+      "sha256": "7b26691a7c8ee48af425a53cbaeaabc9aa3a84ea2e93fe47a1ecc550c1de76db",
+      "mlxPaths": [
+        "mlx/einsum.cpp"
+      ]
+    },
+    {
+      "component": "supervised-lda NumpyFormat adaptation (MIT)",
+      "source": "https://github.com/angeloskath/supervised-lda/blob/fe3a39bb0d6c7d0c2a33f069440869ad70774da8/LICENSE",
+      "sha256": "b50379222802591434ac7a2137ba171b6c7529e9c1bb95eba1c9c9aa55609621",
+      "mlxPaths": [
+        "mlx/io/load.cpp"
+      ]
+    },
+    {
+      "component": "fastermath exponential adaptation (BSD-3-Clause)",
+      "source": "https://github.com/akohlmey/fastermath/blob/2ed806f45871129c9ccddc63422370641af9f14d/src/exp.c",
+      "sha256": "1d408b5aed22e94947cd8bcb74594b8e0d0287bada919d875fc9a32d2d3cf665",
+      "mlxPaths": [
+        "mlx/backend/cpu/simd/math.h"
+      ],
+      "noticeLines": [
+        1,
+        28
+      ]
+    },
+    {
+      "component": "Julien Pommier NEON math adaptation (zlib)",
+      "source": "https://github.com/JishinMaster/simd_utils/blob/3c1433a86fb38edcc9b02039f3c9a65b16640976/neon_mathfun.h",
+      "sha256": "e75773addab087ff17c288f1143f45af0a532b1fafe2b550f13e55475a7d05a6",
+      "mlxPaths": [
+        "mlx/backend/cpu/simd/math.h"
+      ],
+      "noticeLines": [
+        7,
+        26
+      ]
+    },
+    {
+      "component": "PyTorch CPU and Metal math adaptations (BSD-3-Clause)",
+      "source": "https://github.com/pytorch/pytorch/blob/e3643e1e0e923f0fc063dfab6f45c956d568919d/LICENSE",
+      "sha256": "a8a2c6b67cf8a597ffaa5c82380a6bd1b82629c0417e00673d8013d662eb500a",
+      "mlxPaths": [
+        "mlx/backend/cpu/simd/math.h",
+        "mlx/backend/metal/kernels/fp8.h"
+      ]
+    },
+    {
+      "component": "TensorFlow cumulative log-sum-exp gradient adaptation (Apache-2.0)",
+      "source": "https://github.com/tensorflow/tensorflow/blob/2a5910906a0e0f3dbc186ff9db6386d81a63448c/tensorflow/python/ops/math_grad.py",
+      "sha256": "29ff2b107b055bd5be79647d790d7a6ad89b9363a6bfee15c79c1c08c0b02658",
+      "mlxPaths": [
+        "mlx/primitives.cpp"
+      ],
+      "noticeLines": [
+        1,
+        13
+      ]
+    },
+    {
+      "component": "JAX Threefry algorithm reference (Apache-2.0)",
+      "source": "https://github.com/jax-ml/jax/blob/81991d87c8608d07f9752940375092aa4fb9610e/jax/_src/prng.py",
+      "sha256": "8d41666e2e2a5ceedfc4848ec38cedf48a38ccab2da004edf3c6095745751470",
+      "mlxPaths": [
+        "mlx/backend/cpu/threefry.h",
+        "mlx/random.cpp"
+      ],
+      "noticeLines": [
+        1,
+        13
+      ]
+    },
+    {
+      "component": "Random123 Threefry attribution (BSD-3-Clause)",
+      "source": "https://github.com/DEShawResearch/random123/blob/726a093cd9a73f3ec3c8d7a70ff10ed8efec8d13/LICENSE",
+      "sha256": "5fd0885ab205878bd90c19144677286252eb9b988c1545a3a910edfe1e27b6df",
+      "mlxPaths": [
+        "mlx/backend/cpu/threefry.h"
+      ]
+    },
+    {
+      "component": "VkFFT algorithm reference (MIT)",
+      "source": "https://github.com/DTolm/VkFFT/blob/066a17c17068c0f11c9298d848c2976c71fad1c1/LICENSE",
+      "sha256": "2bfae14bf46ead0effe63ed36b0d28bcc8846716bfc030d03b146eda7f0bdebd",
+      "mlxPaths": [
+        "mlx/backend/metal/kernels/fft.h"
+      ]
+    },
+    {
+      "component": "CUB merge-sort algorithm reference (BSD-3-Clause)",
+      "source": "https://github.com/NVIDIA/cccl/blob/64d3a5f0c1c83ed83be8c0a9a1f0cdb31f913e81/cub/LICENSE.TXT",
+      "sha256": "2e15eba2e130f3e80d9e91724c7dce3781ce99316324681ff54b00c1fc9759b3",
+      "mlxPaths": [
+        "mlx/backend/metal/kernels/sort.h"
+      ]
+    },
+    {
+      "component": "metal-cpp 26 (Apache-2.0)",
+      "source": "https://files.pythonhosted.org/packages/2a/d6/4340ed6e184f71693d7f531c9ae55d677451351245760d71f8dd714dcbe5/mlx_metal-0.32.4-py3-none-macosx_26_0_arm64.whl",
+      "archiveMember": "mlx/include/metal_cpp/LICENSE.txt",
+      "sha256": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+      "packagedAs": "LICENSE-APACHE-2.0"
+    },
+    {
+      "component": "Cephes math provenance (upstream permission statement; review open)",
+      "source": "https://www.netlib.org/cephes/readme",
+      "sha256": "82004ae6ed8feb08fd16783b6b32e82adfe047f60cb2f238dbf5d4bf9dae42a2",
+      "mlxPaths": [
+        "mlx/backend/cpu/simd/math.h"
+      ]
+    },
+    {
+      "component": "PyTorch Metal hypot license variant (BSD-3-Clause)",
+      "source": "https://github.com/pytorch/pytorch/blob/a82aae9d4a7827849ce50f31c4c7ee8f278d05f5/LICENSE",
+      "sha256": "bd018feef8825e88181c84eb7e3aa4eafb8f08a20d9fd6ef948569610c4a3e43",
+      "mlxPaths": [
+        "mlx/backend/metal/kernels/utils.h"
+      ]
     }
   ],
   "packagedTexts": {
     "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
-    "THIRD-PARTY-NOTICES": "05b1c3f340a7dfa55be9bdf9ea6722f66e4b5805ce1db62d4accfee79051108e",
-    "NOTICE": "24504f331cf88fc190b6b94c34080f170fc978a0808c8ca3ca34a15888414e90",
+    "THIRD-PARTY-NOTICES": "4efc6e66304629e287bb7120b732a5784c2c1e398e28bf47e214eef885e34eb8",
+    "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
     "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
   },
   "nativePins": {

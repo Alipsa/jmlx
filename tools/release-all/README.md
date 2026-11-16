@@ -124,6 +124,15 @@ compatibility.
 `release_inputs.py native <directory-or-jar> --bootstrap scripts/bootstrap-native.sh` checks
 ARM64 Mach-O `LC_BUILD_VERSION`, native pins, personal path leaks and exact legal text digests.
 Only the known pinned upstream MLX path is allowlisted; upstream binaries remain unchanged.
+`--documentation-jar <jar>` also checks every reviewed notice in a companion artifact;
+it scans companion entries for the supplied `--forbid` prefixes as well.
+The main JAR's other entries receive the same scan; its five native payload entries retain
+the separate binary/path verifier and pinned upstream MLX exception.
+`:jmlx-native-macos-arm64:verifyNativeReleasePayload` checks main, sources and Javadoc jars.
+The [native license audit](../../req/phase8-4-native-license-audit.md) records the source
+inventory, reproduction command and unresolved provenance findings. Its
+`audit_native_licenses.py` check supports `--require-clear`; source/notice consistency alone
+does not close the license release gate.
 The native publication's unconditional unstaged guard also applies to combined staging.
 
 The Portal upload documentation states a 1 GB archive limit; account-level publishing limits

@@ -1,0 +1,394 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "reviewedSourceSha": "a97eb5b0c735cdc047a13c5539295cce64130eef",
+  "status": "blocked-on-provenance",
+  "inventory": "req/native-license-inventory.json",
+  "scope": "Pinned macOS ARM64 MLX 0.32.4 wheel and mlx-c; source-level transitive and adaptation review, not a reproducible build of the vendor wheel.",
+  "sourceEvidence": [
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/CMakeLists.txt",
+      "sha256": "2f00891709ef72b5eefbb233444c12759d69b242b853eb65213c4f96c8d074fa"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/setup.py",
+      "sha256": "96c246d8920bc788a76aaa488a72ef06ff694a68067466f9f2d45b5845dc1f0c"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/CMakeLists.txt",
+      "sha256": "073e21b832e81e887ed7ad1992bcba44f242cc1e0525e9aec72fd3d96e953f7b"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/io/CMakeLists.txt",
+      "sha256": "6670ba104506c020a095e883a1d21dd5187574e3e22042beb9fcb888b35c5818"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/io/load.cpp",
+      "sha256": "e1e2053254678abcc7f499b7d57ad98324fc15d10ee8b316aba2b242cbd012ab"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/io/gguf.cpp",
+      "sha256": "18e766b7ed3d07c736b0725391bb187f509dfb243a434ffe0e9644cdac27d1be"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/io/gguf_quants.cpp",
+      "sha256": "0fd0ce5da615388905310269a3c189ac7e8714c0f47daf478e109f33a00321b3"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/einsum.cpp",
+      "sha256": "7eaf1572757c74f6fff603181137df3a6b39ee762cb57ab0693bcf9bd96b2636"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/primitives.cpp",
+      "sha256": "06b9ffc486d7fc74556911c4a99a11683ba35c4015868e968a4c07b342f18cf1"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/types/fp16.h",
+      "sha256": "b63e769ec5794e19d338081727b212405355c3f47328b0e0817e61d2500ea6f7"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/cpu/CMakeLists.txt",
+      "sha256": "682ff05b4bde5166215981d983abd366556ea84458d6519b512a52718d2a523b"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/cpu/simd/math.h",
+      "sha256": "5dbe79caa33a228d1354b2621876dc0fb3629dd6733c8ee4ebd0471790b0a94a"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/cpu/lapack.h",
+      "sha256": "dd51d42638da3dd64ef91562f5a670c5fad913c3989c4de81273004a065ada61"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/cpu/threefry.h",
+      "sha256": "b174dd5054408045dfefcf6eec8856223ee7f86b73c28e078905c303a0701725"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/cpu/threefry.cpp",
+      "sha256": "f732e47eb1ffbbd51cea451618c31c3d76ade14494176836c483ec1d0a2884c3"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/common/hadamard.h",
+      "sha256": "9fe5c5c7a386cc74266ed031dc95a106f330d8b6e2f76dc20137c546c01ddfb7"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/CMakeLists.txt",
+      "sha256": "0755d1749ab6210320a17ad1f9908e778c2f3ed179869017eddd1317ba3dd1de"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/erf.h",
+      "sha256": "31d88004390bbe08636c5f64a3cb3180ebc8d79a89267347de9f6c33aba0e9f9"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/fp8.h",
+      "sha256": "9a9d77a6295f66b4ada4311c3b855b6ecb7a2b38f28623109e3c61d2e17e81ae"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/utils.h",
+      "sha256": "e40473c36e2f2e7ba250b29e8dbbe3c150ce207379e57a2818e916b343e9f2cf"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/fft.h",
+      "sha256": "fba2fbfd998e437cbe6db4842fcd75ae995ca1eda891057db76caba376367cda"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/sort.h",
+      "sha256": "3171f47dabf2cf501dffc2e388e3d66446d6f71712e8d070028258a084b63574"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/unary_ops.h",
+      "sha256": "af710925f066b029f67289a0bbe4edd0ba6c5e7f51c9df609abb111216fa963f"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/distributed/jaccl/lib/CMakeLists.txt",
+      "sha256": "0979cfa705cf47d193b3a3d5057646a42d632c0df856b98c656ac8bf4a5bb9bf"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/distributed/jaccl/lib/README.md",
+      "sha256": "ccc60539e33f3a4139fb6cf37834467edec88ed083b92b06ce34913ac1c06e51"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/distributed/jaccl/lib/jaccl/threadpool.h",
+      "sha256": "ca375bc5bf8828860a49f961a364fd03073fc9e836bdf3137de15fbfc594a37e"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/distributed/jaccl/lib/jaccl/rdma.cpp",
+      "sha256": "0b3d7e113a75815178ad479b3f218993b957b1a453be63400ccec82bb8aedf33"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/distributed/mpi/mpi.cpp",
+      "sha256": "d8b608d8c009c1058a6d53389ffd604c3a4189837ab49dc5ff882215d96a3f9f"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx-c/blob/a26f2d584a14ec619ae8db9a09be03becd47598a/CMakeLists.txt",
+      "sha256": "11ef0ba482ab8a97c44e97342be6a233ada4e1e2821c746002231c1884b1ce1c"
+    },
+    {
+      "source": "https://github.com/ml-explore/mlx-c/blob/a26f2d584a14ec619ae8db9a09be03becd47598a/LICENSE",
+      "sha256": "44326a4ea062241ae6fc26ee2ec90bdc81af7eb7b9d3966181b733fa69d42057"
+    },
+    {
+      "source": "https://api.stackexchange.com/2.3/answers/35148199?site=stackoverflow&filter=withbody",
+      "jsonBody": true,
+      "sha256": "fc4bebdfe83046e2054633802d2d1a3e24e370a53570722fc99cf7a1594057ef",
+      "answerId": 35148199,
+      "contentLicense": "CC BY-SA 4.0",
+      "lastEditDate": 1655581169
+    },
+    {
+      "source": "https://api.stackexchange.com/2.3/answers/49743348?site=stackoverflow&filter=withbody",
+      "jsonBody": true,
+      "sha256": "a3ab5a09acc1039b51f1e4cbcf21bc66d8e807432cb26bbdd4ae2459f565c81d",
+      "answerId": 49743348,
+      "contentLicense": "CC BY-SA 4.0",
+      "lastEditDate": 1623305077
+    },
+    {
+      "source": "https://github.com/pytorch/pytorch/blob/a82aae9d4a7827849ce50f31c4c7ee8f278d05f5/LICENSE",
+      "sha256": "bd018feef8825e88181c84eb7e3aa4eafb8f08a20d9fd6ef948569610c4a3e43"
+    },
+    {
+      "source": "https://github.com/pytorch/pytorch/blob/abf28982a8cb43342e7669d859de9543fd804cc9/LICENSE",
+      "sha256": "a8a2c6b67cf8a597ffaa5c82380a6bd1b82629c0417e00673d8013d662eb500a"
+    }
+  ],
+  "unresolvedFindings": [
+    {
+      "id": "NATIVE-LICENSE-1",
+      "component": "Norbert Juffa erf / erfinv adaptations",
+      "mlxPaths": [
+        "mlx/backend/metal/kernels/erf.h",
+        "mlx/backend/cpu/simd/math.h"
+      ],
+      "evidence": [
+        "https://stackoverflow.com/a/35148199",
+        "https://stackoverflow.com/a/49743348"
+      ],
+      "finding": "Metal erf explicitly cites Stack Overflow; inverse-erf coefficients and evaluation structure also match njuffa answer 49743348. Both retrieved answer records declare CC BY-SA 4.0. The BSD-2-Clause notice in expm1f.h covers that file, not proof of a permissive grant for erf/erfinv.",
+      "resolutionRequired": "Retain an applicable alternative license grant with the exact code mapping, or review and satisfy the applicable attribution/share-alike obligations before distribution. A separately reviewed upstream/pin or implementation change is another option."
+    },
+    {
+      "id": "NATIVE-LICENSE-2",
+      "component": "Cephes through fastermath and NEON math",
+      "mlxPaths": [
+        "mlx/backend/cpu/simd/math.h"
+      ],
+      "evidence": [
+        "https://www.netlib.org/cephes/readme"
+      ],
+      "finding": "MLX explicitly traces exp/sincos to Cephes through fastermath and neon_mathfun.h. The direct BSD-3-Clause and zlib notices and the original Cephes permission statement are now retained. The original statement has no standard license identifier; no additional Cephes grant for this exact provenance chain was established.",
+      "resolutionRequired": "Document why the retained original permission covers this redistribution, or retain an applicable grant for the exact derived material. Do not label this chain BSD solely because another project received permission."
+    }
+  ],
+  "nativeFiles": {
+    "libmlxc.dylib": {
+      "sha256": "15a08b85d40333093a38043d0545f9ff6d12ab532e58e7c1af067a23c93a238d",
+      "size": 2364080
+    },
+    "libmlx.dylib": {
+      "sha256": "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6",
+      "size": 21720704
+    },
+    "libjaccl.dylib": {
+      "sha256": "7890e84a96e3121c8c1c2f351e41e46ba4d92e7b7bc6275fc2b38c2773891032",
+      "size": 2131168
+    },
+    "mlx.metallib": {
+      "sha256": "c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893",
+      "size": 214156448
+    },
+    "native-pin.properties": {
+      "sha256": "9fbdc2f67202c57a6e86adbae8f3ab318c89cbbc222df34c197aedf14f5739b7",
+      "size": 75
+    }
+  },
+  "wheelSha256": "514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936",
+  "verification": {
+    "componentCount": 26,
+    "packagedTexts": {
+      "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+      "THIRD-PARTY-NOTICES": "4efc6e66304629e287bb7120b732a5784c2c1e398e28bf47e214eef885e34eb8",
+      "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
+      "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
+    },
+    "result": "Source/notice consistency and main/companion non-payload path checks pass; legal findings remain open.",
+    "releaseSelftests": {
+      "tests": 74,
+      "seconds": 59.161,
+      "result": "passed"
+    },
+    "gradle": {
+      "result": "passed",
+      "tasks": 15,
+      "executed": 6,
+      "upToDate": 9
+    },
+    "sourceCheck": {
+      "components": 26,
+      "sourceEvidenceRecords": 34,
+      "sourceUrlDigestPairs": 57,
+      "networkCacheInitiallyEmpty": false,
+      "cache": "Prior URL-bound review cache; all source objects rehashed without new requests.",
+      "locale": "en_US.ISO8859-1",
+      "pythonUtf8Mode": false,
+      "checkedJars": [
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar"
+      ],
+      "requireClearExitCode": 1,
+      "releaseReady": false
+    }
+  },
+  "artifacts": {
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar": {
+      "sha256": "895b8e847735663859aad46d0083b9081ba33b3fbf7f5967bf1c8c94f71e6435",
+      "size": 77821148
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar": {
+      "sha256": "b61dbff6e31caf5a9a2226d942c0a474308345ceef0d890cf533f988edd2a4b9",
+      "size": 15599
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar": {
+      "sha256": "1c759f986d1ed8d102a3ef4d08b4a37b4a59895ddb3b2242ab1937d5da87fa82",
+      "size": 4167653
+    },
+    "jmlx-native-macos-arm64/build/publications/maven/pom-default.xml": {
+      "sha256": "84d86eecdea022cdd63b5dcac25ae0586a627ee3f722bf9c972b4170ff11ae35",
+      "size": 1793
+    }
+  },
+  "retainedEvidence": {
+    "req/plans/evidence/native-license-audit-2026-11-16/commands.json": "bb7405bae0fc42201d644b8a7196ccf188d3529b6e49f458f863a90604b57fa8",
+    "req/plans/evidence/native-license-audit-2026-11-16/dylib-dependencies.txt": "6a89c22df5bd2df1233ac72062eaa3c0ed43877e5d4a95650be221f7bc105cdc",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-commands.json": "74d43b6c91a9ea17cb6a93a2507b0496b7e1ef976e38df340acbb634808efe15",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-gradle.log": "ecf1908c967a38780f74512d1c10aa59b5c940f2a052e250135e1f17b89385f7",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-release-selftests.log": "0c5bb6869448f0333c5bfa457297e78ffd3ce5612f7cba895213df71f41f8a78",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-require-clear.log": "790b5abfba72fb67f90bf1b69735aad801d2f57ac2dcb73cf38a9e98d435b36e",
+    "req/plans/evidence/native-license-audit-2026-11-16/followup-source-verification.json": "e6f34e6d83d1e387956728cf14eda4f6fe46fd1e9d8f9bfc6eb6fd759f37e1c9",
+    "req/plans/evidence/native-license-audit-2026-11-16/gradle.log": "b6c4f673c6ec2344860aa5f7f9f2777ee48875c6875c8db83483a1ab823451d0",
+    "req/plans/evidence/native-license-audit-2026-11-16/release-selftests.log": "8349212051702036b0a08fe9d45375449db51005eded98d20a8b32be680fa27a",
+    "req/plans/evidence/native-license-audit-2026-11-16/require-clear.log": "790b5abfba72fb67f90bf1b69735aad801d2f57ac2dcb73cf38a9e98d435b36e",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-commands.json": "0c40721f8cd70de57734efb7165cb7fe92f9a8b7e3bab1220930520e1ddb5a56",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-environment.json": "3e891906644fb6679d6c79c0bd80bc69cd6ee045cf70b2018cb5aa0e458fb634",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-gradle.log": "b6c4f673c6ec2344860aa5f7f9f2777ee48875c6875c8db83483a1ab823451d0",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-release-selftests.log": "278dd7abab947eabfc83b5d7bc507426f86edf5a5f92b45fbda32097c12533e3",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-require-clear.log": "790b5abfba72fb67f90bf1b69735aad801d2f57ac2dcb73cf38a9e98d435b36e",
+    "req/plans/evidence/native-license-audit-2026-11-16/review-source-verification.json": "5b6b1befe93eec262d2aad5cd811468bab02eda7a3afb772de657eb0665e6a6a",
+    "req/plans/evidence/native-license-audit-2026-11-16/source-verification.json": "d997ffe28d000a2fbc6fff5fd94d4e1331e038750131826b70c9b24bce01e1ac"
+  },
+  "verificationTools": {
+    "tools/release-all/audit_native_licenses.py": "3b26e1a6976a882d5d1dd0ada610381239e9f2dadfc39a593ada3392504a349a",
+    "tools/release-all/release_inputs.py": "5266931df56ab5c6b119d26d632365a4a912956ed8e5bdf4593e02bdae4a9018",
+    "tools/release-all/tests/test_native_licenses.py": "274c3bbe0d4fe8de34e2298c3b62c320270f1e77b3333ed4be6d64ee693454ef",
+    "tools/release-all/tests/test_release_inputs.py": "b6154e90f6cf0ab136f2458d56cd9c669b06a5e7c999e91b06419cb26b8165ac"
+  },
+  "originalVerification": {
+    "componentCount": 26,
+    "packagedTexts": {
+      "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+      "THIRD-PARTY-NOTICES": "163204e769e4db89cb29aaffb4ef125839f298ae71372ee1591df3a2fe5c7ba6",
+      "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
+      "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
+    },
+    "result": "Source and notice consistency checks do not resolve the open license findings.",
+    "releaseSelftests": {
+      "tests": 63,
+      "seconds": 51.987,
+      "result": "passed"
+    },
+    "gradle": {
+      "result": "passed",
+      "tasks": 15,
+      "executed": 6,
+      "upToDate": 9
+    },
+    "sourceCheck": {
+      "components": 26,
+      "sourceEvidenceRecords": 34,
+      "networkCacheInitiallyEmpty": true,
+      "checkedJars": [
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar"
+      ],
+      "requireClearExitCode": 1,
+      "releaseReady": false
+    }
+  },
+  "originalArtifacts": {
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar": {
+      "sha256": "3aebc865da1b4f72d6b4d770c9dce743f418ddf07511d910250cf8751fd27b9f",
+      "size": 77821135
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar": {
+      "sha256": "61ac28b0914c9283591574a7cba48233d398d73b2d807b548a7234f4ea8dc80f",
+      "size": 15586
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar": {
+      "sha256": "37bf4835d5bd543a25f6a9a980e5003b35d7f10dd27faf9d01ca35f2195b349d",
+      "size": 4167640
+    },
+    "jmlx-native-macos-arm64/build/publications/maven/pom-default.xml": {
+      "sha256": "84d86eecdea022cdd63b5dcac25ae0586a627ee3f722bf9c972b4170ff11ae35",
+      "size": 1793
+    }
+  },
+  "reviewOfCommit": "8dd48dc7ee85fb6e449db2c6cbdcc4efbcda9d9b",
+  "historicalEvidenceNote": "Unprefixed evidence and originalVerification/originalArtifacts record the first PR #100 implementation (56 of 57 distinct URL/digest fetches). Review-prefixed evidence and priorReviewVerification/priorReviewArtifacts record the subsequent URL-bound cold run (57 of 57). Followup-prefixed evidence supersedes the artifact/section/path validation using that warm URL-bound cache.",
+  "priorReviewVerification": {
+    "componentCount": 26,
+    "packagedTexts": {
+      "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+      "THIRD-PARTY-NOTICES": "ef25c942cd907e22c0177d1726facffca4be894f848e31e92464e5d80ffaadda",
+      "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
+      "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
+    },
+    "result": "Source/notice consistency and companion path checks pass; legal findings remain open.",
+    "releaseSelftests": {
+      "tests": 72,
+      "seconds": 64.873,
+      "result": "passed"
+    },
+    "gradle": {
+      "result": "passed",
+      "tasks": 15,
+      "executed": 6,
+      "upToDate": 9
+    },
+    "sourceCheck": {
+      "components": 26,
+      "sourceEvidenceRecords": 34,
+      "sourceUrlDigestPairs": 57,
+      "newCacheEntries": 57,
+      "networkCacheInitiallyEmpty": true,
+      "locale": "en_US.ISO8859-1",
+      "preferredEncoding": "ISO8859-1",
+      "pythonUtf8Mode": false,
+      "checkedJars": [
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar",
+        "jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar"
+      ],
+      "requireClearExitCode": 1,
+      "releaseReady": false
+    }
+  },
+  "priorReviewArtifacts": {
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar": {
+      "sha256": "8cbd8ceff0d126b435b9b57634c4c49c89f4f1392efe18dce74b14835419c37e",
+      "size": 77821143
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar": {
+      "sha256": "6d8752626fcefff509c489d52ca20995ba58d5e81a14d81493ac89ceb1d2e490",
+      "size": 15594
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar": {
+      "sha256": "df47c556060393ac65fe10381386e0fba5ea1446658c767c734afb204cb32a81",
+      "size": 4167648
+    },
+    "jmlx-native-macos-arm64/build/publications/maven/pom-default.xml": {
+      "sha256": "84d86eecdea022cdd63b5dcac25ae0586a627ee3f722bf9c972b4170ff11ae35",
+      "size": 1793
+    }
+  }
+}

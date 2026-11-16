@@ -1,0 +1,103 @@
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-native-macos-arm64:compileJava UP-TO-DATE
+> Task :jmlx-native-macos-arm64:processResources NO-SOURCE
+> Task :jmlx-native-macos-arm64:classes UP-TO-DATE
+> Task :jmlx-native-macos-arm64:checkstyleMain UP-TO-DATE
+> Task :jmlx-native-macos-arm64:compileTestJava NO-SOURCE
+> Task :jmlx-native-macos-arm64:processTestResources NO-SOURCE
+> Task :jmlx-native-macos-arm64:testClasses UP-TO-DATE
+> Task :jmlx-native-macos-arm64:checkstyleTest NO-SOURCE
+> Task :jmlx-native-macos-arm64:spotlessJava UP-TO-DATE
+> Task :jmlx-native-macos-arm64:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-native-macos-arm64:spotlessCheck UP-TO-DATE
+> Task :jmlx-native-macos-arm64:stageNativeResources UP-TO-DATE
+> Task :jmlx-native-macos-arm64:jar
+> Task :jmlx-native-macos-arm64:javadoc UP-TO-DATE
+> Task :jmlx-native-macos-arm64:javadocJar
+> Task :jmlx-native-macos-arm64:sourcesJar
+> Task :jmlx-native-macos-arm64:test NO-SOURCE
+> Task :jmlx-native-macos-arm64:verifyPackagedNativeResources
+> Task :jmlx-native-macos-arm64:verifyReleaseScriptsMatch UP-TO-DATE
+> Task :jmlx-native-macos-arm64:check
+
+> Task :jmlx-native-macos-arm64:verifyNativeReleasePayload
+{
+  "pins": {
+    "mlxMetalVersion": "0.32.4",
+    "mlxcCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a"
+  },
+  "supportedMinimum": [
+    27,
+    2,
+    0
+  ],
+  "deploymentTarget": [
+    26,
+    2,
+    0
+  ],
+  "files": {
+    "libmlxc.dylib": {
+      "sha256": "15a08b85d40333093a38043d0545f9ff6d12ab532e58e7c1af067a23c93a238d",
+      "size": 2364080,
+      "minos": [
+        26,
+        2,
+        0
+      ],
+      "sdk": [
+        27,
+        2,
+        0
+      ]
+    },
+    "libmlx.dylib": {
+      "sha256": "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6",
+      "size": 21720704,
+      "minos": [
+        26,
+        2,
+        0
+      ],
+      "sdk": [
+        26,
+        5,
+        0
+      ],
+      "upstreamPathAllowlist": [
+        "/Users/runner/work/mlx/mlx/build/temp.macosx-11.0-arm64-cpython-310/mlx.core/mlx/backend/metal/kernels//mlx.metallib"
+      ]
+    },
+    "libjaccl.dylib": {
+      "sha256": "7890e84a96e3121c8c1c2f351e41e46ba4d92e7b7bc6275fc2b38c2773891032",
+      "size": 2131168,
+      "minos": [
+        26,
+        2,
+        0
+      ],
+      "sdk": [
+        26,
+        5,
+        0
+      ]
+    },
+    "mlx.metallib": {
+      "sha256": "c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893",
+      "size": 214156448
+    },
+    "native-pin.properties": {
+      "sha256": "9fbdc2f67202c57a6e86adbae8f3ab318c89cbbc222df34c197aedf14f5739b7",
+      "size": 75
+    }
+  }
+}
+
+> Task :jmlx-native-macos-arm64:generatePomFileForMavenPublication
+
+BUILD SUCCESSFUL in 4s
+15 actionable tasks: 6 executed, 9 up-to-date

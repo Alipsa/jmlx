@@ -166,9 +166,11 @@ tasks.named('check') { dependsOn tasks.named('verifyPackagedNativeResources') }
 tasks.register('verifyNativeReleasePayload', Exec) {
     group = 'verification'
     description = 'Checks packaged dylib deployment targets, source paths, pins and license texts.'
-    dependsOn tasks.named('jar')
+    dependsOn tasks.named('jar'), tasks.named('sourcesJar'), tasks.named('javadocJar')
     commandLine 'python3', rootProject.file('tools/release-all/release_inputs.py'), 'native',
             tasks.named('jar').get().archiveFile.get().asFile,
+            '--documentation-jar', tasks.named('sourcesJar').get().archiveFile.get().asFile,
+            '--documentation-jar', tasks.named('javadocJar').get().archiveFile.get().asFile,
             '--bootstrap', rootProject.file('scripts/bootstrap-native.sh'),
             '--forbid', System.getProperty('user.home'), '--forbid', rootProject.projectDir
 }

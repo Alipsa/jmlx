@@ -33,6 +33,7 @@ MODULE_KEYS = {
 PURE = set(list(MODULE_KEYS)[:3])
 NATIVE_FILES = ("libmlxc.dylib", "libmlx.dylib", "libjaccl.dylib", "mlx.metallib",
                 "native-pin.properties")
+REQUIRED_NATIVE_LEGAL_TEXTS = {"LICENSE", "NOTICE", "LICENSE-APACHE-2.0", "THIRD-PARTY-NOTICES"}
 UPSTREAM_PATH = (b"/Users/runner/work/mlx/mlx/build/temp.macosx-11.0-arm64-cpython-310/"
                  b"mlx.core/mlx/backend/metal/kernels//mlx.metallib")
 UPSTREAM_MLX_HASH = "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6"
@@ -207,7 +208,43 @@ def verify_smoke_environment(kind, env, supported_minimum, run_id=None):
         raise ValueError(error)
 
 
+def validate_native_legal_inventory(inventory):
+    texts = inventory.get("packagedTexts")
+    if not isinstance(texts, dict) or not REQUIRED_NATIVE_LEGAL_TEXTS <= texts.keys():
+        raise ValueError("native license inventory lacks required packaged texts")
+
+
+def native_notice_report(jar, inventory, forbidden=(), *, skip_native_payload=False):
+    """Check reviewed legal texts in either the runtime or documentation artifact."""
+    validate_native_legal_inventory(inventory)
+    with zipfile.ZipFile(jar) as archive:
+        names = archive.namelist()
+        if len(names) != len(set(names)):
+            raise ValueError(f"duplicate jar entries: {jar}")
+        result = {}
+        for name, digest in inventory["packagedTexts"].items():
+            entry = "META-INF/" + name
+            if entry not in names:
+                raise ValueError(f"{jar}: missing native legal text: {name}")
+            data = archive.read(entry)
+            if not data.strip() or hashlib.sha256(data).hexdigest() != digest:
+                raise ValueError(f"{jar}: native legal text differs from reviewed inventory: {name}")
+            result[name] = digest
+        for entry in archive.infolist():
+            if skip_native_payload and entry.filename in {
+                    "se/alipsa/jmlx/native/macos-aarch64/" + name for name in NATIVE_FILES}:
+                # native_report checks these bytes separately, including the pinned MLX exception.
+                continue
+            if not entry.is_dir() and forbidden:
+                data = archive.read(entry)
+                if any(prefix and prefix.encode("utf-8") in data for prefix in forbidden):
+                    raise ValueError(f"{jar}: personal path leaked in {entry.filename}")
+        return result
+
+
 def native_jar_report(jar, bootstrap, forbidden):
+    inventory = read_json(Path(bootstrap).resolve().parents[1] / "req/native-license-inventory.json")
+    native_notice_report(jar, inventory, forbidden, skip_native_payload=True)
     with tempfile.TemporaryDirectory(prefix="jmlx-native-verify-") as temp:
         with zipfile.ZipFile(jar) as archive:
             names = archive.namelist()
@@ -216,14 +253,7 @@ def native_jar_report(jar, bootstrap, forbidden):
             for name in NATIVE_FILES:
                 data = archive.read("se/alipsa/jmlx/native/macos-aarch64/" + name)
                 (Path(temp) / name).write_bytes(data)
-            for name in ("META-INF/LICENSE", "META-INF/NOTICE", "META-INF/LICENSE-APACHE-2.0"):
-                if not archive.read(name).strip():
-                    raise ValueError(f"missing native legal text: {name}")
-            inventory = read_json(Path(bootstrap).resolve().parents[1] / "req/native-license-inventory.json")
             notice = archive.read("META-INF/NOTICE").decode("utf-8")
-            for name, digest in inventory["packagedTexts"].items():
-                if hashlib.sha256(archive.read("META-INF/" + name)).hexdigest() != digest:
-                    raise ValueError(f"native legal text differs from reviewed inventory: {name}")
         report = native_report(temp, bootstrap, forbidden)
         if inventory.get("nativePins") != report["pins"]:
             raise ValueError("native license inventory targets different upstream pins")
@@ -345,6 +375,7 @@ def main():
     native.add_argument("directory", type=Path)
     native.add_argument("--bootstrap", type=Path, required=True)
     native.add_argument("--forbid", action="append", default=[])
+    native.add_argument("--documentation-jar", type=Path, action="append", default=[])
     bundle = sub.add_parser("bundle")
     bundle.add_argument("bundle", type=Path)
     bundle.add_argument("--record", type=Path, required=True)
@@ -367,7 +398,12 @@ def main():
                 archive.extractall(args.extract)
     else:
         verify = native_jar_report if args.directory.suffix == ".jar" else native_report
-        print(json.dumps(verify(args.directory, args.bootstrap, args.forbid), indent=2))
+        report = verify(args.directory, args.bootstrap, args.forbid)
+        if args.documentation_jar:
+            inventory = read_json(args.bootstrap.resolve().parents[1] / "req/native-license-inventory.json")
+            for jar in args.documentation_jar:
+                native_notice_report(jar, inventory, args.forbid)
+        print(json.dumps(report, indent=2))
 
 
 if __name__ == "__main__":

@@ -50,3 +50,9 @@ Run `./scripts/bootstrap-native.sh` before building a distributable native jar. 
 checkout still builds, but the local native jar intentionally has no bundled runtime and cannot be
 published. The publish task refuses to run until the validated staged files and completion marker
 are present.
+
+The main, sources and Javadoc JARs carry `LICENSE`, `NOTICE`, `LICENSE-APACHE-2.0` and
+`THIRD-PARTY-NOTICES` under `META-INF`. Run
+`./gradlew :jmlx-native-macos-arm64:verifyNativeReleasePayload` to verify their reviewed digests.
+The [Phase 8.4 native license audit](../req/phase8-4-native-license-audit.md) records compiled-in
+dependencies and unresolved provenance findings that must be resolved before release.

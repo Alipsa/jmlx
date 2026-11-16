@@ -1,0 +1,33 @@
+{
+  "sourceAudit": {
+    "argv": [
+      "python3",
+      "tools/release-all/audit_native_licenses.py",
+      "--wheel",
+      "native/scratch/mlx_metal.whl",
+      "--cache",
+      "build/releaseAll/native-license-audit-cache",
+      "--jar",
+      "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT.jar",
+      "--jar",
+      "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-sources.jar",
+      "--jar",
+      "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-SNAPSHOT-javadoc.jar",
+      "--output",
+      "build/releaseAll/native-license-verification.json",
+      "--require-clear"
+    ],
+    "expectedExitCode": 1,
+    "cache": "Actual retained run started with an empty external temporary cache; this normalized command uses an ignored repository cache."
+  },
+  "gradle": [
+    "./gradlew",
+    ":jmlx-native-macos-arm64:check",
+    ":jmlx-native-macos-arm64:verifyNativeReleasePayload",
+    ":jmlx-native-macos-arm64:generatePomFileForMavenPublication"
+  ],
+  "selftests": [
+    "bash",
+    "tools/release-all/selftest.sh"
+  ]
+}

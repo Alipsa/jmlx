@@ -98,6 +98,24 @@ The recorded plugin JAR hash above identifies the resolved artifact; it is not c
 enforced by Gradle dependency verification. Verification metadata covering the release
 plugin and its dependency graph remains a separate dependency-policy follow-up.
 
+## PR review corrections (2026-11-16)
+
+The upload fixture now checks the request journal for rejected upload attempts, requires
+exactly one upload on success and fails on handler exceptions. Handler errors remain strict;
+no dropped-connection failure has been observed locally. The real final-receipt CLI now has
+an exact stdout contract test for its reviewed bundle and manifest digests.
+
+The tampered-ZIP case is rejected by the fixture receipt verifier in jmlx's `doFirst`;
+the tampered-manifest case is rejected earlier by `releaseAllGuard`. These cases do not
+exercise the plugin's later `ReleaseAllTask.release()` anchor checks or its
+"Bundle changed after verification" snapshot check. Coverage of that later window belongs
+to the upstream plugin tests and has not been verified by this jmlx fixture.
+
+After these review changes, `bash tools/release-all/selftest.sh` passed all 24 tests
+locally on macOS in 52.252 seconds, including the published-plugin cold-cache TLS fixture.
+`git diff --check` also passed. Hosted run 43773425790 above remains historical evidence
+for its recorded commit and 23-test suite; it does not verify these review changes.
+
 ## Remaining release work
 
 The external plugin prerequisite and historical compatibility checks are satisfied by this

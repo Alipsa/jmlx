@@ -41,9 +41,10 @@ tasks.named('dependencyUpdates').configure {
 // releaseAllPrepareMaven is registered too but never runs: jmlx has no static Maven
 // candidates). nexus-release-plugin 2.6.0 derives the candidate set, the per-module staging
 // publication (with signing and the module's check wired in), and every output path from
-// combinedRelease.modules; jmlx only sets the module list, the committed Portal fixture and
-// the report/resume overrides below. The subprojects get the plugin through the maven-publish
-// wiring exactly as before, and ordinary builds never reach this block.
+// combinedRelease.modules. jmlx configures the module list, committed Portal fixture,
+// report/resume overrides and existing-bundle upload mode with both digest anchors, and
+// revalidates the final receipt before upload. The subprojects get the plugin through
+// maven-publish wiring as before, and ordinary builds never reach this block.
 // BEGIN JMLX COMBINED RELEASE
 if (providers.gradleProperty('releaseAllMode').isPresent()) {
     apply plugin: 'se.alipsa.nexus-release-plugin'
@@ -130,8 +131,8 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
                     standardOutput = digestOutput
                 }
                 def reviewedAnchors = digestOutput.toString('UTF-8').trim().split('\t', -1).toList()
-                def uploadAnchors = [releaseTask.expectedBundleSha256.get().toLowerCase(Locale.ROOT),
-                        releaseTask.expectedManifestSha256.get().toLowerCase(Locale.ROOT)]
+                def uploadAnchors = [expectedBundleSha256.get().toLowerCase(Locale.ROOT),
+                        expectedManifestSha256.get().toLowerCase(Locale.ROOT)]
                 if (reviewedAnchors != uploadAnchors) {
                     throw new GradleException('Receipt digest anchors differ from plugin upload inputs')
                 }

@@ -15,6 +15,7 @@ import re
 import shutil
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -32,6 +33,11 @@ class PluginUploadTest(unittest.TestCase):
             root = Path(temp)
             uploads = []
             requests = []
+            handler_errors = []
+
+            class PortalServer(http.server.ThreadingHTTPServer):
+                def handle_error(self, request, client_address):
+                    handler_errors.append(sys.exc_info()[1])
 
             class Portal(http.server.BaseHTTPRequestHandler):
                 def log_message(self, *args):
@@ -77,7 +83,7 @@ class PluginUploadTest(unittest.TestCase):
             java = str(Path(os.environ["JAVA_HOME"]) / "bin/java") if os.environ.get("JAVA_HOME") else "java"
             properties = subprocess.run([java, "-XshowSettings:properties", "-version"], check=True,
                                         capture_output=True, text=True)
-            java_home = Path(re.search(r"^\s*java.home = (.+)$", properties.stderr, re.MULTILINE).group(1))
+            java_home = Path(re.search(r"^\s*java\.home = (.+)$", properties.stderr, re.MULTILINE).group(1))
             cacerts = java_home / "lib/security/cacerts"
             original_cacerts_hash = hashlib.sha256(cacerts.read_bytes()).hexdigest()
             # Preserve public roots for cold Plugin Portal downloads, adding local trust to a copy.
@@ -88,7 +94,7 @@ class PluginUploadTest(unittest.TestCase):
             subprocess.run([str(java_home / "bin/keytool"), "-importcert", "-noprompt", "-alias", "fixture", "-file", str(certificate),
                             "-keystore", str(truststore), "-storepass", "changeit"],
                            check=True, capture_output=True)
-            server = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Portal)
+            server = PortalServer(("127.0.0.1", 0), Portal)
             context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
             context.load_cert_chain(certificate, key)
             server.socket = context.wrap_socket(server.socket, server_side=True)
@@ -192,7 +198,7 @@ if a.plugin_digests:
                     "build/releaseAll/manifest.json": plan_hash}}
                 final.write_text(json.dumps(evidence))
                 shell = subprocess.run(["bash", str(project / "releaseAll.sh"), "--publish-verified", str(final)],
-                                       env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                                       env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
                 self.assertEqual(shell.returncode, 0, shell.stdout)
                 wrapper_args = json.loads((project / "build/wrapper-argv.json").read_text())
                 self.assertIn("-PreleaseAllExpectedBundleSha256=" + bundle_hash, wrapper_args)
@@ -206,14 +212,14 @@ if a.plugin_digests:
                                  if arg.startswith("-PreleaseAllExpectedBundleSha256=") else arg for arg in upload]
                 self.assertIn("Receipt digest anchors differ from plugin upload inputs",
                               run(*wrong_anchors, success=False))
-                self.assertFalse(uploads)
+                self.assertFalse([path for path in requests if "/publisher/upload" in path])
                 # Reject malformed verifier output before starting even the stub Gradle launcher.
                 (project / "build/wrapper-argv.json").unlink()
                 for malformed in ("garbage\t" + plan_hash, bundle_hash + "\t" + plan_hash + "\nextra"):
                     evidence["digestOutput"] = malformed
                     final.write_text(json.dumps(evidence))
                     invalid_shell = subprocess.run(["bash", str(project / "releaseAll.sh"), "--publish-verified", str(final)],
-                                                   env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                                                   env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
                     self.assertNotEqual(invalid_shell.returncode, 0)
                     self.assertIn("Receipt verifier returned malformed digests", invalid_shell.stdout)
                     self.assertFalse((project / "build/wrapper-argv.json").exists())
@@ -221,31 +227,34 @@ if a.plugin_digests:
                 final.write_text(json.dumps(evidence))
                 # The jmlx graph gate must reject ordinary rebuilding uploads before any tasks.
                 self.assertIn("Use releaseAll.sh --publish-verified", run("releaseAll", success=False))
-                self.assertFalse(uploads)
+                self.assertFalse([path for path in requests if "/publisher/upload" in path])
                 evidence["testEvidencePassed"] = False
                 final.write_text(json.dumps(evidence))
                 rejected_shell = subprocess.run(["bash", str(project / "releaseAll.sh"), "--publish-verified", str(final)],
-                                                env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                                                env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
                 self.assertNotEqual(rejected_shell.returncode, 0)
                 self.assertFalse((project / "build/wrapper-argv.json").exists())
                 self.assertIn("fixture required test evidence rejected", run(*upload, success=False))
-                self.assertFalse(uploads)
+                self.assertFalse([path for path in requests if "/publisher/upload" in path])
                 evidence["testEvidencePassed"] = True
                 final.write_text(json.dumps(evidence))
                 (project / "marker.txt").write_text("drift")
                 self.assertIn("Stale manifest", run(*upload, success=False))
-                self.assertFalse(uploads)
+                self.assertFalse([path for path in requests if "/publisher/upload" in path])
                 (project / "marker.txt").write_text("reviewed")
+                # These mutations hit jmlx's receipt verifier and releaseAllGuard,
+                # not the plugin's later digest/snapshot checks after doFirst.
                 bundle.write_bytes(original + b"tampered")
                 self.assertIn("fixture final receipt mismatch", run(*upload, success=False))
-                self.assertFalse(uploads)
+                self.assertFalse([path for path in requests if "/publisher/upload" in path])
                 bundle.write_bytes(original)
                 plan_bytes = plan.read_bytes()
                 plan.write_bytes(plan_bytes + b"\n")
                 self.assertIn("expectedManifestSha256", run(*upload, success=False))
-                self.assertFalse(uploads)
+                self.assertFalse([path for path in requests if "/publisher/upload" in path])
                 plan.write_bytes(plan_bytes)
                 run(*upload)
+                self.assertEqual(sum("/publisher/upload" in path for path in requests), 1)
                 self.assertEqual(uploads, [original])
                 self.assertEqual(bundle.read_bytes(), original)
                 self.assertEqual(json.loads((build / "deployment.json").read_text())["bundleHash"], bundle_hash)
@@ -255,6 +264,7 @@ if a.plugin_digests:
                 server.shutdown()
                 server.server_close()
                 thread.join()
+            self.assertFalse(handler_errors, handler_errors)
 
 
 if __name__ == "__main__":

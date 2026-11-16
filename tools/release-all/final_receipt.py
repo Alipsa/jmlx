@@ -12,7 +12,7 @@ from verify_native_tests import verify_events
 REQUIRED = {"macos-full", "macos-pure", "linux-pure", "minimum-host"}
 
 
-def verify(root, receipt_path, *, plugin_digests=False):
+def verify(root, receipt_path):
     receipt = read_json(receipt_path)
     if receipt.get("schema") != "jmlx-verified-bundle-1":
         raise ValueError("only a final verified-bundle receipt is accepted")
@@ -86,9 +86,12 @@ def verify(root, receipt_path, *, plugin_digests=False):
             raise ValueError("expected local Linux ARM64 evidence")
         elif kind.startswith("macos-") and (env.get("system") != "Darwin" or env.get("architecture") != "arm64"):
             raise ValueError("expected macOS evidence")
-    if plugin_digests:
-        return record["bundleSha256"], record["pluginReceipt"]["manifestHash"]
-    return receipt
+    return receipt, record
+
+
+def plugin_digests(root, receipt_path):
+    _, record = verify(root, receipt_path)
+    return record["bundleSha256"], record["pluginReceipt"]["manifestHash"]
 
 
 if __name__ == "__main__":
@@ -104,9 +107,10 @@ if __name__ == "__main__":
     args = parser.parse_args()
     try:
         if args.verify:
-            result = verify(args.root.resolve(), args.verify, plugin_digests=args.plugin_digests)
             if args.plugin_digests:
-                print("\t".join(result))
+                print("\t".join(plugin_digests(args.root.resolve(), args.verify)))
+            else:
+                verify(args.root.resolve(), args.verify)
         else:
             if args.plugin_digests:
                 raise ValueError("--plugin-digests requires --verify")

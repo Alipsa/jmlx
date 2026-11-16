@@ -29,9 +29,8 @@ by the plan. Leave its registration and labels intact. Use a separate standard m
 and a separate runner installation; two installations under the same account would still
 share that account's state. The owner approved creating `jmlxrunner`; it is now provisioned
 with UID 503 and a private (`0700`) home. At provisioning its runner was
-`jmlx-release-minimum-m5-max`, ID 23,
-with labels `self-hosted`, `macOS`, `ARM64`, `jmlx-release-minimum`. The original runner's
-registration and labels were preserved.
+`jmlx-release-minimum-m5-max`, ID 23, with labels `self-hosted`, `macOS`, `ARM64`,
+`jmlx-release-minimum`. The original runner's registration and labels were preserved.
 
 ## Completed setup and operation
 
@@ -60,9 +59,9 @@ supplied clean PATH and `.env` empty. Their digests are retained in
 [the review evidence](plans/evidence/minimum-host-runner-2026-11-16/review.json).
 Neither contains the owner's home or an inherited `JAVA_HOME`. Configuration used `env -i`,
 not the owner's shell environment. Both `RunAtLoad` and `KeepAlive` are disabled.
-The definition remains installed but unloaded;
-it will not start the worker on reboot. GitHub's own runner authentication files are private
-to the account. Reinspect these saved files before each release window; the plist alone
+The definition remains installed but unloaded; it will not start the worker on reboot.
+GitHub's own runner authentication files are private to the account. Reinspect these saved
+files before each release window; the plist alone
 does not control the effective environment.
 
 Python and Git resolve to **owner-managed Homebrew** installations under `/opt/homebrew`.
@@ -74,10 +73,11 @@ Resolve and record them again before each window and review any change before ac
 The owner's Gradle properties file is now mode `0600`, rather than relying solely on
 parent-directory permissions. The account still cannot read or write it. The sharing group
 `com.apple.sharepoint.group.1` includes `everyone` through a nested group, explaining the
-new account's membership. Inspection found an existing owner Public-folder SMB share with
-guest access configured; `smbd` was not loaded at inspection. No new share was created for
-`jmlxrunner`. This is not proof that File Sharing is globally disabled or that all network
-sharing access has been audited; keep the private account home and recheck sharing at window time.
+new account's membership. Inspection found a guest share configured; `smbd` was not loaded
+at inspection. Public evidence retains only that boolean, without share identity or write mode.
+No new share was created for `jmlxrunner`. This is not proof that File Sharing is globally
+disabled or that all network sharing access has been audited; keep the private account home
+and recheck sharing at window time.
 
 For a reviewed release verification window, a host administrator can start it with:
 
@@ -156,13 +156,23 @@ Automatic runner updates remain enabled. The archive digest records the **initia
 not a permanently pinned running binary. GitHub documents its
 [update behavior](https://docs.github.com/en/actions/reference/runners/self-hosted-runners#runner-software-updates-on-self-hosted-runners).
 As the dedicated account, record `./bin/Runner.Listener --version` and its executable SHA-256
-before starting and again after connection or any update, before dispatch. Review version
-changes alongside the saved environment and tool paths. Persistent registration and manual
-workspace cleanup remain the chosen setup; ephemeral registration alone would not wipe files.
+before starting and again after connection or any update, before dispatch. An update may
+still occur on job assignment: also retain the actual run's **Set up job** log and compare
+its `Current runner version` line with the pre-dispatch version. If it differs, re-measure
+the installed listener and digest and review the updated version before accepting the report.
+The earlier binary digest must not be attributed to the updated runner; if the job-time binary
+cannot be identified, repeat verification on an identified version. No actual candidate run
+exists yet, so no job-time version comparison has been performed.
+Review version changes alongside the saved environment and tool paths. Persistent registration
+and manual workspace cleanup remain the chosen setup; ephemeral registration alone would not wipe files.
 
 List active workflow runs and their jobs matching the release label before bringing the
 runner online. The following read-only commands paginate both collections and list matching
-unfinished jobs (including jobs queued behind another job):
+unfinished jobs that the API currently exposes. They also list approval-required runs even
+when jobs or labels are not yet exposed. Jobs blocked on `needs:` may not yet be visible with
+labels; this check does not claim to enumerate those jobs. Review the active workflows and
+their possible downstream jobs before starting the runner, and do not approve fork runs
+during the release window.
 
 ```sh
 python3 - <<'PY'
@@ -173,16 +183,22 @@ def gh(*args):
     return subprocess.check_output(["gh", "api", "--paginate", *args], text=True, timeout=60)
 
 run_ids = set()
-for status in ("queued", "in_progress", "waiting", "requested", "pending"):
+for status in ("queued", "in_progress", "waiting", "requested", "pending", "action_required"):
     run_ids.update(gh(f"repos/Alipsa/jmlx/actions/runs?status={status}",
                       "--jq", ".workflow_runs[].id").split())
 for run_id in sorted(run_ids, key=int):
     run = json.loads(gh(f"repos/Alipsa/jmlx/actions/runs/{run_id}"))
+    approval_required = (run.get("status") == "action_required" or
+                         run.get("conclusion") == "action_required")
+    if approval_required:
+        print(json.dumps({key: run[key] for key in ("id", "path", "head_branch", "head_sha", "event")}))
+        print("Approval required: review this run even if job labels are not exposed.")
     jobs = gh(f"repos/Alipsa/jmlx/actions/runs/{run_id}/jobs", "--jq",
               '.jobs[] | select(.status != "completed") | '
               'select(.labels | index("jmlx-release-minimum")) | {id,name,status,labels}')
-    if jobs.strip():
+    if jobs.strip() and not approval_required:
         print(json.dumps({key: run[key] for key in ("id", "path", "head_branch", "head_sha", "event")}))
+    if jobs.strip():
         print(jobs)
 PY
 ```

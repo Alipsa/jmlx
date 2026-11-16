@@ -59,17 +59,10 @@
     "sharepointGroup": "com.apple.sharepoint.group.1",
     "nestedGroupGuid": "ABCDEFAB-CDEF-ABCD-EFAB-CDEF0000000C",
     "nestedGroupName": "everyone",
-    "configuredShares": [
-      {
-        "scope": "existing owner Public folder",
-        "protocol": "SMB",
-        "guestAccess": true,
-        "readOnly": false
-      }
-    ],
     "smbdLaunchdServiceLoaded": false,
     "newReleaseAccountShareCreated": false,
-    "scope": "Group/share configuration and launchd state only; no remote/network access audit or global sharing changes."
+    "scope": "Group/share configuration and launchd state only; no remote/network access audit or global sharing changes.",
+    "guestShareConfigured": true
   },
   "queueInspection": {
     "commandSource": "req/phase8-4-minimum-host-setup.md",
@@ -78,10 +71,15 @@
       "in_progress",
       "waiting",
       "requested",
-      "pending"
+      "pending",
+      "action_required"
     ],
     "unfinishedJobsMatchingReleaseLabel": [],
-    "scope": "Live paginated API snapshot; not an authorization boundary."
+    "scope": "Live paginated API snapshot of exposed jobs and approval-required runs; needs-blocked jobs/labels may be absent. Not an authorization boundary.",
+    "recordedAt": "2026-11-16T21:40:21.847256+00:00",
+    "baseCommit": "407c7be7ddcb7729ae0932e55a8c2de833454038",
+    "workingTree": "Documentation follow-up adding action_required and surfacing approval-required runs without exposed jobs.",
+    "output": ""
   },
   "references": {
     "runsvc": "https://github.com/actions/runner/blob/v2.338.2/src/Misc/layoutbin/runsvc.sh",
@@ -100,6 +98,8 @@
       "command": "bash tools/release-all/check-workflows.sh",
       "result": "passed"
     },
-    "queueCommand": "Executed the documented paginated command successfully; it reported no unfinished release-label jobs."
-  }
+    "queueCommand": "Refreshed successfully with action_required included; exact output retained in queueInspection.output. A synthetic approval-required run with no visible jobs was reported in both status and conclusion forms."
+  },
+  "baseCommit": "7c9a057066e2777f664989382cd9256d8d7fe4ed",
+  "validatedWorkingTree": "Release selftests and actionlint ran on the working tree containing the code changes subsequently committed as 407c7be7ddcb7729ae0932e55a8c2de833454038. Queue inspection is refreshed separately under queueInspection."
 }

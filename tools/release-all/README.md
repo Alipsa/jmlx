@@ -42,6 +42,9 @@ are ignored for status-only recovery. Protect the journal against modification.
    bump. Record the new plugin's historical 8.1 regressions on an unpushed throwaway commit.
 2. Merge the reviewed release-version PR. Anchor an annotated immutable `jmlx-phase8.4-rc.N`
    tag at that SHA and work from a clean detached checkout. Never move the tag.
+   Cut the candidate only after PR #103's workflow-identity changes have merged, with those
+   changes included in the tagged commit: `bundle_smoke.py` runs from the candidate checkout.
+   An older tag cannot produce the workflow block now required by final-receipt verification.
 3. Run root checks, shared-build checks and `bash tools/release-all/selftest.sh`. Normal candidate
    smoke publishes only manifest-local entries and resolves reused entries solely from Central.
 4. Run `./releaseAll.sh --dry-run`, inspect the exact selected set, then set
@@ -64,9 +67,8 @@ are ignored for status-only recovery. Protect the journal against modification.
 8. Upload **both ZIP and preliminary JSON** as assets of a temporary draft GitHub Release on
    the candidate tag, after authorization for that external write. Dispatch
    `release-candidate.yml` from `main` with both asset IDs/digests, Release ID and tag/peeled SHA.
-   The transfer
-   job has draft-access permissions and never executes the bundle. The dedicated physical
-   minimum-host job has read-only repository access and checks tag object, HEAD, digests,
+   The transfer job has draft-access permissions and never executes the bundle. The dedicated
+   physical minimum-host job has read-only repository access and checks tag object, HEAD, digests,
    native OS floor and actual packaged kernels. Provision its `jmlx-release-minimum` runner
    label before attempting this gate; a VM or moving hosted image cannot establish the floor.
    Use the [dedicated-account setup procedure](../../req/phase8-4-minimum-host-setup.md);
@@ -74,6 +76,10 @@ are ignored for status-only recovery. Protect the journal against modification.
    Revalidate registration, saved environment, runner/tool versions and queued label-matching
    jobs before starting the worker. Offline registrations can expire after more than 14 days.
 9. Download minimum-host JSON/log evidence, then create the final receipt:
+
+   Also retain the actual run's **Set up job** log. Compare its `Current runner version` with
+   the pre-dispatch measurement; resolve any update and record the actual version before
+   accepting the report, as described in the dedicated-account procedure.
 
 ```sh
 python3 tools/release-all/final_receipt.py --root "$PWD" \

@@ -17,6 +17,7 @@ from pathlib import Path
 
 ALLOWED_ENVIRONMENT = ("HOME", "PATH", "TMPDIR", "USER")
 FIXED_ENVIRONMENT = {"LC_ALL": "C", "LANG": "C", "LANGUAGE": "C", "TZ": "UTC"}
+GIT_ENVIRONMENT = {"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull}
 
 
 def build_environment(caller, jdk):
@@ -27,6 +28,9 @@ def build_environment(caller, jdk):
 
 
 def extract_jdk_archive(archive, destination, expected_sha256):
+    if not hasattr(tarfile, "data_filter"):
+        raise SystemExit("--jdk-archive requires tarfile.data_filter: use Python 3.12+ "
+                         "or a patched Python 3.11.4+")
     checksum = hashlib.sha256()
     with archive.open("rb") as source:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
@@ -124,12 +128,14 @@ def main():
                              check=True, timeout=30)
     (workspace / "gradle-version.log").write_text(version.stdout + version.stderr)
     verify_gradle(version.stdout, report["pins"]["gradle"])
+    git_environment = dict(environment, **GIT_ENVIRONMENT)
     subprocess.run(["git", "clone", "--no-local", str(repo), str(workspace / "checkout")],
-                   check=True, timeout=120)
+                   env=git_environment, check=True, timeout=120)
     subprocess.run(["git", "-C", str(workspace / "checkout"), "checkout", "--detach",
-                    report["auditedSha"]], check=True, timeout=30)
+                    report["auditedSha"]], env=git_environment, check=True, timeout=30)
     subprocess.run(["git", "-C", str(workspace / "checkout"), "apply",
-                    str(evidence / "comparison-version-overrides.patch")], check=True, timeout=30)
+                    str(evidence / "comparison-version-overrides.patch")],
+                   env=git_environment, check=True, timeout=30)
     shutil.copyfile(evidence / "toolchains.init.gradle", workspace / "toolchains.init.gradle")
 
     def expand(value):

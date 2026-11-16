@@ -427,17 +427,21 @@
   },
   "retainedEvidence": {
     "directory": "req/plans/evidence/pure-java-audit-2026-11-16",
-    "representation": "Committed small inputs and logs; machine-specific path prefixes normalized. Large artifacts/JDK remain disposable local outputs. Hashes refer to these committed representations. comparison-toolchains.log is the preliminary installed-JDK probe; build.log is the historical successful extracted-JDK build; review-build.log records the fresh reproduction and daemon JVM. portable-build.log and portable-gradle-version.log record the controlled-environment reproduction with verified inputs/results; duplicate AUDIT_DAEMON lines cover root and buildSrc. allowlist-* records the subsequent allow-listed build with SHA-256-verified JDK archive extraction. The original build environment and current reproductionEnvironment are recorded separately.",
+    "representation": "Committed small inputs and logs; machine-specific path prefixes normalized. Large artifacts/JDK remain disposable local outputs. Hashes refer to these committed representations. comparison-toolchains.log is the preliminary installed-JDK probe; build.log is the historical successful extracted-JDK build; review-build.log records the fresh reproduction and daemon JVM. portable-build.log and portable-gradle-version.log record the controlled-environment reproduction with verified inputs/results; duplicate AUDIT_DAEMON lines cover root and buildSrc. allowlist-* records the subsequent allow-listed build with SHA-256-verified JDK archive extraction. The original build environment and current reproductionEnvironment are recorded separately. git-isolation-* and compatibility-* retain the subsequent isolated-Git reproduction and Python capability checks.",
     "sha256": {
       "allowlist-build.log": "4a528512a37e10fc8e971ecd25c83d14da6c5e8b086ffdf3d909208be2fca2ea",
       "allowlist-gradle-version.log": "f97deab1b18a6de37c38b90d0c2a6064ab1bd93cb6744582bf3433fa031757ef",
       "allowlist-jdk-provenance.json": "472975440612cd2bd512237c1110858a5752574cee938109649639b93f813294",
       "allowlist-selftest.log": "f0066de0cef85d350398ef5e88ec41aeae9fe262d0bb2143718af13251a8d7b1",
-      "build-command.json": "18c4c2143db601c781a98e5febe96999264cf3b415906ceb2d9f127d9ec7c86e",
+      "build-command.json": "c8daff9d142adde854388787bad10c434cfc8d2c9e14e7bd73fa681744a41a80",
       "build.log": "d218ad25ef7c309b618aeeeafabdc6d140dfc4c36a86c1c2006141f7d8a01149",
       "comparison-toolchains.log": "cb756f6c95404d505e5d5556df084d4feda3398928d6dcf3aa66aea89baecb3c",
       "comparison-version-overrides.patch": "ff3a494b3995706edcb25c1c8a9176668be9ae7a57190c376d74278689a295ff",
       "comparison.json": "99ed1f70cfa2e5251559b7aa6b15b2f85b0818eaf3055df06e9334e8ed41e811",
+      "compatibility-python39.log": "f059173b39df2e2e0f8b9c3a663e2cec1e0b6690d6ab926daffedf68391bb70c",
+      "compatibility-selftest.log": "f21d2359c2f431e9e024bb8ee42ae8ce001b041f85d4a95cc750aa66aee6064e",
+      "git-isolation-build.log": "4a528512a37e10fc8e971ecd25c83d14da6c5e8b086ffdf3d909208be2fca2ea",
+      "git-isolation-gradle-version.log": "f97deab1b18a6de37c38b90d0c2a6064ab1bd93cb6744582bf3433fa031757ef",
       "historical-release-verification.md": "e3f46326f595593c8e2c6f048e056a926715e6317da94f452f496c3ff5c089b5",
       "metadata.diff": "76391f84f0b82752426d92f0346aae58e41b49245215b9fe69012958841a2a65",
       "normal-toolchains.log": "6be75a52d45d881fafa7e29ed34e3a84f89247eee59f345618d0ee37ccc376ad",
@@ -448,14 +452,14 @@
       "record-daemon.init.gradle": "bf8ce13a0b7598c4c9c29521e5dbdd4328d03580b71253d439d016a7eb0ac1fc",
       "relevant-source-stat.txt": "43d56ba5c6756efbbe75048c532f7ab4fd5a0ec40c9dbad5efa0ed75f6ee4fa5",
       "relevant-source.patch": "cacd5eda51b794c9d1938c6730b164ae95243062858e4e0727b1eedd9dda67ec",
-      "reproduce.py": "5dc372e3be53c57874a23bc2bbae45ed8d5be88f7491387ccde957aaa1cb00a5",
+      "reproduce.py": "e178faf42cb21cd2f29bf02f3be3d1853d7ba5b66460379e58e9d6161b2c8379",
       "review-build.log": "dec6de555c90d6d536150e53ad87cfa1d3951a553572599423bdc4b65c5c7adf",
       "review-selftest.log": "b1c3dc7733db57e316e119041fee709dbac80605a72163301655fd4a5be03a2b",
       "selftest.log": "82e42288d4dc40ba4106f1cc15683338b204fe42073cd8a6a81d965e642d7624",
       "toolchains.init.gradle": "4340d9157275c31e796739db8bff89bd2a07d0f6cecc31246848c097875fa0fe",
       "tools/release-all/compare_publications.py": "a5b06cf05b7e1298ad70650ee067887b1be52f292bd3a52c5cb74c26f9a348a5",
       "tools/release-all/tests/test_compare_publications.py": "590433ae8f90befa827b20a5bc8e8a9121a8bdabca1b8f192c09def973515ef4",
-      "tools/release-all/tests/test_reproduce_audit.py": "c5150cb17dde16bb039672c0d1f1696a487fdd7dd6bab326411adb33aa7d2971"
+      "tools/release-all/tests/test_reproduce_audit.py": "edcb1a6ed14ce382b6eff4bf1f0c5e34911ac4c1887b0ff50033489cd7d11c7a"
     }
   },
   "validation": {
@@ -532,6 +536,30 @@
       },
       "evidenceBytecodeCache": "absent after test run",
       "gitDiffCheck": "passed"
+    },
+    "pythonAndGitReview": {
+      "date": "2026-11-16",
+      "releaseSelftests": {
+        "passed": 50,
+        "seconds": 77.781
+      },
+      "reproductionGuardTests": 9,
+      "legacyInterpreterCheck": {
+        "python": "3.9.6",
+        "tests": 9,
+        "passed": 7,
+        "skipped": 2,
+        "scope": "Targeted reproduction tests only; this interpreter is below the general tooling minimum. Archive tests skipped; missing-feature requirement check passed."
+      },
+      "freshReproduction": {
+        "tasksExecuted": 27,
+        "seconds": 40,
+        "gitEnvironment": "Allow-listed build environment plus GIT_CONFIG_NOSYSTEM=1 and GIT_CONFIG_GLOBAL=/dev/null",
+        "jdkArchiveSha256Verified": "0fffffac0fe6ebe7af583bdb15f8725e4873b874dd648cbf485e53fc2b4d9218",
+        "centralSha256Verified": 15,
+        "completeComparisonAutomaticallyVerified": true
+      },
+      "gitDiffCheck": "passed"
     }
   },
   "allEqual": false,
@@ -551,6 +579,14 @@
     },
     "JAVA_HOME": "selected comparison JDK",
     "PATH_prefix": "selected comparison JDK/bin",
-    "allOtherInheritedVariables": "discarded"
+    "allOtherInheritedVariables": "discarded",
+    "gitOverrides": {
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null"
+    }
+  },
+  "reproductionRequirements": {
+    "python": "General tooling: 3.11+. Archive extraction additionally requires tarfile.data_filter (Python 3.12+ or patched 3.11.4+); --jdk remains usable without that feature.",
+    "network": "Gradle does not inherit HTTP_PROXY, HTTPS_PROXY or NO_PROXY; dependency downloads require direct repository access."
   }
 }

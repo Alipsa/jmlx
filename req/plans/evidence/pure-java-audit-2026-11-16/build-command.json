@@ -115,6 +115,10 @@
     },
     "JAVA_HOME": "selected comparison JDK",
     "PATH_prefix": "selected comparison JDK/bin",
-    "allOtherInheritedVariables": "discarded"
+    "allOtherInheritedVariables": "discarded",
+    "gitOverrides": {
+      "GIT_CONFIG_NOSYSTEM": "1",
+      "GIT_CONFIG_GLOBAL": "/dev/null"
+    }
   }
 }

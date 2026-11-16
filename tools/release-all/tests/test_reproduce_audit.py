@@ -5,11 +5,14 @@ import hashlib
 import importlib.util
 import io
 import json
+import os
+import subprocess
 import sys
 import tarfile
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 RECIPE = (Path(__file__).resolve().parents[3]
           / "req/plans/evidence/pure-java-audit-2026-11-16/reproduce.py")
@@ -51,6 +54,13 @@ class ReproduceAuditTest(unittest.TestCase):
         self.assertEqual(report["reproductionEnvironment"]["fixed"], R.FIXED_ENVIRONMENT)
         self.assertEqual(set(report["build"]["environment"]), {"JAVA_HOME", "PATH_prefix"})
 
+    def test_archive_filter_requirement_is_reported_before_io(self):
+        with mock.patch.dict(tarfile.__dict__):
+            tarfile.__dict__.pop("data_filter", None)
+            with self.assertRaisesRegex(SystemExit, "--jdk-archive requires.*Python 3.12"):
+                R.extract_jdk_archive(Path("missing.tar.gz"), Path("unused"), "0" * 64)
+
+    @unittest.skipUnless(hasattr(tarfile, "data_filter"), "requires tarfile.data_filter backport")
     def test_jdk_archive_is_verified_before_extraction(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -67,6 +77,7 @@ class ReproduceAuditTest(unittest.TestCase):
                 R.extract_jdk_archive(archive, root / "rejected", "0" * 64)
             self.assertFalse((root / "rejected").exists())
 
+    @unittest.skipUnless(hasattr(tarfile, "data_filter"), "requires tarfile.data_filter backport")
     def test_archive_requires_one_jdk_and_rejects_path_traversal(self):
         for names, message in ((["other-file"], "exactly one bin/java"),
                                (["one/bin/java", "two/bin/java"], "exactly one bin/java"),
@@ -81,6 +92,24 @@ class ReproduceAuditTest(unittest.TestCase):
                 with self.assertRaisesRegex((ValueError, tarfile.FilterError), message):
                     R.extract_jdk_archive(archive, root / "extracted", wanted)
                 self.assertFalse((root / "outside-file").exists())
+
+    def test_git_ignores_caller_config_and_environment_injection(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            config = root / "user.gitconfig"
+            config.write_text("[core]\n\tautocrlf = true\n")
+            caller = dict(os.environ, GIT_CONFIG_GLOBAL=str(config), GIT_DIR="invalid-directory",
+                          GIT_CONFIG_COUNT="1", GIT_CONFIG_KEY_0="core.autocrlf",
+                          GIT_CONFIG_VALUE_0="true")
+            environment = dict(R.build_environment(caller, Path("/comparison-jdk")),
+                               **R.GIT_ENVIRONMENT)
+            result = subprocess.run(["git", "config", "--get", "core.autocrlf"],
+                                    cwd=root, env=environment, capture_output=True,
+                                    text=True, timeout=10)
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertEqual(result.stdout, "")
+            command = json.loads((RECIPE.parent / "build-command.json").read_text())
+            self.assertEqual(command["reproductionEnvironment"]["gitOverrides"], R.GIT_ENVIRONMENT)
 
     def test_gradle_version_is_checked(self):
         R.verify_gradle("banner\nGradle 9.9.0\nmore output\n", "9.9.0")

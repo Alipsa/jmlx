@@ -77,7 +77,10 @@ and Javadoc selections are in `build.log`.
 
 To reproduce on macOS ARM64, download the BellSoft archive above. The recipe verifies its
 recorded SHA-256 before extracting it into the workspace. Use a Gradle 9.9.0 executable and
-an unused workspace outside `build/`:
+an unused workspace outside `build/`. Here `python3` must provide `tarfile.data_filter`:
+use Python 3.12+ or a patched Python 3.11.4+. The general release-tooling minimum remains
+Python 3.11+; earlier 3.11 builds can use `--jdk` but cannot safely extract archives.
+Stock macOS Python 3.9.6 does not meet the tooling minimum and lacks this extraction feature.
 
 ```sh
 python3 req/plans/evidence/pure-java-audit-2026-11-16/reproduce.py \
@@ -108,7 +111,11 @@ and fixed values are recorded under `reproductionEnvironment` in `build-command.
 the audit JSON. The audit JSON's `build.environment` and `build-command.json`'s `environment` describe only the
 original run's recorded JAVA_HOME/PATH overrides; accompanying notes distinguish these scopes.
 The prior `portable-*` evidence used the earlier deny-list policy; the latest allow-list
-and archive-verification evidence is recorded below.
+and archive-verification evidence is recorded below. Git clone, checkout and patch steps use
+the same allow-list plus `GIT_CONFIG_NOSYSTEM=1` and `GIT_CONFIG_GLOBAL=/dev/null`, excluding
+caller `GIT_*` overrides and global/system config such as checkout filters or `core.autocrlf`.
+The build does not inherit `HTTP_PROXY`, `HTTPS_PROXY` or `NO_PROXY`, so cold dependency
+downloads require direct repository access.
 The additional init script records the daemon JVM in `build.log`. Two `AUDIT_DAEMON` lines
 are expected because the init script applies to the root build and `buildSrc`; both must
 match. This recipe reproduces this dated development audit; a final-candidate audit requires
@@ -191,6 +198,16 @@ that JDK into its workspace and executed all 27 publication tasks in 40 seconds.
 Central hash and complete result checks passed with the same nine raw JAR matches and five
 metadata differences. The `allowlist-*` logs and JDK provenance record retain this run;
 evidence digests were refreshed and `git diff --check` passed.
+
+The Python/Git compatibility correction passed all 50 release selftests in 77.781 seconds.
+Nine reproduction-guard tests now cover the missing-extraction-feature message and ignored
+caller Git config/environment. Targeted tests also ran under stock macOS Python 3.9.6:
+seven passed and the two archive tests skipped, without the former TypeError/AttributeError.
+This targeted compatibility check does not lower the general tooling minimum. A fresh
+archive-mode reproduction with isolated Git settings executed all 27 publication tasks in
+40 seconds and passed every toolchain, Central hash and complete-report check.
+`git-isolation-*` and `compatibility-*` retain these results. Evidence digests and
+`git diff --check` passed.
 
 The tuple still needs human review and minimum-host readiness before a candidate is frozen.
 Repeat this comparison at the final candidate SHA, and rerun it after dependency, wrapper,

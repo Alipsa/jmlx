@@ -65,6 +65,9 @@ release and later versions. The available physical Apple Silicon host runs macOS
 full OS version and successful Metal execution of the exact signed candidate. No candidate
 has been frozen or tested yet. Provision its dedicated non-privileged runner account without
 signing, release or SSH credentials before using the manual minimum-host workflow.
+The [runner setup procedure](phase8-4-minimum-host-setup.md) records the inspected M5 Max
+host and existing `ghrunner` service. That service also runs PR smoke jobs; the dedicated
+manual-only release account and `jmlx-release-minimum` registration remain pending.
 
 Bootstrap records `MACOS_SUPPORTED_MINIMUM="27.2"` independently of
 `MACOS_DEPLOYMENT_TARGET="26.2"`. Receipts and both minimum-host validators consume the

@@ -68,6 +68,8 @@ are ignored for status-only recovery. Protect the journal against modification.
    minimum-host job has read-only repository access and checks tag object, HEAD, digests,
    native OS floor and actual packaged kernels. Provision its `jmlx-release-minimum` runner
    label before attempting this gate; a VM or moving hosted image cannot establish the floor.
+   Use the [dedicated-account setup procedure](../../req/phase8-4-minimum-host-setup.md);
+   the existing `self-macos-xl` PR/Tier-B runner does not satisfy that isolation requirement.
 9. Download minimum-host JSON/log evidence, then create the final receipt:
 
 ```sh

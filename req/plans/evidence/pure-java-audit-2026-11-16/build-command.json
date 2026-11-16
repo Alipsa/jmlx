@@ -35,7 +35,23 @@
   ],
   "environment": {
     "JAVA_HOME": "$AUDIT/toolchain/jdk-21.0.12.1.jdk",
-    "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin"
+    "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "LANGUAGE": "C",
+    "TZ": "UTC",
+    "unset": [
+      "JAVA_TOOL_OPTIONS",
+      "JDK_JAVA_OPTIONS",
+      "_JAVA_OPTIONS",
+      "JAVA_OPTS",
+      "GRADLE_OPTS",
+      "GRADLE_RO_DEP_CACHE",
+      "CLASSPATH"
+    ],
+    "discardInheritedPrefixes": [
+      "LC_"
+    ]
   },
   "publicationCopies": [
     {

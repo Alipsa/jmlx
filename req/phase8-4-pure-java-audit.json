@@ -146,7 +146,23 @@
     ],
     "environment": {
       "JAVA_HOME": "$AUDIT/toolchain/jdk-21.0.12.1.jdk",
-      "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin"
+      "PATH_prefix": "$AUDIT/toolchain/jdk-21.0.12.1.jdk/bin",
+      "LC_ALL": "C",
+      "LANG": "C",
+      "LANGUAGE": "C",
+      "TZ": "UTC",
+      "unset": [
+        "JAVA_TOOL_OPTIONS",
+        "JDK_JAVA_OPTIONS",
+        "_JAVA_OPTIONS",
+        "JAVA_OPTS",
+        "GRADLE_OPTS",
+        "GRADLE_RO_DEP_CACHE",
+        "CLASSPATH"
+      ],
+      "discardInheritedPrefixes": [
+        "LC_"
+      ]
     },
     "publicationCopies": [
       {
@@ -224,7 +240,7 @@
     "otherBuildChanges": "Shared native, adapter, test, style and release tooling; relevant source patch retained. No additional pure-Java artifact content changes observed."
   },
   "normalization": {
-    "jars": "Sort names and fix DOS entry timestamps to 1980-01-01. Preserve uncompressed entry bytes, compression methods, permissions/attributes, extra fields, entry/archive comments. Compressed streams are regenerated. Compare original entry metadata directly as well, including flags and creator/extractor versions. Reject duplicate names; no content normalization.",
+    "jars": "Sort entry names; fix DOS entry timestamps to 1980-01-01; serialize as ZIP_STORED without deflation, so normalized hashes do not depend on zlib. Preserve content, attributes, extra fields and comments. Separately compare original compression methods and all recorded entry metadata (including flags and creator/extractor versions). Extra-field timestamps are compared verbatim. Reject duplicate names; no content normalization. Verdicts include metadata checks even when normalized hashes coincide.",
     "poms": "Exact byte comparison.",
     "moduleMetadata": "Validate original referenced JAR sizes and all recorded hashes, then replace only their size/checksum value tokens with canonical-JAR values. Preserve every other byte, including Gradle provenance, dependency values and formatting."
   },
@@ -255,8 +271,8 @@
         "candidate": "8c8846d4bed11a5bc4c36219f61b3345a753f6b646e3e438b0d9ef9c4cd3ab75"
       },
       "normalizedSha256": {
-        "central": "10a1a92f3637a6743bf095daa4ef85cbbf890283224019fa8991dfe9596377eb",
-        "candidate": "10a1a92f3637a6743bf095daa4ef85cbbf890283224019fa8991dfe9596377eb"
+        "central": "1dea4f0417f2873102a919f3295eba4c79f015cd9fff7e3d903f3d76b350cd0d",
+        "candidate": "1dea4f0417f2873102a919f3295eba4c79f015cd9fff7e3d903f3d76b350cd0d"
       },
       "equal": true,
       "changedEntries": []
@@ -267,8 +283,8 @@
         "candidate": "ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5"
       },
       "normalizedSha256": {
-        "central": "c0a9478e56a77b26b493a531ef216d9a06d59bfa1ba3a79f0d9e7f872673337e",
-        "candidate": "c0a9478e56a77b26b493a531ef216d9a06d59bfa1ba3a79f0d9e7f872673337e"
+        "central": "d7dbe296bd6a81a14dc680a3588dc51180d89cdef791d9b54ba04de9a6d8dfe6",
+        "candidate": "d7dbe296bd6a81a14dc680a3588dc51180d89cdef791d9b54ba04de9a6d8dfe6"
       },
       "equal": true,
       "changedEntries": []
@@ -279,8 +295,8 @@
         "candidate": "c4c6bd11cb552ceade3b30703b27c50bbf417eb3d7eb21a6663f94edb6d27565"
       },
       "normalizedSha256": {
-        "central": "3f75dd27fc2e1ec8b9fd0a6f81dcac82658374ba03b0f9a5171d85446ceb327c",
-        "candidate": "3f75dd27fc2e1ec8b9fd0a6f81dcac82658374ba03b0f9a5171d85446ceb327c"
+        "central": "8cd02ccdf2dad69fddfa8a11e9b8be31b9278e2200a1161d6a534182a07ba877",
+        "candidate": "8cd02ccdf2dad69fddfa8a11e9b8be31b9278e2200a1161d6a534182a07ba877"
       },
       "equal": true,
       "changedEntries": []
@@ -291,8 +307,8 @@
         "candidate": "456a9767afd41c262a1cc0c5d5cedc836c247a9adaf1a835f460ba7c0a0ffd12"
       },
       "normalizedSha256": {
-        "central": "5810accae81139dd645a81ff526b32f62dbf785581a8f887acdbd2b5c8654ed2",
-        "candidate": "ebfbc051bed129f54ee1eff69106033fab25c86079a84a1f051b207ca37f7266"
+        "central": "ff224d634710315ad4dfce289b2badd068fc8085ae927ce0811ac8df5da29a8f",
+        "candidate": "82525ec995b7a16226dbaf1e4963294db94fcb547d592784d26cc83737d7da9c"
       },
       "equal": false
     },
@@ -313,8 +329,8 @@
         "candidate": "0d570ba51590e8a26eb1cff929bb17d79c9511182817903977f96405e269488f"
       },
       "normalizedSha256": {
-        "central": "f40e89f3d563714d9f8b43c0588f11ff82ed8e279ec3db875c7c78044f720b70",
-        "candidate": "f40e89f3d563714d9f8b43c0588f11ff82ed8e279ec3db875c7c78044f720b70"
+        "central": "f6deafc88050123ee34ed97608249a7cd7603ef53420d9b8b18e6e345a2a67fa",
+        "candidate": "f6deafc88050123ee34ed97608249a7cd7603ef53420d9b8b18e6e345a2a67fa"
       },
       "equal": true,
       "changedEntries": []
@@ -325,8 +341,8 @@
         "candidate": "47d1de74c003c80d930aeb7906f5db81698108aea53a629d8c4fec020d608b79"
       },
       "normalizedSha256": {
-        "central": "6f5fb7ca4cee0fb3f5d24a5a1da9742a42555b416b3c3468cb3d82d535cb7e30",
-        "candidate": "6f5fb7ca4cee0fb3f5d24a5a1da9742a42555b416b3c3468cb3d82d535cb7e30"
+        "central": "6e4aa532fb095ce5f937358fc1437197031601ac42975cf25b5ed7d5ff6602cb",
+        "candidate": "6e4aa532fb095ce5f937358fc1437197031601ac42975cf25b5ed7d5ff6602cb"
       },
       "equal": true,
       "changedEntries": []
@@ -337,8 +353,8 @@
         "candidate": "3c660cd11ed54a5b047cdaf26a84ac9add0c51f25781fdb000336e4168546db0"
       },
       "normalizedSha256": {
-        "central": "33b20268333701b5e3fc9b1bf0314c10e614a37a721bf4df205e692e866804e7",
-        "candidate": "33b20268333701b5e3fc9b1bf0314c10e614a37a721bf4df205e692e866804e7"
+        "central": "87ee69c02b40da6d396bc269450eecc3e12b825c5fbee2eccaeddf619ee29812",
+        "candidate": "87ee69c02b40da6d396bc269450eecc3e12b825c5fbee2eccaeddf619ee29812"
       },
       "equal": true,
       "changedEntries": []
@@ -349,8 +365,8 @@
         "candidate": "cc5acdd1719638f573b5219e9da09c78309503e67e74868c58415ede122a8cd9"
       },
       "normalizedSha256": {
-        "central": "6b1dc5c9d4346876f8e732cc2446773e6ee9201aafff1df617d4b0685b0d4425",
-        "candidate": "9619aa08ed40d6649b719eac77f49da56a8fb4aa908c7349f05b2c6032f20425"
+        "central": "da24e96c752081d20a9ec8c879537b916c5fc9347ce922d6ed7ece223e63bcda",
+        "candidate": "ee1ae0fe60e4413d83af6d368ca0d06ad6255ee5cdc189abd28a8a48f3df4b93"
       },
       "equal": false
     },
@@ -371,8 +387,8 @@
         "candidate": "209e330e083e660c02546dfac4bcbdb63541cbd89a226cfe2c5b439e96d61028"
       },
       "normalizedSha256": {
-        "central": "7d26fd4c5f9846b6ecae6ffde05fd6fb795fffbb1b8db5b9437aa7ba6ceb8f20",
-        "candidate": "7d26fd4c5f9846b6ecae6ffde05fd6fb795fffbb1b8db5b9437aa7ba6ceb8f20"
+        "central": "60747f25fc0c7b9c9073fe0a5d1d9b2dfb58d1e12d04414ed3c5943080da2cda",
+        "candidate": "60747f25fc0c7b9c9073fe0a5d1d9b2dfb58d1e12d04414ed3c5943080da2cda"
       },
       "equal": true,
       "changedEntries": []
@@ -383,8 +399,8 @@
         "candidate": "6b931e3e7daee72b6947ff120efbb602f87901075ff09a637aa27d40442bae6c"
       },
       "normalizedSha256": {
-        "central": "8a4c5b7e12724b2e7b0645b37cbf6e2f85ab117297f9f799ab118f1a6c61444a",
-        "candidate": "8a4c5b7e12724b2e7b0645b37cbf6e2f85ab117297f9f799ab118f1a6c61444a"
+        "central": "c79a26de5049d5f143b498b1437cd983a8d05fb171bbf6085b4f6d5e2eb58374",
+        "candidate": "c79a26de5049d5f143b498b1437cd983a8d05fb171bbf6085b4f6d5e2eb58374"
       },
       "equal": true,
       "changedEntries": []
@@ -395,8 +411,8 @@
         "candidate": "c1d0c420ba23e3329fe74f51eb33f012820f8331a3f2222b883d8706f58b3c72"
       },
       "normalizedSha256": {
-        "central": "a4990648a9049eb51d08f2d8d0975d682c97dbe8ca7b6e96617c38dc73a4421d",
-        "candidate": "a4990648a9049eb51d08f2d8d0975d682c97dbe8ca7b6e96617c38dc73a4421d"
+        "central": "dff350b28ffc48e793b8c9476e26c0c5a846fd99cbb2987f11acf51974c64f8a",
+        "candidate": "dff350b28ffc48e793b8c9476e26c0c5a846fd99cbb2987f11acf51974c64f8a"
       },
       "equal": true,
       "changedEntries": []
@@ -407,8 +423,8 @@
         "candidate": "0a47c2e415c22c2787558f2e840c2fd6fdbbe0040ebdcdb449726516dc2e6b3f"
       },
       "normalizedSha256": {
-        "central": "039f9d42afdc30d469b5e29856a817ef4ca2f741f95cdb1d7a0591f9e09af1e4",
-        "candidate": "813bf56b80a7ecacd897f5193f890a92ff65ab04bc68fa31e7b135e61c0e294a"
+        "central": "264714b0a24f96dfb7703f8c2c284307204a5361b245c261367f8d2e5f88b34b",
+        "candidate": "02f703301403cab4cc2fd8b81ea141c66bbc9b5753f3f52fcbb3e2264b13dc2b"
       },
       "equal": false
     },
@@ -426,26 +442,31 @@
   },
   "retainedEvidence": {
     "directory": "req/plans/evidence/pure-java-audit-2026-11-16",
-    "representation": "Committed small inputs and logs; machine-specific path prefixes normalized. Large artifacts/JDK remain disposable local outputs. Hashes refer to these committed representations. comparison-toolchains.log is the preliminary installed-JDK probe; build.log is the historical successful extracted-JDK build; review-build.log records the fresh reproduction and daemon JVM.",
+    "representation": "Committed small inputs and logs; machine-specific path prefixes normalized. Large artifacts/JDK remain disposable local outputs. Hashes refer to these committed representations. comparison-toolchains.log is the preliminary installed-JDK probe; build.log is the historical successful extracted-JDK build; review-build.log records the fresh reproduction and daemon JVM. portable-build.log and portable-gradle-version.log record the controlled-environment reproduction with verified inputs/results; duplicate AUDIT_DAEMON lines cover root and buildSrc.",
     "sha256": {
-      "build-command.json": "940b28bacb3cbff83b8689be932f15b001748ec0bcf94e3a93d59bb4efb85c22",
+      "build-command.json": "d88568636c0efe32075f87c103368b47b0ce79aca79e31271af8c76f91733580",
       "build.log": "d218ad25ef7c309b618aeeeafabdc6d140dfc4c36a86c1c2006141f7d8a01149",
       "comparison-toolchains.log": "cb756f6c95404d505e5d5556df084d4feda3398928d6dcf3aa66aea89baecb3c",
       "comparison-version-overrides.patch": "ff3a494b3995706edcb25c1c8a9176668be9ae7a57190c376d74278689a295ff",
-      "comparison.json": "107e6deae6626f93b1ef8a24184f4e741a6dd284aa0b687fe19c4b8405e1430e",
+      "comparison.json": "99ed1f70cfa2e5251559b7aa6b15b2f85b0818eaf3055df06e9334e8ed41e811",
       "historical-release-verification.md": "e3f46326f595593c8e2c6f048e056a926715e6317da94f452f496c3ff5c089b5",
       "metadata.diff": "76391f84f0b82752426d92f0346aae58e41b49245215b9fe69012958841a2a65",
       "normal-toolchains.log": "6be75a52d45d881fafa7e29ed34e3a84f89247eee59f345618d0ee37ccc376ad",
+      "portable-build.log": "bbd5251619b7eeff8937aecf4963a44f9876e6429ecf005bf9721186a57b90de",
+      "portable-gradle-version.log": "b3d2e8dfdac579b3eadddd73abc48514d3d334dece9989343d1ddb6e81ffdc19",
+      "portable-selftest.log": "712d688fb9aca579555408e1facca7d8b0438c1bf0df30aa20734e1f87cf6d34",
       "publications.json": "f827ef57b8d003f68b842256b0a3deddcbff0003a37172d591f06baec14860a2",
-      "record-daemon.init.gradle": "96210667692943ef916969b2934bfc50f63fd74f998f9246d1aa21db899ed4dc",
+      "record-daemon.init.gradle": "bf8ce13a0b7598c4c9c29521e5dbdd4328d03580b71253d439d016a7eb0ac1fc",
       "relevant-source-stat.txt": "43d56ba5c6756efbbe75048c532f7ab4fd5a0ec40c9dbad5efa0ed75f6ee4fa5",
       "relevant-source.patch": "cacd5eda51b794c9d1938c6730b164ae95243062858e4e0727b1eedd9dda67ec",
-      "reproduce.py": "e010d7a259d37660525fd77af43d7bf3cb79f46e43058b7c443d18bb38cd8ddd",
+      "reproduce.py": "ebd721e6a19c9950427e270436ccce58739990fd8a73345f74e790037ef77ea8",
       "review-build.log": "dec6de555c90d6d536150e53ad87cfa1d3951a553572599423bdc4b65c5c7adf",
       "review-selftest.log": "b1c3dc7733db57e316e119041fee709dbac80605a72163301655fd4a5be03a2b",
       "selftest.log": "82e42288d4dc40ba4106f1cc15683338b204fe42073cd8a6a81d965e642d7624",
       "toolchains.init.gradle": "4340d9157275c31e796739db8bff89bd2a07d0f6cecc31246848c097875fa0fe",
-      "tools/release-all/compare_publications.py": "11a21ddbc401531622573745d672214924955779057fc16f8ee7b8bb4c8e22d7"
+      "tools/release-all/compare_publications.py": "a5b06cf05b7e1298ad70650ee067887b1be52f292bd3a52c5cb74c26f9a348a5",
+      "tools/release-all/tests/test_compare_publications.py": "590433ae8f90befa827b20a5bc8e8a9121a8bdabca1b8f192c09def973515ef4",
+      "tools/release-all/tests/test_reproduce_audit.py": "249df1b89762bdd1174cc89412942c7119933a1cd40510255fcad2805617b696"
     }
   },
   "validation": {
@@ -475,7 +496,29 @@
           "home": "$AUDIT/toolchain/jdk-21.0.12.1.jdk",
           "vendor": "BellSoft",
           "runtimeVersion": "21.0.12.1+1-LTS"
-        }
+        },
+        "comparisonScope": "Historical manual same-host check with deflated canonical bytes. The artifacts block has since been reprocessed with ZIP_STORED; automated reproduction is recorded in portableReview."
+      },
+      "gitDiffCheck": "passed"
+    },
+    "portableReview": {
+      "date": "2026-11-16",
+      "releaseSelftests": {
+        "passed": 46,
+        "seconds": 75.423
+      },
+      "comparisonTests": 17,
+      "reproductionGuardTests": 5,
+      "freshReproduction": {
+        "tasksExecuted": 27,
+        "seconds": 35,
+        "gradleVersionVerified": "9.9.0",
+        "allDaemonCompilerAndJavadocIdentitiesVerified": true,
+        "centralSha256Verified": 15,
+        "completeComparisonAutomaticallyVerified": true,
+        "rawIdenticalJars": 9,
+        "differentMetadataFiles": 5,
+        "normalization": "ZIP_STORED; original compression method compared separately"
       },
       "gitDiffCheck": "passed"
     }

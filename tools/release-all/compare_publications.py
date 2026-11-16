@@ -16,7 +16,7 @@ def digest(data, algorithm="sha256"):
 
 
 def archive_content(data):
-    """Sort entries and fix timestamps; retain compression, attributes, extras and comments."""
+    """Use sorted, timestamp-fixed stored bytes; compare original ZIP metadata separately."""
     with zipfile.ZipFile(io.BytesIO(data)) as source:
         names = source.namelist()
         if len(names) != len(set(names)):
@@ -33,6 +33,7 @@ def archive_content(data):
                                  info.internal_attr, info.extra, info.comment,
                                  info.create_system, info.create_version, info.extract_version,
                                  info.flag_bits, info.reserved, info.volume)
+                info.compress_type = zipfile.ZIP_STORED
                 target.writestr(info, content)
     return output.getvalue(), entries
 
@@ -100,6 +101,11 @@ def compare(central, candidate, publications=None):
     if not names or names != files(candidate):
         raise ValueError("publication file sets differ or are empty")
     if publications is not None:
+        if (not isinstance(publications, dict) or not publications
+                or any(not isinstance(module, str) or not module
+                       or not isinstance(version, str) or not version
+                       for module, version in publications.items())):
+            raise ValueError("publications must be a nonempty object mapping module names to version strings")
         expected = {f"{module}-{version}{suffix}"
                     for module, version in publications.items()
                     for suffix in (".jar", "-sources.jar", "-javadoc.jar", ".pom", ".module")}

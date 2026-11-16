@@ -10,6 +10,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import compare_publications as C
@@ -130,6 +131,37 @@ class ComparePublicationsTest(unittest.TestCase):
                                 setattr(info, field, value)
                         archive.writestr(info, b"class bytes")
                 self.assertFalse(C.compare(self.central, self.candidate)["allEqual"])
+
+    def test_normalization_never_deflates_even_for_deflated_inputs(self):
+        for directory, level in ((self.central, 1), (self.candidate, 9)):
+            with zipfile.ZipFile(directory / "fixture.jar", "w",
+                                 compression=zipfile.ZIP_DEFLATED, compresslevel=level) as archive:
+                archive.writestr("Example.class", b"repeated bytes" * 100)
+            self.write_module(directory)
+        with mock.patch.object(zipfile.zlib, "compressobj",
+                               side_effect=AssertionError("normalization must not deflate")):
+            normalized, entries = C.archive_content((self.central / "fixture.jar").read_bytes())
+            self.assertEqual(entries["Example.class"][1], zipfile.ZIP_DEFLATED)
+            with zipfile.ZipFile(io.BytesIO(normalized)) as archive:
+                self.assertEqual(archive.getinfo("Example.class").compress_type, zipfile.ZIP_STORED)
+            result = C.compare(self.central, self.candidate)
+            self.assertTrue(result["allEqual"])
+            hashes = result["artifacts"]["fixture.jar"]["rawSha256"]
+            self.assertNotEqual(hashes["central"], hashes["candidate"])
+
+    def test_publications_shape_is_validated(self):
+        for value in ([], ["fixture"], {}, {"fixture": 1}, {"": "1.0"}):
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "publications must be"):
+                C.compare(self.central, self.candidate, value)
+        path = Path(self.temp.name) / "publications.json"
+        path.write_text('[]')
+        result = subprocess.run([sys.executable, str(Path(C.__file__)),
+                                 "--central", str(self.central), "--candidate", str(self.candidate),
+                                 "--output", str(Path(self.temp.name) / "output.json"),
+                                 "--publications", str(path)], capture_output=True, text=True, timeout=10)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("publications must be", result.stderr)
+        self.assertNotIn("AttributeError", result.stderr)
 
     def test_duplicate_archive_entries_are_rejected(self):
         with warnings.catch_warnings():

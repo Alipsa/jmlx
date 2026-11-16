@@ -46,6 +46,8 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   [MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902); awaiting an upstream response
   and review of any applicable grant or compliance decision.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
+  [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
+  organization Usage Center values and the exact signed bundle remain outstanding.
 - [x] Integrate released upstream plugin 2.6.0 and verify the clean historical 8.1 fixture.
   [Compatibility evidence](phase8-4-plugin-2.6.0-compatibility.md) records the unpushed scratch
   commit, expected published-tuple refusal, eligible-three dry-run and HTTPS upload fixture.
@@ -99,7 +101,7 @@ exclusions, evidence and unresolved provenance; review its findings before closi
 Logs/receipts belong under ignored `build/releaseAll/` or outside the checkout.
 Never put credentials in the evidence or publish the temporary candidate draft Release.
 
-## Portal limits research (2026-11-14)
+## Portal limits research (2026-11-16)
 
 The official [upload documentation](https://central.sonatype.org/publish/publish-portal-upload/)
 states a 1 GB archive limit. The bundle checker conservatively caps compressed ZIP bytes at
@@ -110,3 +112,5 @@ Current [publishing limits](https://central.sonatype.org/publish/maven-central-p
 and [Usage Center](https://central.sonatype.org/publish/publish-portal-usage-center/)
 require account-specific capacity verification. The older ten-deployments statement is not
 used as proof of present entitlement or rejected-upload accounting; that gate remains open.
+The [capacity procedure](phase8-4-portal-capacity.md) separates upload bytes from monthly
+published-file usage and records the account information needed to close this gate.

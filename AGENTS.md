@@ -291,8 +291,9 @@ driven by `./releaseAll.sh`: the root `combinedRelease.modules` list names all n
 modules, the plan derives the candidate set (SNAPSHOT modules are excluded and reported), the
 script gates the plan's selected set against the expected release tuple, and `releaseAll` runs
 the selected modules' checks, signs, stages and bundles — including the `.module` each POM
-advertises — and submits one Portal deployment (Central allows 10 deployments per month, and
-the combined flow spends one slot for the whole tuple). The auxiliary modes are
+advertises — and submits one Portal deployment for the tuple. Current monthly size, file-count
+and release-count limits are organization-specific; verify the Usage Center and the
+[capacity procedure](req/phase8-4-portal-capacity.md) before publication. The auxiliary modes are
 `./releaseAll.sh --dry-run` (plan + report, warning-only signing), `--bundle-only` (through
 bundling, no upload) and `--resume <deployment-id>` (polls an already-submitted deployment,
 journaled in `build/releaseAll/deployment.json`, to `PUBLISHED` without re-uploading). A

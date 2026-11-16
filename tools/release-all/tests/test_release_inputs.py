@@ -80,14 +80,25 @@ class ReleaseInputsTest(unittest.TestCase):
         root = Path(self.temp.name)
         bootstrap = root / "bootstrap.sh"
         bootstrap.write_text('MLX_METAL_VERSION="0.32.4"\nMLX_C_COMMIT="' + 'a'*40 +
-                             '"\nMACOS_DEPLOYMENT_TARGET="26.2"\n')
+                             '"\nMACOS_DEPLOYMENT_TARGET="26.2"\nMACOS_SUPPORTED_MINIMUM="27.2"\n')
         (root / "native-pin.properties").write_text('mlxMetalVersion=0.32.4\nmlxcCommit=' + 'a'*40 + '\n')
         header = struct.pack("<8I", 0xFEEDFACF, 0x100000C, 0, 6, 1, 24, 0, 0)
         command = struct.pack("<6I", 0x32, 24, 1, 0x1A0200, 0x1B0200, 0)
         for name in R.NATIVE_FILES[:3]:
             (root / name).write_bytes(header + command)
         (root / "mlx.metallib").write_bytes(b'fixture')
-        self.assertEqual(R.native_report(root, bootstrap, ["/Users/release"])["minimum"], (26,2,0))
+        report = R.native_report(root, bootstrap, ["/Users/release"])
+        self.assertEqual(report["supportedMinimum"], (27, 2, 0))
+        self.assertEqual(report["deploymentTarget"], (26, 2, 0))
+        original = bootstrap.read_text()
+        bootstrap.write_text(original.replace('MACOS_SUPPORTED_MINIMUM="27.2"', ''))
+        with self.assertRaisesRegex(ValueError, "supported minimum missing"):
+            R.native_report(root, bootstrap, [])
+        bootstrap.write_text(original.replace('MACOS_SUPPORTED_MINIMUM="27.2"',
+                                             'MACOS_SUPPORTED_MINIMUM="26.1"'))
+        with self.assertRaisesRegex(ValueError, "deployment target exceeds"):
+            R.native_report(root, bootstrap, [])
+        bootstrap.write_text(original)
         upstream = header + command + R.UPSTREAM_PATH + b'\0'
         (root / "libmlx.dylib").write_bytes(upstream)
         with patch.object(R, "UPSTREAM_MLX_HASH", hashlib.sha256(upstream).hexdigest()):

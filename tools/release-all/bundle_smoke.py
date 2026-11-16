@@ -12,7 +12,7 @@ from pathlib import Path
 if sys.version_info < (3, 11):
     raise SystemExit("Python 3.11+ is required for bundle smoke")
 
-from release_inputs import check_bundle, read_runtime, sha256
+from release_inputs import check_bundle, read_runtime, sha256, verify_smoke_environment
 
 
 def output(*args):
@@ -46,18 +46,12 @@ def main():
         raise ValueError("report is immutable; use a new output path")
     record = check_bundle(args.bundle, args.preliminary, args.preliminary_sha256,
                           root / "tools/release-smoke/released-8.4.json", root)
+    native = record.get("native")
+    if not isinstance(native, dict) or "supportedMinimum" not in native:
+        raise ValueError("preliminary record lacks native.supportedMinimum; regenerate the record")
     env = environment()
-    if args.kind == "minimum-host":
-        if (env["system"] != "Darwin" or env["architecture"] != "arm64" or env["virtualized"]
-                or list(map(int, env["osVersion"].split(".")[:2])) != record["native"]["minimum"][:2]):
-            raise ValueError("physical minimum-host OS/architecture requirements not met")
-        if not os.environ.get("GITHUB_RUN_ID"):
-            raise ValueError("minimum-host workflow run identity missing")
-    elif args.kind == "linux-pure":
-        if env["system"] != "Linux" or env["architecture"] != "aarch64" or not env["containerImage"]:
-            raise ValueError("local Ubuntu ARM64 container identity required")
-    elif env["system"] != "Darwin" or env["architecture"] != "arm64":
-        raise ValueError("macOS report requested on another OS")
+    verify_smoke_environment(args.kind, env, native["supportedMinimum"],
+                             os.environ.get("GITHUB_RUN_ID"))
     profile = "pure-java" if args.kind.endswith("pure") else "all"
     command = ["bash", str(root / "tools/release-smoke/run.sh"), "candidate", "--profile", profile,
                "--bundle", str(args.bundle.resolve()), "--bundle-record", str(args.preliminary.resolve()),

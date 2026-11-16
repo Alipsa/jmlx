@@ -11,7 +11,8 @@ Baseline: `9bc85042df50ed3f979cb8d3e7c8767917c71483` (published 8.1 recovery).
 Implementation starts from PR #94 merge `679d525b43d33eba552af3e6c4f46d80ee6ec673`.
 The [post-plugin artifact audit](phase8-4-pure-java-audit.md) at PR #97 merge
 `98190d44fd725b484e98e5e8b7b41efa925e0b23` supports the committed all-new manifest.
-Tuple review and minimum-host readiness remain open; repeat the audit at the final candidate SHA.
+Tuple review and exact-candidate minimum-host verification remain open; repeat the audit at
+the final candidate SHA.
 
 | Module | Proposed decision | Evidence / remaining work |
 | --- | --- | --- |
@@ -33,7 +34,9 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 
 - [x] Hosted PR #94 [CI run 43628489480](https://github.com/Alipsa/jmlx/actions/runs/43628489480)
   passed both Java and native jobs, including required-native-suite execution and artifact smoke.
-- [ ] Secure physical minimum-host access or review a raised minimum; owner selection pending.
+- [x] Owner approved raising the supported native minimum to macOS 27.2.x (2026-11-16).
+  The local physical Apple Silicon Mac runs 27.2.1; exact-candidate execution and the
+  dedicated credential-free runner setup remain required before release acceptance.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
 - [x] Integrate released upstream plugin 2.6.0 and verify the clean historical 8.1 fixture.
@@ -46,6 +49,33 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [ ] Review concrete verified-bundle receipt, then explicitly authorize Central publication.
 - [ ] Verify all nine exact Central coordinates and selected Java 21 subset on both platforms.
 - [ ] Merge development-bump PR only after Central verification.
+
+## Supported minimum decision (2026-11-16)
+
+The owner approved macOS 27.2 as the native support floor, including every 27.2.x patch
+release and later versions. The available physical Apple Silicon host runs macOS 27.2.1
+(build 26B131). The release job must still record chip/GPU identity, virtualization status,
+full OS version and successful Metal execution of the exact signed candidate. No candidate
+has been frozen or tested yet. Provision its dedicated non-privileged runner account without
+signing, release or SSH credentials before using the manual minimum-host workflow.
+
+Bootstrap records `MACOS_SUPPORTED_MINIMUM="27.2"` independently of
+`MACOS_DEPLOYMENT_TARGET="26.2"`. Receipts and both minimum-host validators consume the
+`supportedMinimum`; per-dylib checks still enforce the binary target. The latter remains at
+the upstream wheel floor so hosted `macos-26` PR checks can continue. Those checks are
+additional coverage and do not establish supported-minimum acceptance. Both macOS report
+kinds must run at or above `supportedMinimum`; the physical minimum-host report must match
+its major/minor exactly. Reports explicitly separate `supportedMinimum` from `deploymentTarget`.
+
+For this combined release, produce `macos-full` and `macos-pure` on the same supported
+macOS 27.2+ host. Applying the native floor to `macos-pure` is an intentional release-evidence
+policy; it does not add a native dependency or macOS minimum to the pure-Java modules'
+Java 21 headless contract. Linux pure-Java acceptance remains independent of that floor.
+
+Runner availability checked 2026-11-16: GitHub's
+[`xcode-27` ARM64 image](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md)
+lists macOS 27.0.1, so it does not provide 27.2.x acceptance. Hosted image labels may move;
+the release workflow independently verifies the actual OS major/minor from the receipt.
 
 ## Local native rebuild
 

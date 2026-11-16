@@ -32,7 +32,13 @@ MLX_METAL_WHEEL_SHA256="514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345a
 MLX_C_REPO="https://github.com/ml-explore/mlx-c.git"
 MLX_C_COMMIT="a26f2d584a14ec619ae8db9a09be03becd47598a"
 
-# The wheel's dylibs require 26.2. Do not inherit the release machine's OS version.
+# Supported native floor: all macOS 27.2 patch releases and later. Release acceptance
+# must execute the packaged candidate on physical 27.2.x hardware.
+# Machine-read by release verification; keep this top-level, quoted X.Y assignment.
+# Bootstrap itself uses only the independent deployment target below.
+MACOS_SUPPORTED_MINIMUM="27.2"
+# Keep the binary target at the wheel's 26.2 floor for hosted CI compatibility.
+# This build setting does not extend the supported OS range.
 MACOS_DEPLOYMENT_TARGET="26.2"
 
 JEXTRACT_PAGE="https://jdk.java.net/jextract/"

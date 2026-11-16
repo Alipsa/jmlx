@@ -120,6 +120,15 @@ URL-bound cache and verified all 57 URL/digest pairs plus three rebuilt JARs. Fo
 evidence records this warm-cache check separately from the prior cold run. Both legal findings
 remain open and `--require-clear` still exits 1.
 
+The [license resolution investigation](phase8-4-native-license-resolution.md) follows
+PR #100's merge on 2026-11-16. It retains Juffa's explicitly BSD-licensed forum samples,
+records their differences from the shipped implementations, reviews the original Cephes
+correspondence and prepares an unsent provenance request. It does not establish an additional
+grant or close either legal finding. Validation confirms the comparison inputs and retained
+file hashes and reproduces the unchanged audit result (57 URL/digest pairs, releaseReady false,
+expected exit 1). This follow-up changes only documentation and research evidence; the 74-test
+and native Gradle results above remain evidence for PR #100's implementation, not a new run.
+
 ## Review corrections (2026-11-15)
 
 The minimum-host workflow now creates its Gradle home through `GITHUB_ENV` at step scope;

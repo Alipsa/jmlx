@@ -1,0 +1,138 @@
+{
+  "schema": 1,
+  "date": "2026-11-16",
+  "baselineSha": "ee807c99e89f06f63ef326e2bbb976b7cb247989",
+  "status": "owner-legal-review-required",
+  "releaseGateClosed": false,
+  "sources": [
+    {
+      "id": "bsd-forum-erf",
+      "url": "https://forums.developer.nvidia.com/t/40977/1",
+      "apiUrl": "https://forums.developer.nvidia.com/t/40977.json",
+      "postId": 190213,
+      "postVersion": 2,
+      "updatedAt": "2021-11-12T23:16:50.729Z",
+      "projection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded",
+      "sha256": "cf24268b5b339f51c4e271223354fcf6906369f3bec318d0f19e841187cceded",
+      "retainedPath": "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt",
+      "disposition": "BSD-2-Clause grant in this sample; not established as applicable to the different shipped function"
+    },
+    {
+      "id": "bsd-forum-erfinv",
+      "url": "https://forums.developer.nvidia.com/t/61961/1",
+      "apiUrl": "https://forums.developer.nvidia.com/t/61961.json",
+      "postId": 300099,
+      "postVersion": 1,
+      "updatedAt": "2020-05-06T17:35:53.152Z",
+      "projection": "longest code element in post_stream.posts[0].cooked, HTML-decoded, UTF-8 encoded",
+      "sha256": "d477d7ecfc31535ae74560c87d04713b749ea2750654845233f368f4ab81cbe6",
+      "retainedPath": "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt",
+      "disposition": "BSD-2-Clause grant in this sample; not established as applicable to the different shipped function"
+    },
+    {
+      "id": "cephes-email",
+      "url": "https://lists.debian.org/debian-legal/2004/12/msg00295.html",
+      "projection": "complete HTML response bytes at review time",
+      "sha256": "3a9f8b9032e320544df870e7706b7fc69184c1058c187aaddd74dc0302a071d7",
+      "retainedPath": null,
+      "note": "Live page may change; hash identifies the reviewed response, not an immutable upstream URL. Full HTML is not committed; retain citations rather than a new redistribution of correspondence or site content."
+    },
+    {
+      "id": "cephes-followup",
+      "url": "https://lists.debian.org/debian-legal/2004/12/msg00297.html",
+      "projection": "complete HTML response bytes at review time",
+      "sha256": "5339e44536e481f05e7717527625f43464f9b1600f07a5f13e5d2aed6843f9cb",
+      "retainedPath": null,
+      "note": "Live page may change; hash identifies the reviewed response, not an immutable upstream URL. Full HTML is not committed; retain citations rather than a new redistribution of correspondence or site content."
+    },
+    {
+      "id": "cc-legalcode",
+      "url": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.en",
+      "projection": "complete HTML response bytes at review time",
+      "sha256": "47c0a954c88d793bdefe92fb007ae3c038fb3807f1a27083433d01aa7542c0d8",
+      "retainedPath": null,
+      "note": "Live page may change; hash identifies the reviewed response, not an immutable upstream URL. Full HTML is not committed; retain citations rather than a new redistribution of correspondence or site content."
+    },
+    {
+      "id": "cc-faq",
+      "url": "https://creativecommons.org/faq/",
+      "projection": "complete HTML response bytes at review time",
+      "sha256": "d4ffb015ad13ce12eb060979abf835caa5c2ce2ef5d928e6af1885845db99c02",
+      "retainedPath": null,
+      "note": "Live page may change; hash identifies the reviewed response, not an immutable upstream URL. Full HTML is not committed; retain citations rather than a new redistribution of correspondence or site content."
+    },
+    {
+      "id": "erf-answer-comments",
+      "url": "https://api.stackexchange.com/2.3/answers/35148199/comments?site=stackoverflow&filter=withbody&pagesize=100",
+      "projection": "ordered records containing comment_id, creation_date, body, owner.user_id",
+      "sha256": "6e71966d58d42b16ab61817b37ea595fe03e2acfb33f66129842af459787b45b",
+      "count": 16,
+      "hasMore": false,
+      "licenseKeywordMatch": false,
+      "retainedPath": null,
+      "disposition": "No licensing keyword matched in these fetched comments; this is a bounded observation, not proof that no grant exists elsewhere."
+    },
+    {
+      "id": "erfinv-answer-comments",
+      "url": "https://api.stackexchange.com/2.3/answers/49743348/comments?site=stackoverflow&filter=withbody&pagesize=100",
+      "projection": "ordered records containing comment_id, creation_date, body, owner.user_id",
+      "sha256": "a3d35031fe28152f103a3cfc43c51e95220e32a3500f1bbd90f269fc723dbbdc",
+      "count": 6,
+      "hasMore": false,
+      "licenseKeywordMatch": false,
+      "retainedPath": null,
+      "disposition": "No licensing keyword matched in these fetched comments; this is a bounded observation, not proof that no grant exists elsewhere."
+    }
+  ],
+  "codeComparison": "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json",
+  "codeComparisonSha256": "b6497c840640ed9069b50e23f6e464b1a434f737fa623cb96686f975fa31d7dd",
+  "unresolvedFindingIds": [
+    "NATIVE-LICENSE-1",
+    "NATIVE-LICENSE-2"
+  ],
+  "nativePinsAndPayloadChanged": false,
+  "thirdPartyContactMade": false,
+  "validation": {
+    "lexicalComparisons": "five expected true/false results confirmed",
+    "sourceScope": "Pinned MLX files hash-match the committed audit; source comments fetched completely for both specific Stack Overflow answers. Forum code samples retain their explicit BSD text.",
+    "auditExitCode": 1,
+    "auditResultEqualsFollowupEvidence": true,
+    "auditEvidencePath": "req/plans/evidence/native-license-audit-2026-11-16/followup-source-verification.json",
+    "auditEvidenceSha256": "e6f34e6d83d1e387956728cf14eda4f6fe46fd1e9d8f9bfc6eb6fd759f37e1c9",
+    "releaseReady": false,
+    "sourceUrlDigestPairs": 57,
+    "sourceChecks": "All MLX comparison input file hashes and both Stack Overflow body hashes match the committed audit.",
+    "nativeAndArtifactHashesMatchMergedAudit": true
+  },
+  "upstreamHistory": {
+    "source": "https://api.github.com/repos/ml-explore/mlx/commits?path=mlx/backend/metal/kernels/erf.h&per_page=100&sha=36969c094354086e15d2a327a9c50feb20b9cf11",
+    "commits": [
+      {
+        "sha": "634b148dd4203f80b8cc8db3e33452a91785fad8",
+        "subject": "Optimize erf function with expm1f in Metal backend (#3025)"
+      },
+      {
+        "sha": "226748b3e7f280e204c1af61b031588853e4ad88",
+        "subject": "JIT compile option for binary minimization (#1091)"
+      },
+      {
+        "sha": "46a39e5b1ff92d93833d9710ef64db207ce274ea",
+        "subject": "copyright + ack"
+      },
+      {
+        "sha": "d1f86272a27b5a0729378ac75bb03727c7c0e553",
+        "subject": "angelos's commit files"
+      }
+    ],
+    "latestPullRequest": "https://github.com/ml-explore/mlx/pull/3025",
+    "latestPullRequestCommentsChecked": "https://api.github.com/repos/ml-explore/mlx/issues/3025/comments",
+    "latestPullRequestCommentCountAtReview": 0,
+    "disposition": "The latest PR describes a numerical substitution, not a grant for the other functions; public file history alone does not establish a separate permission record."
+  },
+  "retainedFiles": {
+    "req/plans/evidence/native-license-resolution-2026-11-16/code-comparison.json": "b6497c840640ed9069b50e23f6e464b1a434f737fa623cb96686f975fa31d7dd",
+    "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erf-bsd-sample.txt": "cf24268b5b339f51c4e271223354fcf6906369f3bec318d0f19e841187cceded",
+    "req/plans/evidence/native-license-resolution-2026-11-16/juffa-erfinv-bsd-sample.txt": "d477d7ecfc31535ae74560c87d04713b749ea2750654845233f368f4ab81cbe6",
+    "req/plans/evidence/native-license-resolution-2026-11-16/upstream-request-draft.md": "cf27edbab32784ece7938ed9fb5a6e29ec39b756334d0677b004a40ad8ae32a6"
+  }
+}

@@ -160,3 +160,17 @@ both macOS report kinds below, at and above the supported floor. Native module `
 `verifyNativeReleasePayload` passed (11 tasks, 2 executed). Shell syntax and `git diff --check`
 pass. These results supersede the earlier 51-test validation for the current implementation;
 physical exact-candidate acceptance remains pending.
+
+
+## Release-host policy clarification (2026-11-16)
+
+The combined-release checklist explicitly schedules both macOS acceptance profiles on the
+same supported 27.2+ host. This evidence policy does not change the pure-Java modules' Java
+21 headless contract or impose the native OS floor on Linux pure-Java acceptance.
+
+Bundle smoke now rejects preliminary records without `native.supportedMinimum` with an
+explicit regeneration message before probing the environment or invoking the consumer.
+The regression covers legacy `minimum` records as well as missing or malformed native objects.
+
+All 57 release selftests passed locally in 65.564 seconds, including all five producer tests
+and the real Gradle upload/routing fixtures. `git diff --check` passed.

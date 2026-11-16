@@ -46,8 +46,11 @@ def main():
         raise ValueError("report is immutable; use a new output path")
     record = check_bundle(args.bundle, args.preliminary, args.preliminary_sha256,
                           root / "tools/release-smoke/released-8.4.json", root)
+    native = record.get("native")
+    if not isinstance(native, dict) or "supportedMinimum" not in native:
+        raise ValueError("preliminary record lacks native.supportedMinimum; regenerate the record")
     env = environment()
-    verify_smoke_environment(args.kind, env, record["native"]["supportedMinimum"],
+    verify_smoke_environment(args.kind, env, native["supportedMinimum"],
                              os.environ.get("GITHUB_RUN_ID"))
     profile = "pure-java" if args.kind.endswith("pure") else "all"
     command = ["bash", str(root / "tools/release-smoke/run.sh"), "candidate", "--profile", profile,

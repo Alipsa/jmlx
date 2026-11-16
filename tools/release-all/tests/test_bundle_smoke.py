@@ -72,6 +72,26 @@ class BundleSmokeTest(unittest.TestCase):
                     self.assertFalse(output.exists())
                     self.assertFalse(output.with_suffix(".log").exists())
 
+    def test_main_explains_that_legacy_preliminary_records_must_be_regenerated(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            output = root / "report.json"
+            argv = ["bundle_smoke.py", "--root", temp, "--bundle", str(root / "bundle.zip"),
+                    "--preliminary", str(root / "preliminary.json"),
+                    "--preliminary-sha256", "a" * 64, "--kind", "macos-full",
+                    "--output", str(output)]
+            for record in ({}, {"native": None}, {"native": []},
+                           {"native": {"minimum": [26, 2, 0]}}):
+                with self.subTest(record=record), patch.object(sys, "argv", argv), \
+                        patch.object(B, "check_bundle", return_value=record), \
+                        patch.object(B, "environment") as environment, \
+                        patch.object(B.subprocess, "run") as consumer:
+                    with self.assertRaisesRegex(ValueError, "native.supportedMinimum; regenerate"):
+                        B.main()
+                    environment.assert_not_called()
+                    consumer.assert_not_called()
+                    self.assertFalse(output.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

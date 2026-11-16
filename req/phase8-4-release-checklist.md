@@ -67,6 +67,11 @@ additional coverage and do not establish supported-minimum acceptance. Both macO
 kinds must run at or above `supportedMinimum`; the physical minimum-host report must match
 its major/minor exactly. Reports explicitly separate `supportedMinimum` from `deploymentTarget`.
 
+For this combined release, produce `macos-full` and `macos-pure` on the same supported
+macOS 27.2+ host. Applying the native floor to `macos-pure` is an intentional release-evidence
+policy; it does not add a native dependency or macOS minimum to the pure-Java modules'
+Java 21 headless contract. Linux pure-Java acceptance remains independent of that floor.
+
 Runner availability checked 2026-11-16: GitHub's
 [`xcode-27` ARM64 image](https://github.com/actions/runner-images/blob/main/images/macos/xcode-27-arm64-Readme.md)
 lists macOS 27.0.1, so it does not provide 27.2.x acceptance. Hosted image labels may move;

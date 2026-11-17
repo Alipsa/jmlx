@@ -1,7 +1,7 @@
 # jmlx LangChain4j adapter
 
-Java 25, LangChain4j 1.23.0, macOS on Apple Silicon. Development coordinate:
-se.alipsa:jmlx-langchain4j:0.1.0-SNAPSHOT. Publication is planned for Phase 8.4.
+Java 25, LangChain4j 1.23.0, macOS on Apple Silicon. Coordinate:
+se.alipsa:jmlx-langchain4j:0.1.0. Publication is planned for Phase 8.4.
 The native runtime jar remains an explicit runtime dependency.
 
 Configure a shared SchedulerInferenceClient as in the

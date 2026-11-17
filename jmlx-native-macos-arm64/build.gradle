@@ -8,7 +8,7 @@ plugins {
 // mlx-c commit) travels inside the jar as native-pin.properties instead of in this version string,
 // so this module's own SemVer stays independent of mlx-c's own independent versioning (already a
 // distinct axis per AGENTS.md).
-version = '0.1.0-SNAPSHOT'
+version = '0.1.0'
 
 // This module has a small Java metadata API alongside its native payload. Native resources are added
 // directly to the main jar below, rather than registered as source-set resources, so normal source

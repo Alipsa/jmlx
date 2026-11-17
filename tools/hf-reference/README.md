@@ -160,7 +160,7 @@ tools/hf-reference/.venv/bin/python \
 JMLX_LIBRARY_PATH=$PWD/native/install/lib \
 JMLX_ROPE_REFERENCE=$PWD/build/qwen3vl-rope-reference.txt \
   "$JDK25_HOME/bin/jshell" --execution local -s -J--enable-native-access=ALL-UNNAMED \
-  --class-path jmlx-core/build/libs/jmlx-core-0.5.0-SNAPSHOT.jar:jmlx-ffi/build/libs/jmlx-ffi-0.5.0-SNAPSHOT.jar \
+  --class-path jmlx-core/build/libs/jmlx-core-0.5.0.jar:jmlx-ffi/build/libs/jmlx-ffi-0.5.0.jar \
   tools/hf-reference/qwen3vl_rope_interleaved_check.jsh
 ```
 

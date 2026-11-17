@@ -115,10 +115,12 @@ expect "all preflight rejects a missing adapter producer" 2 body \
 # --- a failing preflight is side-effect-free: main runs the preflight immediately after argument
 # parsing, so a failing candidate run must exit 2 before the smoke repository or the consumer's
 # project state is touched. Runs the real run.sh, not the function: the property under test is
-# main's ordering, not the function. stderr is captured and must carry the preflight's own
-# message: other early paths (e.g. a missing wrapper distribution) also exit 2, so the status
-# alone would pass a preflight that never ran. The state marker lives in this checkout's real
-# consumer build directory (gitignored), created and removed by the test. ---
+# main's ordering, not the function. The 8.4 preflight reads the actual build.gradle files, so
+# a release-ready tree would pass version validation; the JMLX_JINJA_VERSION override is the
+# deterministic failure independent of the tree's state. stderr is captured and must carry the
+# preflight's own message: other early paths (e.g. a missing wrapper distribution) also exit 2,
+# so the status alone would pass a preflight that never ran. The state marker lives in this
+# checkout's real consumer build directory (gitignored), created and removed by the test. ---
 repo="$tmp/repo"
 state_marker="$here/build/e2e-preflight-state"
 mkdir -p "$repo"
@@ -128,9 +130,10 @@ touch "$state_marker"
 err="$tmp/e2e.err"
 status=0
 JMLX_SMOKE_REPO_DIR="$repo" JMLX_SMOKE_TUPLE_FILE="$tmp/absent.properties" JMLX_SMOKE_PRODUCER_VERSIONS="$producers_release" \
+  JMLX_JINJA_VERSION=0.7.0 \
   bash "$here/run.sh" candidate --profile pure-java >/dev/null 2>"$err" || status=$?
 if [ "$status" -eq 2 ] && [ -f "$repo/marker" ] && [ -f "$state_marker" ] \
-  && grep -q "producer jmlx-jinja version .* != manifest" "$err"; then
+  && grep -q "JMLX_JINJA_VERSION must repeat manifest version" "$err"; then
   echo "ok: failing preflight exits 2 with its own message before touching the repository or consumer state"
 else
   echo "FAIL: preflight ran with side effects or the wrong exit (status $status; repo marker $([ -f "$repo/marker" ] && echo present || echo gone); state marker $([ -f "$state_marker" ] && echo present || echo gone); stderr: $(head -1 "$err"))"

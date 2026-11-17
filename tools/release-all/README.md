@@ -152,7 +152,8 @@ The native publication's unconditional unstaged guard also applies to combined s
 
 The Portal upload documentation states a 1 GB archive limit; account-level publishing limits
 must be checked against current Usage Center data rather than assuming a universal deployment
-quota. See the dated readiness record for sources and pending account-specific verification.
+quota. Follow the [capacity procedure](../../req/phase8-4-portal-capacity.md) to retain the
+account snapshot and measure the exact signed bundle. Account verification remains pending.
 
 Workflow run IDs and container image IDs are operator attestations, not authenticated remote
 provenance. Review actual workflow runs and the declared host before publication. Both macOS

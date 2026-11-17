@@ -77,6 +77,9 @@ class FinalReceiptTest(unittest.TestCase):
             report = write(kind + ".json", {"schema": "jmlx-bundle-smoke-1", "kind": kind, "passed": True,
                 "bundleSha256": bundle_hash, "preliminarySha256": sha256(preliminary), "candidateSha": "c"*40,
                 "runId": "42", "environment": env,
+                **({"workflow": {"ref": "refs/heads/main", "event": "workflow_dispatch",
+                     "workflowRef": "Alipsa/jmlx/.github/workflows/release-candidate.yml@refs/heads/main",
+                     "sha": "d" * 40}} if kind == "minimum-host" else {}),
                 "outputs": {log.name: sha256(log), runtime_file.name: sha256(runtime_file)},
                 "consumerRuntime": runtime, "consumerRuntimeFile": runtime_file.name})
             self.receipt["reports"][kind] = {"path": str(report), "sha256": sha256(report)}
@@ -131,6 +134,21 @@ class FinalReceiptTest(unittest.TestCase):
                 else:
                     with self.assertRaisesRegex(ValueError, "minimum-host evidence"):
                         F.verify(self.root, self.path)
+
+    def test_minimum_host_requires_main_workflow_identity(self):
+        path = self.root / "minimum-host.json"
+        original = json.loads(path.read_text())
+        valid = original["workflow"]
+        for workflow in (None, {}, [], dict(valid, ref="refs/heads/feature"),
+                         dict(valid, event="pull_request"), dict(valid, sha="bad"),
+                         dict(valid, workflowRef=valid["workflowRef"].replace("main", "feature"))):
+            with self.subTest(workflow=workflow):
+                report = dict(original, workflow=workflow)
+                self.write(path.name, report)
+                self.receipt["reports"]["minimum-host"]["sha256"] = sha256(path)
+                self.write("final.json", self.receipt)
+                with self.assertRaisesRegex(ValueError, "minimum-host workflow"):
+                    F.verify(self.root, self.path)
 
     def test_all_macos_acceptance_reports_require_supported_os(self):
         for kind in ("macos-full", "macos-pure"):

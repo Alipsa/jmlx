@@ -12,7 +12,8 @@ from pathlib import Path
 if sys.version_info < (3, 11):
     raise SystemExit("Python 3.11+ is required for bundle smoke")
 
-from release_inputs import check_bundle, read_runtime, sha256, verify_smoke_environment
+from release_inputs import (check_bundle, read_runtime, sha256, verify_smoke_environment,
+                            verify_minimum_host_workflow)
 
 
 def output(*args):
@@ -52,6 +53,12 @@ def main():
     env = environment()
     verify_smoke_environment(args.kind, env, native["supportedMinimum"],
                              os.environ.get("GITHUB_RUN_ID"))
+    workflow = None
+    if args.kind == "minimum-host":
+        workflow = {key: os.environ.get(variable) for key, variable in
+                    (("ref", "GITHUB_REF"), ("event", "GITHUB_EVENT_NAME"),
+                     ("workflowRef", "GITHUB_WORKFLOW_REF"), ("sha", "GITHUB_WORKFLOW_SHA"))}
+        verify_minimum_host_workflow(workflow)
     profile = "pure-java" if args.kind.endswith("pure") else "all"
     command = ["bash", str(root / "tools/release-smoke/run.sh"), "candidate", "--profile", profile,
                "--bundle", str(args.bundle.resolve()), "--bundle-record", str(args.preliminary.resolve()),
@@ -74,6 +81,8 @@ def main():
               "runId": os.environ.get("GITHUB_RUN_ID"),
               "identityAssurance": "Local measurements; workflow run ID and container image are operator attestations, not authenticated provenance",
               "outputs": {log.name: sha256(log), runtime_file.name: sha256(runtime_file)}}
+    if workflow is not None:
+        report["workflow"] = workflow
     with args.output.open("x") as stream:
         json.dump(report, stream, indent=2)
         stream.write("\n")

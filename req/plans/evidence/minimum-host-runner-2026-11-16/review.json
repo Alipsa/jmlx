@@ -1,0 +1,105 @@
+{
+  "account": "jmlxrunner",
+  "savedPath": {
+    "value": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin",
+    "sha256": "879f57bf25438926a82cf2cc977c10bb418ec0e62a1d35dffef8650942abbcb0",
+    "containsOwnerHome": false
+  },
+  "savedEnvironment": {
+    "keys": [],
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "containsOwnerHome": false
+  },
+  "tools": {
+    "python3": {
+      "selected": {
+        "path": "/opt/homebrew/bin/python3",
+        "owner": "per",
+        "group": "admin",
+        "mode": "0o755"
+      },
+      "resolved": {
+        "path": "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/bin/python3.15",
+        "owner": "per",
+        "group": "admin",
+        "mode": "0o755"
+      },
+      "version": "Python 3.15.2"
+    },
+    "git": {
+      "selected": {
+        "path": "/opt/homebrew/bin/git",
+        "owner": "per",
+        "group": "admin",
+        "mode": "0o555"
+      },
+      "resolved": {
+        "path": "/opt/homebrew/Cellar/git/2.56.1/bin/git",
+        "owner": "per",
+        "group": "admin",
+        "mode": "0o555"
+      },
+      "version": "git version 2.56.1"
+    }
+  },
+  "runner": {
+    "id": 23,
+    "disableUpdate": false,
+    "ephemeral": false,
+    "listenerVersion": "2.338.2",
+    "listenerSha256": "732456cbedb8c09870b82a63c05ba5505ad5cc3fb536ee570879a0af1fdb5087"
+  },
+  "ownerGradlePropertiesReadable": false,
+  "ownerGradlePropertiesWritable": false,
+  "recordedAt": "2026-11-16T21:29:53.238540+00:00",
+  "ownerManagedToolchain": true,
+  "toolchainTrust": "Python and Git are owner-managed Homebrew executables; account credential isolation does not isolate executable supply from the owner.",
+  "ownerGradlePropertiesModeAfterHardening": "0o600",
+  "fileSharingInspection": {
+    "sharepointGroup": "com.apple.sharepoint.group.1",
+    "nestedGroupGuid": "ABCDEFAB-CDEF-ABCD-EFAB-CDEF0000000C",
+    "nestedGroupName": "everyone",
+    "smbdLaunchdServiceLoaded": false,
+    "newReleaseAccountShareCreated": false,
+    "scope": "Group/share configuration and launchd state only; no remote/network access audit or global sharing changes.",
+    "guestShareConfigured": true
+  },
+  "queueInspection": {
+    "commandSource": "req/phase8-4-minimum-host-setup.md",
+    "statuses": [
+      "queued",
+      "in_progress",
+      "waiting",
+      "requested",
+      "pending",
+      "action_required"
+    ],
+    "unfinishedJobsMatchingReleaseLabel": [],
+    "scope": "Live paginated API snapshot of exposed jobs and approval-required runs; needs-blocked jobs/labels may be absent. Not an authorization boundary.",
+    "recordedAt": "2026-11-16T21:40:21.847256+00:00",
+    "baseCommit": "407c7be7ddcb7729ae0932e55a8c2de833454038",
+    "workingTree": "Documentation follow-up adding action_required and surfacing approval-required runs without exposed jobs.",
+    "output": ""
+  },
+  "references": {
+    "runsvc": "https://github.com/actions/runner/blob/v2.338.2/src/Misc/layoutbin/runsvc.sh",
+    "updates": "https://docs.github.com/en/actions/reference/runners/self-hosted-runners#runner-software-updates-on-self-hosted-runners"
+  },
+  "validation": {
+    "releaseSelftests": {
+      "command": "bash tools/release-all/selftest.sh",
+      "tests": 84,
+      "seconds": 70.196,
+      "result": "passed",
+      "log": "review-release-selftests.log",
+      "sha256": "05d1b998e27be63dba873a727d00100772b68e5f593c2e4742bde2c08f976e77"
+    },
+    "workflowValidation": {
+      "command": "bash tools/release-all/check-workflows.sh",
+      "result": "passed"
+    },
+    "queueCommand": "Refreshed successfully with action_required included; exact output retained in queueInspection.output. Operator attestation: a synthetic approval-required run with no visible jobs was reported in both status and conclusion forms; its test and output were not retained in the repository."
+  },
+  "baseCommit": "7c9a057066e2777f664989382cd9256d8d7fe4ed",
+  "validatedWorkingTree": "Release selftests and actionlint ran on the working tree containing the code changes subsequently committed as 407c7be7ddcb7729ae0932e55a8c2de833454038. Queue inspection is refreshed separately under queueInspection."
+}

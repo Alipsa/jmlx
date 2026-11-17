@@ -30,6 +30,7 @@ permissions:
 
 jobs:
   transfer:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write # Draft asset access; this job never extracts or executes the bundle.
@@ -81,6 +82,7 @@ jobs:
 
   minimum_host:
     needs: transfer
+    if: github.ref == 'refs/heads/main'
     # Provision this dedicated physical host in WP0; never substitute a moving hosted label.
     runs-on: [self-hosted, macOS, ARM64, jmlx-release-minimum]
     permissions:

@@ -23,27 +23,39 @@ publish operations. Select the organization containing `se.alipsa` at
 [Publishing → Usage Center](https://central.sonatype.com/publishing/usage).
 Retain a dated non-secret snapshot of current usage and limits for all three metrics,
 organization/namespace scope, plan, adjusted-limit or exemption expiry, and any grace/enforcement
-banner. Account for other releases in the same month and refresh immediately before publishing.
+banner. The limits page states that exceeding a threshold starts a 30-day grace period that
+resets "after 2 consecutive months of being below limits", so read any grace/enforcement
+banner together with its snapshot, not in isolation. Account for other releases in the same
+month and refresh immediately before publishing.
 
 ## Measure the signed candidate
 
 After the runbook's preliminary-record and bundle validation succeeds, run this from the
-candidate checkout. It reads the ZIP without extracting it and writes only local evidence.
-The bundle digest must match the preliminary record and eventual final receipt.
+repository root of the candidate checkout, passing the runbook's preliminary record
+(`build/releaseAll/preliminary-<invocation>.json`). It reads the ZIP without extracting it
+and writes only local evidence. The script asserts the bundle digest matches the preliminary
+record; a stale or rebuilt bundle fails before anything is measured, and the eventual final
+receipt repeats the comparison.
 
 ```sh
-python3 - <<'PY'
+python3 - build/releaseAll/preliminary-<invocation>.json <<'PY'
 import hashlib
 import json
+import sys
 import zipfile
 from pathlib import Path
 
 bundle = Path("build/releaseAll/jmlx-mega-bundle.zip")
+record = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
 digest = hashlib.sha256()
 with bundle.open("rb") as stream:
     for chunk in iter(lambda: stream.read(1024 * 1024), b""):
         digest.update(chunk)
+if record.get("bundleSha256") != digest.hexdigest():
+    raise SystemExit("bundle digest differs from the preliminary record")
 with zipfile.ZipFile(bundle) as archive:
+    if archive.testzip() is not None:
+        raise SystemExit("bundle ZIP failed CRC verification")
     files = [entry for entry in archive.infolist() if not entry.is_dir()]
     if not files or len({entry.filename for entry in files}) != len(files):
         raise SystemExit("expected non-empty bundle without duplicate files")
@@ -63,12 +75,23 @@ if not report["withinConservativeUploadLimit"]:
 PY
 ```
 
-`zipEntryBytes` measures files inside the upload ZIP, including already-compressed JARs;
-it does not expand the JARs' native payloads. `zipFileCount` includes signatures and checksum
-sidecars if present. These are local inventory measurements, not authenticated Portal usage.
-Confirm how Portal accounts for sidecars or generated files when reconciling the account.
-The manifest requires five artifacts and five signatures per new coordinate: at least 90
-files for the proposed nine-module tuple, before optional checksum sidecars.
+`zipEntryBytes` reports the sizes recorded in the ZIP directory for the files inside the
+upload ZIP, including already-compressed JARs; it does not expand the JARs' native payloads,
+and the script's `testzip` verifies the archive's recorded CRCs before either number is
+trusted. `zipFileCount` includes the `.asc`, `.md5` and `.sha1` sidecars the pinned
+nexus-release-plugin generates, and Sonatype's publishing-limits FAQ (its "Why does file
+count include signatures, checksums, source jars, javadocs, and related files?" entry)
+states these files "are already reflected in the usage data the thresholds are based on" —
+they are not optional. The plugin's `BundleTask` computes MD5 and SHA-1 for every artifact
+and its `BundleValidator` checks `.asc`, `.md5` and `.sha1` entries;
+`req/phase8-1-release-notes.md` records the 8.1 bundle carrying the `.module` "with signature
+and checksums"; the upload page's example tree shows `.md5`/`.sha1` next to each `.jar`,
+`.pom` and `.asc`. The manifest's five artifacts and five signatures per new coordinate are
+therefore at least 180 files for the proposed nine-module tuple (the 90 artifact/signature
+files plus a `.md5` and a `.sha1` for each of the 45 artifacts), about 270 if the `.asc`
+files also carry checksums as that example shows. Take the exact figure from the measurement
+against the Usage Center snapshot, not from this estimate. These are local inventory
+measurements, not authenticated Portal usage.
 
 Compare the inventory with remaining monthly capacity for the selected scope. The combined
 flow submits one deployment; confirm its release-event accounting rather than equating nine

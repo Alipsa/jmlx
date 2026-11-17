@@ -101,7 +101,7 @@ exclusions, evidence and unresolved provenance; review its findings before closi
 Logs/receipts belong under ignored `build/releaseAll/` or outside the checkout.
 Never put credentials in the evidence or publish the temporary candidate draft Release.
 
-## Portal limits research (2026-11-16)
+## Portal limits research (2026-11-14)
 
 The official [upload documentation](https://central.sonatype.org/publish/publish-portal-upload/)
 states a 1 GB archive limit. The bundle checker conservatively caps compressed ZIP bytes at
@@ -112,5 +112,7 @@ Current [publishing limits](https://central.sonatype.org/publish/maven-central-p
 and [Usage Center](https://central.sonatype.org/publish/publish-portal-usage-center/)
 require account-specific capacity verification. The older ten-deployments statement is not
 used as proof of present entitlement or rejected-upload accounting; that gate remains open.
-The [capacity procedure](phase8-4-portal-capacity.md) separates upload bytes from monthly
-published-file usage and records the account information needed to close this gate.
+
+Addendum (2026-11-16): the [capacity procedure](phase8-4-portal-capacity.md) separates upload
+bytes from monthly published-file usage and records the account information needed to close
+this gate.

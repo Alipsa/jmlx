@@ -167,6 +167,13 @@ tasks.register('verifyNativeReleasePayload', Exec) {
     group = 'verification'
     description = 'Checks packaged dylib deployment targets, source paths, pins and license texts.'
     dependsOn tasks.named('jar'), tasks.named('sourcesJar'), tasks.named('javadocJar')
+    // Like verifyPackagedNativeResources: with native/install/lib unstaged there is no real
+    // payload to check, and this Exec task's own failure (a python error or a missing bootstrap
+    // script in a partial checkout) would otherwise preempt the publish task's unconditional
+    // doFirst refusal -- the canonical message that tells the human to run bootstrap-native.sh.
+    // Staging missing, the payload check is skipped and the publish refusal fires instead;
+    // staging present but the payload wrong, this task still fails the release.
+    onlyIf { hasValidatedStagedNativeFiles() }
     commandLine 'python3', rootProject.file('tools/release-all/release_inputs.py'), 'native',
             tasks.named('jar').get().archiveFile.get().asFile,
             '--documentation-jar', tasks.named('sourcesJar').get().archiveFile.get().asFile,

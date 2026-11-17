@@ -1,6 +1,7 @@
 # Phase 8.4 Portal capacity check
 
 Reviewed 2026-11-16 at PR #101 merge `102e03ea43e508042ec4d43a61802b448a525267`.
+Revised 2026-11-17 (review rounds 1 and 2).
 Status: research complete; account capacity and signed-candidate measurement pending.
 This procedure does not authorize publication or close the native-license gate.
 
@@ -38,7 +39,8 @@ record; a stale or rebuilt bundle fails before anything is measured, and the eve
 receipt repeats the comparison.
 
 ```sh
-python3 - build/releaseAll/preliminary-<invocation>.json <<'PY'
+RECORD='build/releaseAll/preliminary-<invocation>.json'   # set to the runbook's record
+python3 - "$RECORD" <<'PY'
 import hashlib
 import json
 import sys
@@ -83,15 +85,13 @@ nexus-release-plugin generates, and Sonatype's publishing-limits FAQ (its "Why d
 count include signatures, checksums, source jars, javadocs, and related files?" entry)
 states these files "are already reflected in the usage data the thresholds are based on" —
 they are not optional. The plugin's `BundleTask` computes MD5 and SHA-1 for every artifact
-and its `BundleValidator` checks `.asc`, `.md5` and `.sha1` entries;
-`req/phase8-1-release-notes.md` records the 8.1 bundle carrying the `.module` "with signature
-and checksums"; the upload page's example tree shows `.md5`/`.sha1` next to each `.jar`,
-`.pom` and `.asc`. The manifest's five artifacts and five signatures per new coordinate are
-therefore at least 180 files for the proposed nine-module tuple (the 90 artifact/signature
-files plus a `.md5` and a `.sha1` for each of the 45 artifacts), about 270 if the `.asc`
-files also carry checksums as that example shows. Take the exact figure from the measurement
-against the Usage Center snapshot, not from this estimate. These are local inventory
-measurements, not authenticated Portal usage.
+and its `BundleValidator` checks `.asc`, `.md5` and `.sha1` entries; the 8.1 combined bundle
+(nexus-release-plugin 2.5.1; its coordinates are published on Central and its composition is
+recorded in `req/phase8-1-release-notes.md`) carries exactly 30 files per coordinate — five
+artifacts and five signatures, each with a `.md5` and a `.sha1`, including checksums of the
+`.asc` files themselves. Expect 270 files for the proposed nine-module tuple and confirm the
+exact figure from the 2.6.0 measurement. These are local inventory measurements, not
+authenticated Portal usage.
 
 Compare the inventory with remaining monthly capacity for the selected scope. The combined
 flow submits one deployment; confirm its release-event accounting rather than equating nine

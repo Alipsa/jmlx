@@ -2,6 +2,11 @@
 
 ## [0.1.0] - 2026-11-17
 
+Date denotes the version cut, not publication to Maven Central.
+
+Initial Central release; the entries below cover changes tracked since changelog adoption,
+not the full public API.
+
 - Add the Phase 7.3b WP8 Tier-A acceptance suites: `Qwen3VlGoldenTest` (full float32, strict
   `1e-4`) and `Qwen3VlDefaultPrecisionTest` (default TF32 bound `0.0025`) run the pinned tiny
   WP8 Qwen3-VL checkpoint's four plan cases and both forced generated-marker continuations

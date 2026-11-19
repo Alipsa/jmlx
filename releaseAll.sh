@@ -85,17 +85,18 @@ if [[ "$mode" == bundle ]]; then
   invocation=$(python3 -c 'import uuid; print(uuid.uuid4())')
   evidence="$RELEASE_ROOT/build/releaseAll/task-evidence-$invocation.json"
   required=$(python3 "$RELEASE_ROOT/tools/release-all/verify_native_tests.py" --tasks)
-  test_args=()
-  IFS=, read -r -a test_paths <<< "$required"
-  for task in "${test_paths[@]}"; do
-    # Required paths are from the committed inventory, never user-supplied cleanup targets.
+  required_args=()
+  IFS=, read -r -a required_paths <<< "$required"
+  for task in "${required_paths[@]}"; do
+    # The committed list includes native tests and payload verification, never user-supplied
+    # cleanup targets. Non-test tasks have no result directory, so removal is a no-op.
     module="${task#:}"; module="${module%%:*}"
     task_name="${task##*:}"
     rm -rf "$RELEASE_ROOT/$module/build/test-results/$task_name"
-    test_args+=("$task" --rerun)
+    required_args+=("$task" --rerun)
   done
   before=$(shasum -a 256 "$manifest" | cut -d' ' -f1)
-  bundle_command=("${gradle[@]}" "${test_args[@]}" bundleAll --no-build-cache
+  bundle_command=("${gradle[@]}" "${required_args[@]}" bundleAll --no-build-cache
     --init-script "$RELEASE_ROOT/tools/release-all/task-evidence.init.gradle"
     "-PreleaseRequiredTasks=$required" "-PreleaseInvocationId=$invocation" "-PreleaseEvidenceFile=$evidence")
   argv_file="$RELEASE_ROOT/build/releaseAll/gradle-argv-$invocation.json"

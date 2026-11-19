@@ -51,10 +51,13 @@ are ignored for status-only recovery. Protect the journal against modification.
 4. Run `./releaseAll.sh --dry-run`, inspect the exact selected set, then set
    `JMLX_RELEASE_CANDIDATE_TAG` and run `./releaseAll.sh --bundle-only`. Signing preflight is
    strict for bundling and warning-only for dry-run. No upload happens in either mode.
-5. The wrapper reruns **only required test tasks** using task-level `--rerun`, disables the build
-   cache, clears their result directories and collects supported Gradle task events via the
+5. The wrapper reruns required test tasks and `:jmlx-native-macos-arm64:verifyNativeReleasePayload`
+   using task-level `--rerun`, disables the build cache, clears test result directories and
+   collects supported Gradle task events via the
    explicit producer init script. The shared native suite inventory validates fresh JUnit XML,
-   including both precision modes and loader/worker probes. The plan digest must stay unchanged.
+   including both precision modes and loader/worker probes. Native payload verification must
+   execute, including its source/Javadoc NOTICE checks; a skipped task rejects the bundle.
+   The plan digest must stay unchanged.
 6. The resulting immutable `preliminary-<invocation>.json` identifies ZIP/tag/SHA/manifest,
    native hashes, plugin receipt, exact Gradle argument vector and file digest, selected
    native/pure JDK vendor/full version/home, and this invocation's test evidence. Apple tool

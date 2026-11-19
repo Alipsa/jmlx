@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Regression tests for run.sh's argument parsing and candidate preflight. Everything runs in
-# subshells against disposable fixtures (JMLX_SMOKE_TUPLE_FILE, JMLX_SMOKE_PRODUCER_VERSIONS,
-# JMLX_SMOKE_REPO_DIR), so the real smoke repository, producer versions and tuple file are never
-# touched; one test runs the real run.sh candidate path end-to-end with the hooks pointed at a
-# failing fixture. Run it with ./tools/release-smoke/selftest.sh; CI's Java job runs it as a step.
+# subshells against disposable fixtures (JMLX_SMOKE_TUPLE_FILE, JMLX_SMOKE_PRODUCER_VERSIONS).
+# One test runs the real 8.4 candidate path against checkout versions with a failing override
+# and a disposable JMLX_SMOKE_REPO_DIR. Producer versions and tuple files are never modified.
+# Run it with ./tools/release-smoke/selftest.sh; CI's Java job runs it as a step.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -116,10 +116,11 @@ expect "all preflight rejects a missing adapter producer" 2 body \
 # parsing, so a failing candidate run must exit 2 before the smoke repository or the consumer's
 # project state is touched. Runs the real run.sh, not the function: the property under test is
 # main's ordering, not the function. The 8.4 preflight reads the actual build.gradle files, so
-# a release-ready tree would pass version validation; the JMLX_JINJA_VERSION override is the
-# deterministic failure independent of the tree's state. stderr is captured and must carry the
-# preflight's own message: other early paths (e.g. a missing wrapper distribution) also exit 2,
-# so the status alone would pass a preflight that never ran. The state marker lives in this
+# a release-ready tree would pass version validation; the JMLX_JINJA_VERSION override forces
+# failure when producer versions match the manifest. After a development bump, the producer
+# mismatch fails first instead. stderr must carry either preflight message: other early paths
+# (e.g. a missing wrapper distribution) also exit 2, so status alone would pass a preflight
+# that never ran. The state marker lives in this
 # checkout's real consumer build directory (gitignored), created and removed by the test. ---
 repo="$tmp/repo"
 state_marker="$here/build/e2e-preflight-state"
@@ -129,11 +130,11 @@ mkdir -p "$here/build"
 touch "$state_marker"
 err="$tmp/e2e.err"
 status=0
-JMLX_SMOKE_REPO_DIR="$repo" JMLX_SMOKE_TUPLE_FILE="$tmp/absent.properties" JMLX_SMOKE_PRODUCER_VERSIONS="$producers_release" \
+JMLX_SMOKE_REPO_DIR="$repo" \
   JMLX_JINJA_VERSION=0.7.0 \
   bash "$here/run.sh" candidate --profile pure-java >/dev/null 2>"$err" || status=$?
 if [ "$status" -eq 2 ] && [ -f "$repo/marker" ] && [ -f "$state_marker" ] \
-  && grep -q "JMLX_JINJA_VERSION must repeat manifest version" "$err"; then
+  && grep -Eq "JMLX_JINJA_VERSION must repeat manifest version|producer jmlx-jinja version .* != manifest" "$err"; then
   echo "ok: failing preflight exits 2 with its own message before touching the repository or consumer state"
 else
   echo "FAIL: preflight ran with side effects or the wrong exit (status $status; repo marker $([ -f "$repo/marker" ] && echo present || echo gone); state marker $([ -f "$state_marker" ] && echo present || echo gone); stderr: $(head -1 "$err"))"

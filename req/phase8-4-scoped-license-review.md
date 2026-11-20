@@ -160,14 +160,14 @@ python3 req/plans/evidence/scoped-license-review-2026-11-21/reproduce.py \
 ```
 
 Omit `--fetch-missing` for cached-input replay. The API projection rejects malformed/empty
-responses, mixed post IDs and noncontiguous or duplicate revision numbers/GUIDs. It sorts
-the validated complete snapshot by revision number and retains post ID, revision number/GUID/date,
-license, body and owner user ID. It excludes quota and mutable user-profile metadata.
-Byte inputs are hashed unchanged. The script reuses the earlier function extractor/decimal regex, reads selected
-Cephes tar members in memory and inspects the three nested native JARs without executing them.
-The newest answer code blocks must hash-match the earlier audit's comparison inputs. CPU
-sequence equality is recorded separately from multiset equality. Fastermath's Cephes 2.8
-reference and both CPU source citations are recorded; the two correspondence inputs pin
+responses, mixed post IDs and noncontiguous or duplicate revision numbers/GUIDs. It sorts the
+validated complete snapshot by revision number and retains post ID, revision number/GUID/date,
+license, body and owner user ID. It excludes quota and mutable user-profile metadata. Byte
+inputs are hashed unchanged. The script reuses the earlier function extractor/decimal regex,
+reads selected Cephes tar members in memory and inspects the three nested native JARs without
+executing them. The newest answer code blocks must hash-match the earlier audit's comparison
+inputs. CPU sequence equality is recorded separately from multiset equality. Fastermath's Cephes
+2.8 reference and both CPU source citations are recorded; the two correspondence inputs pin
 snapshots for manual interpretation only. Their permission meaning is not replayed.
 
 A local `hashlib` SHA-256 verifies the prior recipe before executing those same bytes, with

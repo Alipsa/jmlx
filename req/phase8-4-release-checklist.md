@@ -36,11 +36,6 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 
 ## Readiness gates
 
-- [x] Merge the approved release-version PR after review and green CI.
-  [PR #104](https://github.com/Alipsa/jmlx/pull/104) merged 2026-11-20;
-  [final-head CI run 44814142153](https://github.com/Alipsa/jmlx/actions/runs/44814142153)
-  passed Java and native checks, both release-smoke profiles and required-native-suite verification.
-
 - [x] Hosted PR #94 [CI run 43628489480](https://github.com/Alipsa/jmlx/actions/runs/43628489480)
   passed both Java and native jobs, including required-native-suite execution and artifact smoke.
 - [x] Owner approved raising the supported native minimum to macOS 27.2.x (2026-11-16).
@@ -69,8 +64,15 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [x] Revalidate pure-Java artifact reuse after the plugin pin bump and Jackson 3.3.0 update;
   [audit and artifact hashes](phase8-4-pure-java-audit.md) support all three new versions.
 - [ ] Approve the audited tuple after minimum-host readiness; repeat audit at final candidate SHA.
-  The owner approved the tuple 2026-11-17 and the version PR sets the module versions and
-  smoke CI defaults to it; the audit rerun at the final candidate SHA remains.
+  The owner approved the tuple 2026-11-17;
+  [PR #104](https://github.com/Alipsa/jmlx/pull/104), merged as
+  `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e`, sets the module versions and smoke CI defaults
+  to it; the audit rerun at the final candidate SHA remains.
+- [x] Merge the approved release-version PR after review and green CI.
+  [PR #104](https://github.com/Alipsa/jmlx/pull/104) merged 2026-11-20 as
+  `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e`;
+  [merge-commit CI run 44815990385](https://github.com/Alipsa/jmlx/actions/runs/44815990385)
+  passed Java and native checks, both release-smoke profiles and required-native-suite verification.
 - [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
   changelog version-cut dates with the final candidate cut date.
   Prepared as 2026-11-20; recheck the date immediately before creating the immutable tag.
@@ -82,19 +84,31 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 
 ## Pre-candidate verification (2026-11-20)
 
-The clean PR #104 merge `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e` passed
-`./gradlew :jmlx-jinja:releaseVerification` using Eclipse Adoptium 25.0.4.1 and
-pinned Node v26.7.0. Its isolated matrix passed online/offline checks, reproducible
-main/sources/Javadoc archives, corpus verification and independent consumer resolution.
-The published and consumer-resolved main JAR hashes matched. The retained dependency
-review and generated POM report no published runtime dependencies; the Node pin is unchanged.
+The earlier jinja verification at PR #104 merge
+`784124ac44cfe17f8bf7f4d8c814fc30b96ff05e` predates this PR's changelog date change and
+is stale for that contract input. A fresh `./gradlew :jmlx-jinja:releaseVerification`
+passed at clean PR #105 commit `a37d1683463081b16cdc6cbbab0238b47af9cf4f`, after the
+changelog change was committed. Its report records the current `CHANGELOG.md` SHA-256
+`918ccbfd3dbf1a3f250c1a6424b49859dbfd3f7bee3a927a12a77208843b1725`.
 
-Root `./gradlew check` and separate `./gradlew -p buildSrc check` passed during preparation
-(with normal up-to-date reuse). Smoke selftests and all 85 Gradle-backed release regressions
-also passed. Logs and retained jinja reports are under ignored
-`build/releaseAll/pre-candidate-2026-11-20/`. These are preparation checks, not evidence for
-an immutable tagged candidate or signed bundle. The final tag still requires its own audit,
-verification, signed-bundle task evidence, consumer reports and minimum-host execution.
+Gradle ran on Eclipse Adoptium 25.0.4.1; jinja compiled with the resolved Java 21 toolchain,
+Temurin 21.0.13+9 at `/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home`.
+Node was pinned to v26.7.0. The isolated matrix passed online/offline checks, corpus
+verification and independent consumer resolution. Main/sources/Javadoc archives matched
+between two clean Temurin builds; this does not establish a match to Central, whose retained
+release report records BellSoft 21.0.12.1. The published and consumer-resolved main JAR hashes
+matched. The retained dependency review and generated POM report no published runtime
+dependencies; the Node pin is unchanged.
+
+Root `./gradlew check` and separate `./gradlew -p buildSrc check` were rerun and passed at
+clean `a37d1683463081b16cdc6cbbab0238b47af9cf4f` with normal up-to-date reuse, replacing
+the earlier runs whose working-tree state was not recorded. The nine-module release dry-run
+also passed at that commit. Smoke selftests and all 85 Gradle-backed release regressions
+passed during the earlier preparation. Logs and retained jinja reports are under ignored
+`build/releaseAll/pre-candidate-2026-11-20/`; the new runs use `*-pr105-*` names. These are
+preparation checks, not evidence for an immutable tagged candidate or signed bundle. The
+final tag still requires its own audit, verification, signed-bundle task evidence, consumer
+reports and minimum-host execution.
 
 ## Supported minimum decision (2026-11-16)
 

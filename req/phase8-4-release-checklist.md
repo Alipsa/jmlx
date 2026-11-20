@@ -64,10 +64,8 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [x] Revalidate pure-Java artifact reuse after the plugin pin bump and Jackson 3.3.0 update;
   [audit and artifact hashes](phase8-4-pure-java-audit.md) support all three new versions.
 - [ ] Approve the audited tuple after minimum-host readiness; repeat audit at final candidate SHA.
-  The owner approved the tuple 2026-11-17;
-  [PR #104](https://github.com/Alipsa/jmlx/pull/104), merged as
-  `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e`, sets the module versions and smoke CI defaults
-  to it; the audit rerun at the final candidate SHA remains.
+  The owner approved the tuple 2026-11-17; the release-version merge is recorded in the
+  next gate. The audit rerun at the final candidate SHA remains.
 - [x] Merge the approved release-version PR after review and green CI.
   [PR #104](https://github.com/Alipsa/jmlx/pull/104) merged 2026-11-20 as
   `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e`;
@@ -104,7 +102,8 @@ Root `./gradlew check` and separate `./gradlew -p buildSrc check` were rerun and
 clean `a37d1683463081b16cdc6cbbab0238b47af9cf4f` with normal up-to-date reuse, replacing
 the earlier runs whose working-tree state was not recorded. The nine-module release dry-run
 also passed at that commit. Smoke selftests and all 85 Gradle-backed release regressions
-passed during the earlier preparation. Logs and retained jinja reports are under ignored
+were rerun and passed at clean `de37ee4551b8dd74be3f0b360173ccfe89fddaf9`, replacing their
+earlier runs whose working-tree state was not recorded. Logs and retained jinja reports are under ignored
 `build/releaseAll/pre-candidate-2026-11-20/`; the new runs use `*-pr105-*` names. These are
 preparation checks, not evidence for an immutable tagged candidate or signed bundle. The
 final tag still requires its own audit, verification, signed-bundle task evidence, consumer

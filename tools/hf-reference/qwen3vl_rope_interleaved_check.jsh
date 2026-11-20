@@ -6,7 +6,8 @@
 // and writes no golden; the pinned transformers output is authoritative, so
 // a divergence means the Java component is fixed, not the probe.
 //
-// Invocation (from the repository root; the jars must be built first):
+// Invocation (from the repository root; the jars must be built first). Replace
+// <core-version> and <ffi-version> with the versions in the modules' build.gradle files:
 //
 //   ./gradlew :jmlx-core:jar :jmlx-ffi:jar
 //   tools/hf-reference/.venv/bin/python \
@@ -15,7 +16,7 @@
 //   JMLX_LIBRARY_PATH=$PWD/native/install/lib \
 //   JMLX_ROPE_REFERENCE=$PWD/build/qwen3vl-rope-reference.txt \
 //     "$JDK25_HOME/bin/jshell" --execution local -s -J--enable-native-access=ALL-UNNAMED \
-//     --class-path jmlx-core/build/libs/jmlx-core-0.5.0-SNAPSHOT.jar:jmlx-ffi/build/libs/jmlx-ffi-0.5.0-SNAPSHOT.jar \
+//     --class-path "jmlx-core/build/libs/jmlx-core-<core-version>.jar:jmlx-ffi/build/libs/jmlx-ffi-<ffi-version>.jar" \
 //     tools/hf-reference/qwen3vl_rope_interleaved_check.jsh
 //
 // $JDK25_HOME is the Java 25 toolchain home the build uses (on this machine:

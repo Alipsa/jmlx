@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import final_receipt as F
 from release_inputs import sha256
 from release_inputs import MODULE_KEYS
-from verify_native_tests import required_tasks
+from verify_native_tests import required_tasks, verify_events
 
 
 class FinalReceiptTest(unittest.TestCase):
@@ -183,6 +183,21 @@ class FinalReceiptTest(unittest.TestCase):
         (self.root / "build/releaseAll/manifest.json").write_text("changed")
         with self.assertRaisesRegex(ValueError, "plan changed"):
             F.verify(self.root, self.path)
+
+    def test_native_payload_verification_must_execute(self):
+        events = json.loads((self.root / "events.json").read_text())
+        payload = ":jmlx-native-macos-arm64:verifyNativeReleasePayload"
+        self.assertIn(payload, {task["path"] for task in events["tasks"]})
+        verify_events(events, "run")
+        for outcome in ("SKIPPED", "UP-TO-DATE", "FROM-CACHE", "FAILED", "MISSING"):
+            with self.subTest(outcome=outcome):
+                changed = copy.deepcopy(events)
+                if outcome == "MISSING":
+                    changed["tasks"] = [task for task in changed["tasks"] if task["path"] != payload]
+                else:
+                    next(task for task in changed["tasks"] if task["path"] == payload)["outcome"] = outcome
+                with self.assertRaisesRegex(ValueError, "task outcomes"):
+                    verify_events(changed, "run")
 
     def test_cached_task_cannot_claim_passed(self):
         path = self.root / "events.json"

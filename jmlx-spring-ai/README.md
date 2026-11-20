@@ -1,7 +1,7 @@
 # jmlx Spring AI adapter
 
-Java 25, Spring AI 2.0.2, macOS on Apple Silicon. Development coordinate:
-se.alipsa:jmlx-spring-ai:0.1.0-SNAPSHOT. Publication is planned for Phase 8.4.
+Java 25, Spring AI 2.0.2, macOS on Apple Silicon. Coordinate:
+se.alipsa:jmlx-spring-ai:0.1.0. Publication is planned for Phase 8.4.
 The native runtime jar remains an explicit runtime dependency.
 
 Create one scheduler and one shared client for the application:

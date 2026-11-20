@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
-"""Fail on missing, skipped or failed required native suites; print verified XML digests."""
+"""Verify native suites and bundle task execution, including native payload verification.
+
+The default CLI checks suite results and prints verified XML digests; --tasks lists all
+required bundle tasks, including the payload task that has no JUnit results.
+"""
 
 import argparse
 import json
 from pathlib import Path
 from xml.etree import ElementTree
 
-from native_suites import results_dirs, suites
+from native_suites import required_non_test_tasks, results_dirs, suites
 from release_inputs import sha256
 
 
 def required_tasks():
-    return {f":{module}:{task}" for module, names in suites.items() for name in names
-            for task in results_dirs.get(module, {}).get(name, ["test"])}
+    tests = {f":{module}:{task}" for module, names in suites.items() for name in names
+             for task in results_dirs.get(module, {}).get(name, ["test"])}
+    return tests | required_non_test_tasks
 
 
 def verify_events(events, invocation):

@@ -507,6 +507,10 @@ inheriting the root's Java 25 — that 25 exists for `jmlx-core`/`jmlx-ffi`'s Pa
 those pure-Java modules needs it, so targeting 21 keeps their published artifacts usable by Java 21
 consumers. `jmlx-tokenizer`'s and `jmlx-vision`'s `verifyBytecodeLevel` tasks enforce this.
 
+**Phase 8.4 release window:** release versions are set; see
+`tools/release-smoke/released-8.4.json` for current coordinates. The SNAPSHOT versions below
+and in the adapter milestone notes describe the preceding development state.
+
 **Nine modules are publishable**, each carrying its own version independent of the root's
 `0.5.0-SNAPSHOT` (`jmlx-examples` and `jmlx-benchmarks` are unpublished applications): `jmlx-jinja` is
 `0.6.2-SNAPSHOT` (continuing the archived hfjinja project's line; `0.6.1` was published in

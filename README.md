@@ -138,4 +138,4 @@ Java 25 applications can use the [Spring AI adapter](jmlx-spring-ai/README.md)
 or [LangChain4j adapter](jmlx-langchain4j/README.md) for local chat, streaming
 and BERT sentence embeddings. Both borrow one shared scheduler client so
 virtual-thread callers never perform native work themselves. These modules
-are development snapshots; their first Central publication belongs to Phase 8.4.
+have release versions set for their planned first Central publication in Phase 8.4.

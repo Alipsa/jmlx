@@ -86,7 +86,7 @@ expect "pure preflight rejects a snapshot tuple entry" 2 body \
 expect "pure preflight rejects a mismatched producer" 2 body \
   "printf 'jmlx-jinja=0.7.0\njmlx-tokenizer=0.1.0\njmlx-vision=0.1.0\n' > '$tmp/mismatched.properties'; export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$tmp/mismatched.properties'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight rejects a non-repeating override" 2 body \
-  "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release' JMLX_JINJA_VERSION=0.7.0; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
+  "export JMLX_SMOKE_TUPLE_FILE='$tuple' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release' JMLX_JINJA_VERSION=0.0.0-selftest-never-valid; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight rejects a whitespace tuple value" 2 body \
   "printf 'jmlxJinjaVersion=0.6.0 \njmlxTokenizerVersion=0.1.0\njmlxVisionVersion=0.1.0\n' > '$tmp/whitespace-tuple.properties'; export JMLX_SMOKE_TUPLE_FILE='$tmp/whitespace-tuple.properties' JMLX_SMOKE_PRODUCER_VERSIONS='$producers_release'; MODE=candidate PROFILE=pure-java RECORD=false; preflight_candidate"
 expect "pure preflight rejects a CRLF tuple file" 2 body \
@@ -131,7 +131,7 @@ touch "$state_marker"
 err="$tmp/e2e.err"
 status=0
 JMLX_SMOKE_REPO_DIR="$repo" \
-  JMLX_JINJA_VERSION=0.7.0 \
+  JMLX_JINJA_VERSION=0.0.0-selftest-never-valid \
   bash "$here/run.sh" candidate --profile pure-java >/dev/null 2>"$err" || status=$?
 if [ "$status" -eq 2 ] && [ -f "$repo/marker" ] && [ -f "$state_marker" ] \
   && grep -Eq "JMLX_JINJA_VERSION must repeat manifest version|producer jmlx-jinja version .* != manifest" "$err"; then

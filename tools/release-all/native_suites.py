@@ -1,4 +1,6 @@
-"""Required native suite inventory shared by CI and local release verification."""
+"""Required native suite and task inventory shared by CI and release verification."""
+
+required_non_test_tasks = {":jmlx-native-macos-arm64:verifyNativeReleasePayload"}
 
 suites = {
     'jmlx-ffi': ['NativeLoaderMissingMetallibTest', 'NativeLoaderExtractionFallbackTest'],

@@ -58,7 +58,7 @@ abstract class ReleaseTaskEvidence implements BuildService<ReleaseTaskEvidence.P
         File output = parameters.outputFile.get().asFile
         output.parentFile.mkdirs()
         output.setText(JsonOutput.prettyPrint(JsonOutput.toJson(evidence)) + '\n', 'UTF-8')
-        if (!passed) throw new GradleException('Required release tests did not execute; see task evidence')
+        if (!passed) throw new GradleException('Required release tasks did not execute; see task evidence')
     }
 }
 

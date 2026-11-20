@@ -10,14 +10,14 @@ import json
 from pathlib import Path
 from xml.etree import ElementTree
 
-from native_suites import results_dirs, suites
+from native_suites import required_non_test_tasks, results_dirs, suites
 from release_inputs import sha256
 
 
 def required_tasks():
     tests = {f":{module}:{task}" for module, names in suites.items() for name in names
              for task in results_dirs.get(module, {}).get(name, ["test"])}
-    return tests | {":jmlx-native-macos-arm64:verifyNativeReleasePayload"}
+    return tests | required_non_test_tasks
 
 
 def verify_events(events, invocation):

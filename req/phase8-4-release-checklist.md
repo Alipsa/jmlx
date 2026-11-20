@@ -62,6 +62,8 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [ ] Approve the audited tuple after minimum-host readiness; repeat audit at final candidate SHA.
   The owner approved the tuple 2026-11-17 and the version PR sets the module versions and
   smoke CI defaults to it; the audit rerun at the final candidate SHA remains.
+- [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
+  changelog version-cut dates with the final candidate cut date.
 - [ ] Freeze candidate tag/SHA, verify signed bundle, both consumer profiles and minimum host.
 - [ ] Review concrete verified-bundle receipt, then explicitly authorize Central publication.
 - [ ] Verify all nine exact Central coordinates and selected Java 21 subset on both platforms.

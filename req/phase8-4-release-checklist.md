@@ -103,8 +103,8 @@ clean `a37d1683463081b16cdc6cbbab0238b47af9cf4f` with normal up-to-date reuse, r
 the earlier runs whose working-tree state was not recorded. The nine-module release dry-run
 also passed at that commit. Smoke selftests and all 85 Gradle-backed release regressions
 were rerun and passed at clean `de37ee4551b8dd74be3f0b360173ccfe89fddaf9`, replacing their
-earlier runs whose working-tree state was not recorded. Logs and retained jinja reports are under ignored
-`build/releaseAll/pre-candidate-2026-11-20/`; the new runs use `*-pr105-*` names. These are
+earlier runs whose working-tree state was not recorded. Logs and retained jinja reports are under
+ignored `build/releaseAll/pre-candidate-2026-11-20/`; the new runs use `*-pr105-*` names. These are
 preparation checks, not evidence for an immutable tagged candidate or signed bundle. The
 final tag still requires its own audit, verification, signed-bundle task evidence, consumer
 reports and minimum-host execution.

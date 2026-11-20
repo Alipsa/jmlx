@@ -68,6 +68,7 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [ ] Review concrete verified-bundle receipt, then explicitly authorize Central publication.
 - [ ] Verify all nine exact Central coordinates and selected Java 21 subset on both platforms.
 - [ ] Merge development-bump PR only after Central verification.
+  In that PR, update AGENTS.md's version paragraph and remove the Phase 8.4 release-window note.
 
 ## Supported minimum decision (2026-11-16)
 

@@ -5,21 +5,36 @@ import argparse
 from collections import Counter
 import datetime
 from decimal import Decimal
+import hashlib
 import http.client
-import importlib.util
 import io
 import json
 from pathlib import Path
 import re
 import tarfile
+import types
+import xml.etree.ElementTree as ET
 import zipfile
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[3]
 RECIPE = ROOT / 'req/plans/evidence/native-license-resolution-2026-11-16/compare_literals.py'
-spec = importlib.util.spec_from_file_location('prior_comparison', RECIPE)
-prior = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(prior)
+
+
+def sha256(data):
+    return hashlib.sha256(data).hexdigest()
+
+
+def load_prior(evidence, recipe=None):
+    recipe = RECIPE if recipe is None else recipe
+    data = recipe.read_bytes()
+    if sha256(data) != evidence['priorRecipeSha256']:
+        raise ValueError('prior comparison recipe changed')
+    # Execute the same bytes that were hashed; compilation does not write __pycache__.
+    module = types.ModuleType('prior_comparison')
+    module.__file__ = str(recipe)
+    exec(compile(data, str(recipe), 'exec'), module.__dict__)
+    return module
 
 
 def canonical(value):
@@ -27,32 +42,59 @@ def canonical(value):
 
 
 def revisions(raw):
-    document = prior.response_json(raw)
-    if document.get('has_more') is not False:
-        raise ValueError('revision response is incomplete')
+    document = json.loads(raw)
+    if not isinstance(document, dict) or 'error_id' in document:
+        raise ValueError('unexpected revision response')
+    items = document.get('items')
+    if document.get('has_more') is not False or not isinstance(items, list) or not items:
+        raise ValueError('revision response is incomplete or empty')
     records = []
-    for item in document['items']:
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError('unexpected revision record')
+        for key in ('post_id', 'revision_number', 'creation_date'):
+            if type(item.get(key)) is not int or item[key] < 1:
+                raise ValueError('invalid revision integer: ' + key)
+        for key in ('revision_guid', 'content_license', 'body'):
+            if not isinstance(item.get(key), str) or not item[key]:
+                raise ValueError('invalid revision string: ' + key)
+        user = item.get('user')
+        if not isinstance(user, dict) or type(user.get('user_id')) is not int:
+            raise ValueError('invalid revision owner')
         record = {key: item[key] for key in ('post_id', 'revision_number', 'revision_guid',
                   'creation_date', 'content_license', 'body')}
-        record['ownerUserId'] = item['user']['user_id']
+        record['ownerUserId'] = user['user_id']
         records.append(record)
+    numbers = sorted(record['revision_number'] for record in records)
+    if numbers != list(range(1, len(records) + 1)):
+        raise ValueError('revision numbers must be unique and contiguous from 1')
+    if len({record['post_id'] for record in records}) != 1:
+        raise ValueError('revision response mixes posts')
+    if len({record['revision_guid'] for record in records}) != len(records):
+        raise ValueError('revision GUIDs must be unique')
     return canonical(sorted(records, key=lambda record: record['revision_number']))
 
 
-def magnitude_set(text):
+def magnitude_set(text, prior):
     return {abs(Decimal(value)) for value in prior.literals(text)}
 
 
-def technical_findings(sources, bundle):
-    old = json.loads((RECIPE.parent / 'code-comparison.json').read_text())
-    baseline = {record['id']: record for record in old['records']}
+def revision_mapping(sources, baseline, prior):
     mapping = []
     for answer, kind, function in ((35148199, 'erf', 'my_erff'),
                                    (49743348, 'erfinv', 'my_erfinvf')):
-        for item in json.loads(sources[f'revisions-{answer}']):
+        items = json.loads(sources[f'revisions-{answer}'])
+        if any(item['post_id'] != answer for item in items):
+            raise ValueError('revision list belongs to a different answer')
+        newest = max(item['revision_number'] for item in items)
+        for item in items:
             blocks = prior.CodeBlocks()
             blocks.feed(item['body'])
-            code = prior.function_text(max(blocks.blocks, key=len), function)
+            block = max(blocks.blocks, key=len).encode('utf-8')
+            matches_audit = sha256(block) == baseline['stackoverflow-' + kind]['inputSha256']
+            if item['revision_number'] == newest and not matches_audit:
+                raise ValueError('newest revision code differs from prior audit answer')
+            code = prior.function_text(block.decode('utf-8'), function)
             literals = prior.literals(code)
             metal = baseline['mlx-metal-' + kind]['decimalFloatingLiterals']
             cpu = baseline['mlx-cpu-erfinv']['decimalFloatingLiterals']
@@ -62,17 +104,26 @@ def technical_findings(sources, bundle):
                 'date': datetime.datetime.fromtimestamp(item['creation_date'],
                           datetime.timezone.utc).isoformat(),
                 'ownerUserId': item['ownerUserId'],
-                'bodySha256': prior.digest(item['body'].encode('utf-8')),
-                'functionSha256': prior.digest(code.encode('utf-8')),
+                'bodySha256': sha256(item['body'].encode('utf-8')),
+                'codeBlockSha256': sha256(block), 'matchesPriorAuditAnswerCode': matches_audit,
+                'functionSha256': sha256(code.encode('utf-8')),
                 'metalLiteralSequenceEqual': metal == literals,
                 'metalLiteralMultisetSubset': not (Counter(metal) - Counter(literals)),
+                'cpuLiteralSequenceEqual': cpu == literals if kind == 'erfinv' else None,
                 'cpuLiteralMultisetEqual': Counter(cpu) == Counter(literals)
                     if kind == 'erfinv' else None,
             })
+    return mapping
+
+
+def technical_findings(sources, bundle_bytes, prior):
+    old = json.loads((RECIPE.parent / 'code-comparison.json').read_text())
+    baseline = {record['id']: record for record in old['records']}
+    mapping = revision_mapping(sources, baseline, prior)
     # Explicitly verify both MLX comparison inputs against the existing audited file hashes.
     for name, record in (('mlx-metal', baseline['mlx-metal-erf']),
                          ('mlx-simd', baseline['mlx-cpu-erfinv'])):
-        if prior.digest(sources[name]) != record['inputSha256']:
+        if sha256(sources[name]) != record['inputSha256']:
             raise ValueError('MLX source differs from original comparison')
     mlx = sources['mlx-simd'].decode('utf-8')
     coefficients = {
@@ -91,32 +142,90 @@ def technical_findings(sources, bundle):
             text = data.decode('ascii')
             release = re.search(r'Cephes Math Library Release [^\n]+', text).group()
             expected = {abs(Decimal(value)) for value in values}
-            cephes.append({'member': member, 'sha256': prior.digest(data),
+            cephes.append({'member': member, 'sha256': sha256(data),
                            'releaseLabel': release,
                            'comparison': 'six selected polynomial coefficient magnitudes; '
                                          'not control flow, sign/evaluation or '
                                          'permission equivalence',
                            'selectedCoefficients': values,
-                           'allSelectedMagnitudesInNetlibFile': expected <= magnitude_set(text),
+                           'allSelectedMagnitudesInNetlibFile':
+                               expected <= magnitude_set(text, prior),
                            'allSelectedMagnitudesInMlxSimdFunction': expected <= magnitude_set(
                                prior.function_text(mlx,
-                                   'exp' if function == 'exp2f' else 'sincos'))})
+                                   'exp' if function == 'exp2f' else 'sincos'), prior)})
+    references = {
+        'fastermathDescribesCephes28': bool(re.search(
+            r'based on the cephes math library\s+2\.8',
+            sources['fastermath'].decode('utf-8'), re.I)),
+        'mlxSimdCitesFastermath': 'github.com/akohlmey/fastermath/blob/master/src/exp.c' in mlx,
+        'mlxSimdCitesNeonMath': 'github.com/JishinMaster/simd_utils/blob/' in mlx
+                              and '/neon_mathfun.h' in mlx,
+    }
+    return {'revisionMapping': mapping, 'cephesCoefficientChecks': cephes,
+            'sourceReferences': references, **packaging_findings(bundle_bytes, sources)}
+
+
+MARKERS = {
+    'erf': r'\b(?:my_)?erff?\b',
+    'erfinv': r'\b(?:my_)?erfinvf?\b',
+    'ccBySa': r'\bcc[\s_\-\u2010-\u2015]*by[\s_\-\u2010-\u2015]*sa\b',
+    'creativeCommonsShareAlike': r'\bcreative\s+commons\s+attribution'
+                                r'[\s_\-\u2010-\u2015]*share[\s_\-\u2010-\u2015]*alike\b',
+    'juffa': r'\bjuffa\b',
+    'expm1f': r'\bexpm1f\b',
+    'fastermath': r'\bfastermath\b',
+    'neonMath': r'\b(?:simd_utils|neon_mathfun)\b',
+    'cephes': r'\bcephes\b',
+    'moshier': r'\bmoshier\b',
+    'netlib': r'\bnetlib\b',
+}
+
+
+def marker_scan(text):
+    return {name: bool(re.search(pattern, text, re.I)) for name, pattern in MARKERS.items()}
+
+
+def normalized_text(text):
+    return ' '.join(text.split())
+
+
+def packaging_findings(bundle_bytes, sources):
+    # Match the actual packaged notice text to the independently pinned source fragments.
+    fragments = {'juffaExpm1f': ('mlx-expm1f', 1, 33),
+                 'fastermath': ('fastermath', 1, 28),
+                 'neonMath': ('neon-math', 7, 26),
+                 'cephesPermission': ('cephes-readme', 1, None)}
     packaging = []
-    with zipfile.ZipFile(bundle) as outer:
+    with zipfile.ZipFile(io.BytesIO(bundle_bytes)) as outer:
+        prefix = 'se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0'
         for suffix in ('.jar', '-sources.jar', '-javadoc.jar'):
-            name = ('se/alipsa/jmlx-native-macos-arm64/0.1.0/'
-                    'jmlx-native-macos-arm64-0.1.0' + suffix)
-            data = outer.read(name)
+            entry = prefix + suffix
+            data = outer.read(entry)
             with zipfile.ZipFile(io.BytesIO(data)) as jar:
                 notice = jar.read('META-INF/THIRD-PARTY-NOTICES').decode('utf-8')
-                packaging.append({'entry': name, 'sha256': prior.digest(data),
-                    'noticeSha256': prior.digest(notice.encode('utf-8')),
-                    'noticeContainsErfinv': 'erfinv' in notice,
-                    'noticeContainsCcBySa': 'CC BY-SA' in notice,
-                    'nativeSourceEntries': [name for name in jar.namelist()
-                        if name.endswith(('.h', '.cpp', '.c', '.metal'))]})
-    return {'revisionMapping': mapping, 'cephesCoefficientChecks': cephes,
-            'rc1Packaging': packaging}
+                source_matches = {}
+                for name, (source, first, last) in fragments.items():
+                    lines = sources[source].decode('utf-8').splitlines()[first - 1:last]
+                    fragment = normalized_text('\n'.join(lines))
+                    source_matches[name] = bool(fragment) and fragment in normalized_text(notice)
+                meta = {}
+                for member in jar.infolist():
+                    if member.filename.startswith('META-INF/') and not member.is_dir():
+                        raw = jar.read(member)
+                        meta[member.filename] = {'sha256': sha256(raw),
+                            'markers': marker_scan(raw.decode('utf-8', errors='replace'))}
+                packaging.append({'entry': entry, 'sha256': sha256(data),
+                    'noticeSha256': sha256(notice.encode('utf-8')),
+                    'packagedNoticeMatchesSources': source_matches,
+                    'metaInfFiles': meta,
+                    'nativeSourceEntries': [member for member in jar.namelist()
+                        if member.endswith(('.h', '.cpp', '.c', '.metal'))]})
+        pom = outer.read(prefix + '.pom')
+        ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
+        licenses = [{key: item.findtext('m:' + key, namespaces=ns)
+                     for key in ('name', 'url', 'comments')}
+                    for item in ET.fromstring(pom).findall('m:licenses/m:license', ns)]
+    return {'rc1Packaging': packaging, 'nativePom': {'sha256': sha256(pom), 'licenses': licenses}}
 
 
 def main():
@@ -127,25 +236,29 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
     evidence = json.loads((HERE / 'review.json').read_text())
-    if prior.digest(Path(__file__).read_bytes()) != evidence['reproducerSha256']:
+    if sha256(Path(__file__).read_bytes()) != evidence['reproducerSha256']:
         raise ValueError('scoped review recipe changed')
-    if prior.digest(RECIPE.read_bytes()) != evidence['priorRecipeSha256']:
-        raise ValueError('prior comparison recipe changed')
-    if prior.digest(args.bundle.read_bytes()) != evidence['candidate']['bundleSha256']:
+    prior = load_prior(evidence)
+    bundle_bytes = args.bundle.read_bytes()
+    if sha256(bundle_bytes) != evidence['candidate']['bundleSha256']:
         raise ValueError('bundle differs from frozen RC1')
     prior_evidence = RECIPE.parent / 'code-comparison.json'
-    if prior.digest(prior_evidence.read_bytes()) != evidence['priorComparisonSha256']:
+    if sha256(prior_evidence.read_bytes()) != evidence['priorComparisonSha256']:
         raise ValueError('prior comparison evidence changed')
     expected_path = HERE / 'technical-findings.json'
-    if prior.digest(expected_path.read_bytes()) != evidence['technicalFindingsSha256']:
+    expected_bytes = expected_path.read_bytes()
+    if sha256(expected_bytes) != evidence['technicalFindingsSha256']:
         raise ValueError('committed technical report changed')
     sources = {}
     for source in evidence['technicalSources']:
         projection = revisions if source['projection'] == 'revisions' else lambda raw: raw
-        sources[source['id']] = prior.read_source(source['url'], source['sha256'], projection,
-                                                args.inputs, args.fetch_missing)
-    actual = technical_findings(sources, args.bundle)
-    expected = json.loads((HERE / 'technical-findings.json').read_text())
+        data = prior.read_source(source['url'], source['sha256'], projection,
+                                 args.inputs, args.fetch_missing)
+        if sha256(data) != source['sha256']:
+            raise ValueError('source digest differs: ' + source['id'])
+        sources[source['id']] = data
+    actual = technical_findings(sources, bundle_bytes, prior)
+    expected = json.loads(expected_bytes)
     if actual != expected:
         raise ValueError('technical findings differ from the committed review')
     args.output.parent.mkdir(parents=True, exist_ok=True)

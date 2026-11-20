@@ -80,6 +80,12 @@
       "url": "https://github.com/JishinMaster/simd_utils/blob/3c1433a86fb38edcc9b02039f3c9a65b16640976/neon_mathfun.h",
       "projection": "bytes",
       "sha256": "e75773addab087ff17c288f1143f45af0a532b1fafe2b550f13e55475a7d05a6"
+    },
+    {
+      "id": "mlx-expm1f",
+      "url": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/expm1f.h",
+      "projection": "bytes",
+      "sha256": "dbdf551f45723639da54d72e327008bde6ef01a2f1ed561bb065e251ab6c9f1a"
     }
   ],
   "legalReferences": [
@@ -114,14 +120,27 @@
     "Cephes checks compare six selected polynomial coefficient magnitudes per function, not full implementation provenance or permission.",
     "Netlib archives and public API histories are mutable; digests bind this dated snapshot.",
     "Source/wheel association inherits the existing vendor-wheel audit; it is not a reproducible rebuild of the wheel.",
-    "No legally conclusive adaptation boundary or license grant is inferred from numeric matches."
+    "No legally conclusive adaptation boundary or license grant is inferred from numeric matches.",
+    "cephes-email and cephes-followup only pin correspondence snapshots for manual interpretation; the replay does not interpret permission scope or establish a grant."
   ],
-  "technicalFindingsSha256": "7de2a0fe316965be33205b44da4faf5eca77ea8ddc1954ba3b378ee1a1abbd30",
-  "reproducerSha256": "f23bbaf9640bcad7444bab4a9a4d0fc6b531d6ed6f3772982766134302de7f7a",
+  "technicalFindingsSha256": "c3425f6855d64049d87c6283167bb013ec97444d316696f3c6ec26aaa953c218",
+  "reproducerSha256": "3267d1d12191f6c026488d0a3718f36c83208a69ada78c1ed3231a50d6775054",
   "validation": {
     "freshAndCachedReportsEqual": true,
     "wrongBundleRejectedBeforeOutput": true,
-    "replayResult": "7 revision mappings, 2 function-scoped Cephes checks, 3 native JAR inspections reproduced",
-    "legalClearance": false
-  }
+    "replayResult": "7 revision mappings tied to the prior audit, 2 function-scoped Cephes checks, 3 all-META-INF native JAR scans, source-fragment notice matches, source references and the native POM reproduced",
+    "legalClearance": false,
+    "releaseSelftests": {
+      "tests": 94,
+      "seconds": 52.262,
+      "result": "passed",
+      "newFocusedTests": 9,
+      "testFile": "tools/release-all/tests/test_scoped_license_review.py",
+      "testFileSha256": "9cb58a7cdd2d1dd200ae0889c3f86ea548ac68b0bcfc72b9cf9dda2494b45c0d"
+    }
+  },
+  "snapshotOnlySources": [
+    "cephes-email",
+    "cephes-followup"
+  ]
 }

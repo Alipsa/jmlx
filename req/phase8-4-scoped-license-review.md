@@ -71,9 +71,15 @@ jmlx nor assumes that three function-level notices are sufficient for the compil
 ### RC1 packaging gap and proposed changes
 
 The native main, sources and Javadoc JARs all contain the reviewed third-party notice file.
-It contains Juffa's BSD `expm1f` notice, but no `erfinv` mention or `CC BY-SA` marker. None of
-these JARs contains native `.h`, `.c`, `.cpp` or `.metal` source entries. The native POM lists
-MIT and Apache-2.0 with scoped comments. These observations are reproducible from the signed ZIP.
+The replay matches the packaged `expm1f`, fastermath, NEON and Netlib notice fragments to
+their pinned sources, normalizing whitespace only. Every non-directory `META-INF` entry is
+hashed and scanned with case-insensitive function and license markers, including `CC BY-SA`,
+`CC-BY-SA` and the expanded Creative Commons Attribution-ShareAlike name. No `erf`/`erfinv`
+function marker or CC ShareAlike marker appears in those entries. These are bounded marker
+observations, not a semantic proof about every possible attribution spelling. None of
+these JARs contains native `.h`, `.c`, `.cpp` or `.metal` source entries. The native POM's
+license names, URLs and scoped comments are recorded in full: MIT for the jmlx artifact code
+and Apache-2.0 for compiled metal-cpp. These observations are reproducible from the signed ZIP.
 
 For a compliance implementation, prepare the following for reviewer approval:
 
@@ -153,14 +159,29 @@ python3 req/plans/evidence/scoped-license-review-2026-11-21/reproduce.py \
   --output build/releaseAll/scoped-license-review-2026-11-21/replayed.json
 ```
 
-Omit `--fetch-missing` for cached-input replay. The API projection sorts complete revision
-records by revision number and retains post ID, revision number/GUID/date, license, body and
-owner user ID. It excludes quota and mutable user-profile metadata. Byte inputs are hashed
-unchanged. The script reuses the earlier function extractor/decimal regex, reads selected
+Omit `--fetch-missing` for cached-input replay. The API projection rejects malformed/empty
+responses, mixed post IDs and noncontiguous or duplicate revision numbers/GUIDs. It sorts
+the validated complete snapshot by revision number and retains post ID, revision number/GUID/date,
+license, body and owner user ID. It excludes quota and mutable user-profile metadata.
+Byte inputs are hashed unchanged. The script reuses the earlier function extractor/decimal regex, reads selected
 Cephes tar members in memory and inspects the three nested native JARs without executing them.
+The newest answer code blocks must hash-match the earlier audit's comparison inputs. CPU
+sequence equality is recorded separately from multiset equality. Fastermath's Cephes 2.8
+reference and both CPU source citations are recorded; the two correspondence inputs pin
+snapshots for manual interpretation only. Their permission meaning is not replayed.
+
+A local `hashlib` SHA-256 verifies the prior recipe before executing those same bytes, with
+no dependency bytecode written. The bundle is read once; those bytes are hashed and inspected.
+The reviewed manifest is the trust anchor, not an authenticated publisher signature.
 Input integrity and equality to the committed technical report are checked; this is evidence
 reproduction, not automated legal clearance. Fresh-source changes require review of this dated
 snapshot rather than silently updating the report. RC1's tag, ZIP and final receipt stay unchanged.
+
+Focused regressions in `tools/release-all/tests/test_scoped_license_review.py` cover the
+pre-execution hash guard, stable verified bytes, revision shape/completeness, marker variants,
+all-META-INF scans, source notice and POM recording, answer-code linkage and CPU literal order.
+They run through `bash tools/release-all/selftest.sh` alongside the existing regressions.
+
 
 [minimum-run]: https://github.com/Alipsa/jmlx/actions/runs/44834519307
 [erf-r4]: https://stackoverflow.com/revisions/35148199/4

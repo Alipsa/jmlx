@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "date": "2026-11-21",
+  "baselineSha": "ddd2c33242502572aaa1a2a5e87a45f02815a615",
+  "status": "technical-scope-established; compliance proposal awaits owner/legal determination",
+  "releaseGateClosed": false,
+  "unresolvedFindingIds": [
+    "NATIVE-LICENSE-1",
+    "NATIVE-LICENSE-2"
+  ],
+  "thirdPartyContactMadeByThisReview": false,
+  "candidate": {
+    "tag": "jmlx-phase8.4-rc.1",
+    "tagObject": "95d5dd75be5a205dfe3148c5c752c3696316a61a",
+    "sha": "ddd2c33242502572aaa1a2a5e87a45f02815a615",
+    "bundleSha256": "b4428fd0817273fd7387528c35519302c334aee444cbe6dcffe53d2a05f0ef2f",
+    "bundleBytes": 106706355,
+    "preliminarySha256": "981507b908b7f07d1da37a5418ed4d6158fc0ff58e7293a1aef2e7b56c7c9ed4",
+    "finalReceiptSha256": "3ef7b8093dfa7046331052814988ae8ad33e60b069ffbdb00c83375009360f03"
+  },
+  "priorRecipeSha256": "d8298ae1b8801c1453760bce3a7b731cbf95c9402e66e8f9ce9297cf85b16f2c",
+  "priorComparisonSha256": "a2dec69a5b92599ef94723025a1b4c91d7cb13a9823ab815f55d74e652bc9086",
+  "technicalSources": [
+    {
+      "id": "revisions-35148199",
+      "url": "https://api.stackexchange.com/2.3/posts/35148199/revisions?site=stackoverflow&filter=withbody&pagesize=100",
+      "projection": "revisions",
+      "sha256": "293120d0c83093330bdc42187a2f126a60c5e8ac18ef24d22f2fff854d03d124"
+    },
+    {
+      "id": "revisions-49743348",
+      "url": "https://api.stackexchange.com/2.3/posts/49743348/revisions?site=stackoverflow&filter=withbody&pagesize=100",
+      "projection": "revisions",
+      "sha256": "190ec4fbb6cc9cc7eaa6aeb65eb4ad15a59f2a2d80311d892baa63a3683e93ec"
+    },
+    {
+      "id": "mlx-metal",
+      "url": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/erf.h",
+      "projection": "bytes",
+      "sha256": "31d88004390bbe08636c5f64a3cb3180ebc8d79a89267347de9f6c33aba0e9f9"
+    },
+    {
+      "id": "mlx-simd",
+      "url": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/cpu/simd/math.h",
+      "projection": "bytes",
+      "sha256": "5dbe79caa33a228d1354b2621876dc0fb3629dd6733c8ee4ebd0471790b0a94a"
+    },
+    {
+      "id": "cephes-single",
+      "url": "https://netlib.org/cephes/single.tgz",
+      "projection": "bytes",
+      "sha256": "e82d54c877efd4fee5b77acb568cbefd14176e6f115e9d5c199324bab4f8483b"
+    },
+    {
+      "id": "cephes-email",
+      "url": "https://lists.debian.org/debian-legal/2004/12/msg00295.html",
+      "projection": "bytes",
+      "sha256": "3a9f8b9032e320544df870e7706b7fc69184c1058c187aaddd74dc0302a071d7"
+    },
+    {
+      "id": "cephes-readme",
+      "url": "https://netlib.org/cephes/readme",
+      "projection": "bytes",
+      "sha256": "82004ae6ed8feb08fd16783b6b32e82adfe047f60cb2f238dbf5d4bf9dae42a2"
+    },
+    {
+      "id": "cephes-followup",
+      "url": "https://lists.debian.org/debian-legal/2004/12/msg00297.html",
+      "projection": "bytes",
+      "sha256": "5339e44536e481f05e7717527625f43464f9b1600f07a5f13e5d2aed6843f9cb"
+    },
+    {
+      "id": "fastermath",
+      "url": "https://github.com/akohlmey/fastermath/blob/2ed806f45871129c9ccddc63422370641af9f14d/src/exp.c",
+      "projection": "bytes",
+      "sha256": "1d408b5aed22e94947cd8bcb74594b8e0d0287bada919d875fc9a32d2d3cf665"
+    },
+    {
+      "id": "neon-math",
+      "url": "https://github.com/JishinMaster/simd_utils/blob/3c1433a86fb38edcc9b02039f3c9a65b16640976/neon_mathfun.h",
+      "projection": "bytes",
+      "sha256": "e75773addab087ff17c288f1143f45af0a532b1fafe2b550f13e55475a7d05a6"
+    }
+  ],
+  "legalReferences": [
+    {
+      "id": "stack-overflow-licensing",
+      "url": "https://stackoverflow.com/help/licensing",
+      "note": "Reviewed through web tool; direct snapshot unavailable: HTTP Error 403: Forbidden"
+    },
+    {
+      "id": "cc-by-sa-4",
+      "url": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.en",
+      "note": "Reviewed through web tool; direct snapshot unavailable: HTTP Error 403: Forbidden"
+    },
+    {
+      "id": "cc-by-sa-3",
+      "url": "https://creativecommons.org/licenses/by-sa/3.0/legalcode",
+      "note": "Reviewed through web tool; direct snapshot unavailable: HTTP Error 403: Forbidden"
+    },
+    {
+      "id": "cc-software-faq",
+      "url": "https://creativecommons.org/faq/",
+      "note": "Reviewed through web tool; direct snapshot unavailable: HTTP Error 403: Forbidden"
+    },
+    {
+      "id": "cc-compatible",
+      "url": "https://creativecommons.org/compatible-licenses/",
+      "note": "Reviewed through web tool; direct snapshot unavailable: HTTP Error 403: Forbidden"
+    }
+  ],
+  "methodLimits": [
+    "Decimal-floating-literal comparison reuses the previous bounded regex, not a general parser or equivalence proof.",
+    "Cephes checks compare six selected polynomial coefficient magnitudes per function, not full implementation provenance or permission.",
+    "Netlib archives and public API histories are mutable; digests bind this dated snapshot.",
+    "Source/wheel association inherits the existing vendor-wheel audit; it is not a reproducible rebuild of the wheel.",
+    "No legally conclusive adaptation boundary or license grant is inferred from numeric matches."
+  ],
+  "technicalFindingsSha256": "7de2a0fe316965be33205b44da4faf5eca77ea8ddc1954ba3b378ee1a1abbd30",
+  "reproducerSha256": "f23bbaf9640bcad7444bab4a9a4d0fc6b531d6ed6f3772982766134302de7f7a",
+  "validation": {
+    "freshAndCachedReportsEqual": true,
+    "wrongBundleRejectedBeforeOutput": true,
+    "replayResult": "7 revision mappings, 2 function-scoped Cephes checks, 3 native JAR inspections reproduced",
+    "legalClearance": false
+  }
+}

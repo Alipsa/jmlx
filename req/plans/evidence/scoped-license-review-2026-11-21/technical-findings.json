@@ -1,0 +1,155 @@
+{
+  "revisionMapping": [
+    {
+      "answerId": 35148199,
+      "revision": 1,
+      "revisionGuid": "5D1FBDFF-D184-4233-A315-8792803D82D1",
+      "apiLicense": "CC BY-SA 3.0",
+      "date": "2016-02-02T08:16:58+00:00",
+      "ownerUserId": 780717,
+      "bodySha256": "f44460656d0b4bfe57a54f2a5ff1699dbf1792bce2dbee3aed5649f0da74f2fa",
+      "functionSha256": "8bd0170125ce0bc3674b51e5c54ea19034408a466d27dafce7895f73401c8c72",
+      "metalLiteralSequenceEqual": false,
+      "metalLiteralMultisetSubset": false,
+      "cpuLiteralMultisetEqual": null
+    },
+    {
+      "answerId": 35148199,
+      "revision": 2,
+      "revisionGuid": "03D13D81-DD75-4148-B40A-E3CF4AD571EC",
+      "apiLicense": "CC BY-SA 3.0",
+      "date": "2016-02-03T14:19:30+00:00",
+      "ownerUserId": 780717,
+      "bodySha256": "84286ac748ba3193fa60c905f3f17335f845a8b134d04aa1bbcf06554f18a214",
+      "functionSha256": "8bd0170125ce0bc3674b51e5c54ea19034408a466d27dafce7895f73401c8c72",
+      "metalLiteralSequenceEqual": false,
+      "metalLiteralMultisetSubset": false,
+      "cpuLiteralMultisetEqual": null
+    },
+    {
+      "answerId": 35148199,
+      "revision": 3,
+      "revisionGuid": "04D9212F-D07B-4E6A-ABCD-C89F7E4DC7C1",
+      "apiLicense": "CC BY-SA 3.0",
+      "date": "2016-02-06T23:09:37+00:00",
+      "ownerUserId": 780717,
+      "bodySha256": "9b98a9c87ba4a77398f69fd838a5d67dae02c8a7169c5621d628eaf3ef087d90",
+      "functionSha256": "99d1ee7c6a5112552a9df19f0473d0419080593ea0b6d3871d41b71c43c4a87e",
+      "metalLiteralSequenceEqual": false,
+      "metalLiteralMultisetSubset": false,
+      "cpuLiteralMultisetEqual": null
+    },
+    {
+      "answerId": 35148199,
+      "revision": 4,
+      "revisionGuid": "61E756BD-925D-4F54-9BD3-C0357F51528E",
+      "apiLicense": "CC BY-SA 4.0",
+      "date": "2022-06-18T19:39:29+00:00",
+      "ownerUserId": 780717,
+      "bodySha256": "fc4bebdfe83046e2054633802d2d1a3e24e370a53570722fc99cf7a1594057ef",
+      "functionSha256": "727d4a07a43cec85670deae43708ba8f1c88ba474745262e7327df5f26125bb9",
+      "metalLiteralSequenceEqual": false,
+      "metalLiteralMultisetSubset": true,
+      "cpuLiteralMultisetEqual": null
+    },
+    {
+      "answerId": 49743348,
+      "revision": 1,
+      "revisionGuid": "B1905EF7-09F6-416F-AB05-45FA3787649C",
+      "apiLicense": "CC BY-SA 3.0",
+      "date": "2018-04-10T00:02:34+00:00",
+      "ownerUserId": 780717,
+      "bodySha256": "1f64669d1cf27ce982b39e79b9dc6beed485147aa0004d23281a20e4c7ca3205",
+      "functionSha256": "f738cb32d1ccb38590437737050d39649d6b30c4ab7d931726b67e0b02905680",
+      "metalLiteralSequenceEqual": false,
+      "metalLiteralMultisetSubset": false,
+      "cpuLiteralMultisetEqual": false
+    },
+    {
+      "answerId": 49743348,
+      "revision": 2,
+      "revisionGuid": "676CA1B1-1996-416C-A14A-95231D3C050C",
+      "apiLicense": "CC BY-SA 4.0",
+      "date": "2018-06-24T16:35:34+00:00",
+      "ownerUserId": 780717,
+      "bodySha256": "1176b534cbdbf1a36b3b83b63a8856989717e9a1e533f4035c8be7e0dd980057",
+      "functionSha256": "f738cb32d1ccb38590437737050d39649d6b30c4ab7d931726b67e0b02905680",
+      "metalLiteralSequenceEqual": false,
+      "metalLiteralMultisetSubset": false,
+      "cpuLiteralMultisetEqual": false
+    },
+    {
+      "answerId": 49743348,
+      "revision": 3,
+      "revisionGuid": "8439BF7B-10DC-491E-8C10-9B36BC877757",
+      "apiLicense": "CC BY-SA 4.0",
+      "date": "2021-06-10T06:04:37+00:00",
+      "ownerUserId": 780717,
+      "bodySha256": "f8b3c1d76aee800eb542d5feec83c0f3fa516fc74009c296c9b947051bf3bbc9",
+      "functionSha256": "361e8d3356760cb646b9313584e52057ff5f055f2e9b71074637ab8eafaf37a5",
+      "metalLiteralSequenceEqual": true,
+      "metalLiteralMultisetSubset": true,
+      "cpuLiteralMultisetEqual": true
+    }
+  ],
+  "cephesCoefficientChecks": [
+    {
+      "member": "./exp2f.c",
+      "sha256": "b4f9d463126d5deada585824952ca4ff875334775ecfcdefa2a19a41d84c7ad2",
+      "releaseLabel": "Cephes Math Library Release 2.2:  June, 1992",
+      "comparison": "six selected polynomial coefficient magnitudes; not control flow, sign/evaluation or permission equivalence",
+      "selectedCoefficients": [
+        "1.535336188319500e-4",
+        "1.339887440266574e-3",
+        "9.618437357674640e-3",
+        "5.550332471162809e-2",
+        "2.402264791363012e-1",
+        "6.931472028550421e-1"
+      ],
+      "allSelectedMagnitudesInNetlibFile": true,
+      "allSelectedMagnitudesInMlxSimdFunction": true
+    },
+    {
+      "member": "./sinf.c",
+      "sha256": "84b3f281ce0de625b1238da576cf34a97b449924bf91c3423a548d99d82f2284",
+      "releaseLabel": "Cephes Math Library Release 2.2:  June, 1992",
+      "comparison": "six selected polynomial coefficient magnitudes; not control flow, sign/evaluation or permission equivalence",
+      "selectedCoefficients": [
+        "-1.9515295891e-4",
+        "8.3321608736e-3",
+        "-1.6666654611e-1",
+        "2.443315711809948e-5",
+        "-1.388731625493765e-3",
+        "4.166664568298827e-2"
+      ],
+      "allSelectedMagnitudesInNetlibFile": true,
+      "allSelectedMagnitudesInMlxSimdFunction": true
+    }
+  ],
+  "rc1Packaging": [
+    {
+      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.jar",
+      "sha256": "895b8e847735663859aad46d0083b9081ba33b3fbf7f5967bf1c8c94f71e6435",
+      "noticeSha256": "4efc6e66304629e287bb7120b732a5784c2c1e398e28bf47e214eef885e34eb8",
+      "noticeContainsErfinv": false,
+      "noticeContainsCcBySa": false,
+      "nativeSourceEntries": []
+    },
+    {
+      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-sources.jar",
+      "sha256": "b61dbff6e31caf5a9a2226d942c0a474308345ceef0d890cf533f988edd2a4b9",
+      "noticeSha256": "4efc6e66304629e287bb7120b732a5784c2c1e398e28bf47e214eef885e34eb8",
+      "noticeContainsErfinv": false,
+      "noticeContainsCcBySa": false,
+      "nativeSourceEntries": []
+    },
+    {
+      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-javadoc.jar",
+      "sha256": "5f1592368b9be1cd873f56862105c2b73262579019c389cadccba6fb95185a0a",
+      "noticeSha256": "4efc6e66304629e287bb7120b732a5784c2c1e398e28bf47e214eef885e34eb8",
+      "noticeContainsErfinv": false,
+      "noticeContainsCcBySa": false,
+      "nativeSourceEntries": []
+    }
+  ]
+}

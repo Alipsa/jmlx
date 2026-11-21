@@ -3,13 +3,17 @@
 2026-11-21. Research based on main `ea78fa6bb1a45fc87c4e7213bcf08f7bf92234ca`. Status:
 proposed interpretation for owner review; no Juffa approval or finding closure.
 
+Author: Codex (assistant). Assessments and the proposed rationale below are the assistant's
+research, not the owner's determination.
+
 ## Assessment
 
 There is a reasonably arguable redistribution basis using the two existing grants together:
 MLX's MIT grant for rights its licensors hold, and Juffa's CC BY-SA 4.0 grant for his covered
-material. That is a stronger argument than the earlier recommendation to wait for proof of the
-upstream adapter-license treatment acknowledged. It requires jmlx's own CC compliance. The
-evidence does not establish an MIT-only grant for Juffa's exact implementations.
+material. This argument gives more weight to the distributor role than the earlier
+recommendation to wait for proof of upstream adapter-license treatment did. It requires jmlx's
+own CC compliance. The evidence does not establish an MIT-only grant for Juffa's exact
+implementations.
 
 This is an interpretation to assess, not a finding that MLX breached a license or that every
 condition of the proposed route is met. The owner remains the decision-maker under the [owner
@@ -22,7 +26,7 @@ The pinned [MLX MIT license][mit] expressly permits copying, modification, redis
 sublicensing, subject to retaining its copyright and permission notice. Its disclaimer also
 disclaims warranties, expressly including non-infringement. It supports reliance on the rights
 Apple/MLX can grant; it supplies neither a third-party ownership warranty nor an identified
-separate grant from Juffa. The [initial source commit][initial] already contains both Metal
+separate grant from Juffa. The [commit that added erf.h][initial] contains both Metal
 functions and an explicit Stack Overflow citation for `erf`. The [copyright commit][ack] adds
 Apple headers and updates the MIT copyright line; its relevant patches contain no Juffa
 permission record. These observations concern the inspected records, not private grants.
@@ -32,38 +36,55 @@ The [CC legal code][cc-legal] grants reproduction and sharing of adapted materia
 adapted material the licensee produces. Sections 2(a)(5)(A)-(C) address downstream offers and
 restrictions; section 6(a) terminates the noncomplying licensee's rights.
 
-CC's [FAQ][cc-faq] says a breach terminates only the breaching licensee's license. It also
-explains that the original license remains applicable after adaptation and recipients must
-observe both the original and adapter's licenses. Those points support examining jmlx's own
-permissions and conduct, rather than assuming an upstream compliance question automatically
-extinguishes its rights. They do not establish that this particular adaptation is compliant.
+CC's [How do CC licenses operate?][cc-operate] entry says a breach terminates only the
+breaching licensee's license. That supports examining jmlx's own permissions and conduct
+rather than assuming upstream noncompliance automatically terminates its rights.
+
+The separate [adaptation-license FAQ entry][cc-adapt] says the original CC license continues
+on the adapted material and recipients must comply with both it and the adapter's license.
+That supports the counterargument: jmlx still needs to identify the adapter's license. It is
+not evidence that upstream adapter-license treatment can simply be ignored. Both entry bodies
+and their exact anchors were verified in directly fetched official FAQ HTML on 2026-11-21,
+rather than inferred from a rendered summary. No raw-page hash is claimed.
 
 The local [binary observation][binary-observation] confirms that `libmlx.dylib` and
 `mlx.metallib` are byte-identical across the pinned wheel, staged runtime and rebuilt native
 JAR. [Bootstrap](../scripts/bootstrap-native.sh) copies those vendor files; it builds mlx-c
 separately. The observation covers the current producer JAR, not a newly signed candidate. It
-strengthens the distributor-role argument for these two files. It does not establish a
-reproducible MLX build, reconstruct every compiled function, or decide the legal boundary.
+strengthens the distributor-role argument for these two files. The same observation records
+that locally built `libmlxc.dylib` imports `mlx::core::erf` and `mlx::core::erfinv`, exposes
+no SIMD symbols, and has no direct backend/cpu includes in the inspected mlx-c source tree;
+the sources JAR contains only `NativeArtifact.java`, legal texts and its manifest, with no MLX
+headers. These checks corroborate the distributor premise without proving the absence of every
+potentially inlined implementation. The observation does not establish a reproducible MLX
+build, reconstruct every compiled function, or decide the legal boundary.
 
 ## The strongest interpretation and its counterargument
 
-**Proposed inference:** jmlx can obtain permission for Juffa's covered contribution directly
-under CC, while relying on MIT for Apple/MLX contributions, and redistribute the existing
-vendor binaries with both sets of applicable terms preserved. It would not need to assert that
-Apple relicensed Juffa's rights, or to choose a new license for Apple's contributions. An
-upstream request can remain useful without being the exclusive route to a decision.
+**Proposed inference:** section 2(a)(5)(A) supplies the direct offer relied on for Juffa's
+Licensed Material. The interpretation treats his covered expression retained within MLX's
+adaptation as receipt of that Licensed Material, while relying separately on MIT for Apple/MLX
+contributions. It reads (B)'s additional offer for Adapted Material as cumulative, not as
+replacing (A)'s offer for the underlying material. Section 2(a)(1)'s grant and section 3(b)'s
+"You produce" limitation support evaluating redistribution of existing binaries separately
+from producing an adaptation. This is the proposed reading, not a settled conclusion about the
+legal identity of the received material. An upstream request remains useful without being the
+exclusive route to a decision.
 
-**Remaining counterargument:** treating MIT as the identified grant for Apple/MLX changes does
-not demonstrate a conforming ShareAlike adapter's license. MIT is absent from CC's [approved
-compatibility list][cc-compatible]. The direct-permissions argument must explain why the
-combination suffices for downstream redistribution despite that unresolved upstream treatment.
-An automatic downstream offer is not proof that MIT qualifies as a compatible adapter's
-license. The distinction is material and should appear in an owner rationale.
+**Remaining counterargument:** section 2(a)(5)(B) makes the Licensor's offer for Adapted
+Material "under the conditions of the Adapter's License You apply". For the MLX adaptations,
+that raises the question of the license Apple/MLX applied. Receiving an adapted binary cannot
+simply be equated with receiving only the original Licensed Material to bypass that condition.
+The adaptation FAQ reinforces the need to comply with both licenses. MIT's absence from CC's
+[approved compatibility list][cc-compatible] sharpens the problem: identifying the MIT grant
+for MLX changes does not demonstrate a conforming ShareAlike adapter's license. The proposed
+cumulative reading of (A) and (B) must address that problem; an automatic offer alone does not
+resolve it.
 
-My revised assessment is that requiring proof of upstream compliance as an absolute
-prerequisite was too categorical. A reasoned owner decision can evaluate this direct-grants
-interpretation. This investigation does not establish that the counterargument is legally
-settled, or silently replace the still-pending decision in the owner record.
+The assistant's revised assessment is that requiring proof of upstream compliance as an
+absolute prerequisite was too categorical. A reasoned owner decision can evaluate this
+direct-grants interpretation. This investigation does not establish that the counterargument
+is legally settled, or replace the still-pending decision in the owner record.
 
 ## Could the reused mathematics require no Juffa copyright permission?
 
@@ -103,9 +124,12 @@ The following is a draft, not an approved determination:
 > jmlx would act as a distributor and meet its own applicable attribution, modification-notice
 > and downstream conditions. This interpretation treats the two grants as the redistribution
 > basis despite the unresolved upstream adapter-license treatment; it does not describe MIT as
-> a CC-compatible adapter's license or claim an MIT-only grant for Juffa's contribution.
-> Acceptance would depend on the scoped boundary and final notices, POM and distribution terms
-> being approved and validated. New changes by jmlx would need a separate assessment.
+> a CC-compatible adapter's license or claim an MIT-only grant for Juffa's contribution. The
+> owner would rely on section 2(a)(5)(A) for Juffa's expression retained within the adaptation
+> because (B) describes an additional offer, while recognizing that (B)'s adapter-license
+> condition remains the unresolved counterargument. Acceptance would depend on the scoped
+> boundary and final notices, POM and distribution terms being approved and validated. New
+> changes by jmlx would need a separate assessment.
 
 Before accepting that rationale, the owner must decide whether it adequately addresses the
 counterargument above. The material scope remains the three mappings in the [compliance
@@ -133,7 +157,8 @@ this research-only change.
 [initial]: https://github.com/ml-explore/mlx/commit/d1f86272a27b5a0729378ac75bb03727c7c0e553
 [ack]: https://github.com/ml-explore/mlx/commit/46a39e5b1ff92d93833d9710ef64db207ce274ea
 [cc-legal]: https://creativecommons.org/licenses/by-sa/4.0/legalcode.en
-[cc-faq]: https://creativecommons.org/faq/
+[cc-operate]: https://creativecommons.org/faq/#how-do-cc-licenses-operate
+[cc-adapt]: https://creativecommons.org/faq/#if-i-derive-or-adapt-material-offered-under-a-creative-commons-license-which-cc-licenses-can-i-use
 [cc-compatible]: https://creativecommons.org/compatible-licenses/
 [directive]: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:32009L0024
 [sas]: https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX:62010CJ0406

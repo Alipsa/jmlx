@@ -123,20 +123,26 @@
     "No legally conclusive adaptation boundary or license grant is inferred from numeric matches.",
     "cephes-email and cephes-followup only pin correspondence snapshots for manual interpretation; the replay does not interpret permission scope or establish a grant."
   ],
-  "technicalFindingsSha256": "c3425f6855d64049d87c6283167bb013ec97444d316696f3c6ec26aaa953c218",
-  "reproducerSha256": "3267d1d12191f6c026488d0a3718f36c83208a69ada78c1ed3231a50d6775054",
+  "technicalFindingsSha256": "d37cba5d97188a2936abfb784603c5e19bbc94cc9c5e876b32ce09a20d3b1124",
+  "reproducerSha256": "d8ad417a58e8f0cd4a49e5503e5ee47b80c06668358b6f28c69cc6e66a9673e6",
   "validation": {
     "freshAndCachedReportsEqual": true,
     "wrongBundleRejectedBeforeOutput": true,
     "replayResult": "7 revision mappings tied to the prior audit, 2 function-scoped Cephes checks, 3 all-META-INF native JAR scans, source-fragment notice matches, source references and the native POM reproduced",
     "legalClearance": false,
     "releaseSelftests": {
-      "tests": 94,
-      "seconds": 52.262,
+      "tests": 97,
+      "seconds": 62.31,
       "result": "passed",
-      "newFocusedTests": 9,
-      "testFile": "tools/release-all/tests/test_scoped_license_review.py",
-      "testFileSha256": "9cb58a7cdd2d1dd200ae0889c3f86ea548ac68b0bcfc72b9cf9dda2494b45c0d"
+      "newFocusedTests": 12,
+      "testFile": "tools/release-all/tests/test_scoped_license_review.py"
+    },
+    "replayInputs": {
+      "fresh": "build/releaseAll/scoped-license-review-2026-11-21/pr106-fresh-inputs",
+      "cached": "build/releaseAll/scoped-license-review-2026-11-21/inputs",
+      "verifiedSourcesPerReplay": 11,
+      "reportsSha256": "d37cba5d97188a2936abfb784603c5e19bbc94cc9c5e876b32ce09a20d3b1124",
+      "freshCacheAlsoReplayedWithoutFetch": true
     }
   },
   "snapshotOnlySources": [

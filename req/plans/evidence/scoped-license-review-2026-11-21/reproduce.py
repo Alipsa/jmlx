@@ -116,8 +116,7 @@ def revision_mapping(sources, baseline, prior):
     return mapping
 
 
-def technical_findings(sources, bundle_bytes, prior):
-    old = json.loads((RECIPE.parent / 'code-comparison.json').read_text())
+def technical_findings(sources, bundle_bytes, prior, old):
     baseline = {record['id']: record for record in old['records']}
     mapping = revision_mapping(sources, baseline, prior)
     # Explicitly verify both MLX comparison inputs against the existing audited file hashes.
@@ -138,9 +137,7 @@ def technical_findings(sources, bundle_bytes, prior):
     with tarfile.open(fileobj=io.BytesIO(sources['cephes-single']), mode='r:gz') as archive:
         for function, values in coefficients.items():
             member = './' + function + '.c'
-            data = archive.extractfile(member).read()
-            text = data.decode('ascii')
-            release = re.search(r'Cephes Math Library Release [^\n]+', text).group()
+            data, text, release = cephes_member(archive, member)
             expected = {abs(Decimal(value)) for value in values}
             cephes.append({'member': member, 'sha256': sha256(data),
                            'releaseLabel': release,
@@ -165,12 +162,32 @@ def technical_findings(sources, bundle_bytes, prior):
             'sourceReferences': references, **packaging_findings(bundle_bytes, sources)}
 
 
+def cephes_member(archive, member):
+    info = archive.getmember(member)
+    if not info.isfile():
+        raise ValueError('Cephes member is not a regular file: ' + member)
+    handle = archive.extractfile(info)
+    if handle is None:
+        raise ValueError('Cephes member is not a regular file: ' + member)
+    with handle:
+        data = handle.read()
+    text = data.decode('ascii')
+    match = re.search(r'Cephes Math Library Release [^\n]+', text)
+    if match is None:
+        raise ValueError('Cephes release label missing: ' + member)
+    return data, text, match.group()
+
+
 MARKERS = {
-    'erf': r'\b(?:my_)?erff?\b',
-    'erfinv': r'\b(?:my_)?erfinvf?\b',
+    'erf': r'\b(?:my_)?erf[fc]?\b',
+    'erfinv': r'\b(?:my_)?erf_?invf?\b',
     'ccBySa': r'\bcc[\s_\-\u2010-\u2015]*by[\s_\-\u2010-\u2015]*sa\b',
     'creativeCommonsShareAlike': r'\bcreative\s+commons\s+attribution'
                                 r'[\s_\-\u2010-\u2015]*share[\s_\-\u2010-\u2015]*alike\b',
+    'ccUrl': r'creativecommons\.org/licenses/by-sa\b',
+    'shareAlike': r'\bshare[\s_\-\u2010-\u2015]*alike\b',
+    'bySa': r'\bby[\s_\-\u2010-\u2015]*sa\b',
+    'stackOverflow': r'\bstackoverflow\.com\b|\b(?:35148199|49743348)\b',
     'juffa': r'\bjuffa\b',
     'expm1f': r'\bexpm1f\b',
     'fastermath': r'\bfastermath\b',
@@ -210,7 +227,7 @@ def packaging_findings(bundle_bytes, sources):
                     source_matches[name] = bool(fragment) and fragment in normalized_text(notice)
                 meta = {}
                 for member in jar.infolist():
-                    if member.filename.startswith('META-INF/') and not member.is_dir():
+                    if member.filename.upper().startswith('META-INF/') and not member.is_dir():
                         raw = jar.read(member)
                         meta[member.filename] = {'sha256': sha256(raw),
                             'markers': marker_scan(raw.decode('utf-8', errors='replace'))}
@@ -219,7 +236,8 @@ def packaging_findings(bundle_bytes, sources):
                     'packagedNoticeMatchesSources': source_matches,
                     'metaInfFiles': meta,
                     'nativeSourceEntries': [member for member in jar.namelist()
-                        if member.endswith(('.h', '.cpp', '.c', '.metal'))]})
+                        if member.lower().endswith(('.h', '.hpp', '.c', '.cc', '.cpp',
+                                                   '.m', '.mm', '.inc', '.metal'))]})
         pom = outer.read(prefix + '.pom')
         ns = {'m': 'http://maven.apache.org/POM/4.0.0'}
         licenses = [{key: item.findtext('m:' + key, namespaces=ns)
@@ -236,6 +254,7 @@ def main():
     parser.add_argument('--output', required=True, type=Path)
     args = parser.parse_args()
     evidence = json.loads((HERE / 'review.json').read_text())
+    # Drift check against the reviewed manifest; not authentication of this script.
     if sha256(Path(__file__).read_bytes()) != evidence['reproducerSha256']:
         raise ValueError('scoped review recipe changed')
     prior = load_prior(evidence)
@@ -243,7 +262,8 @@ def main():
     if sha256(bundle_bytes) != evidence['candidate']['bundleSha256']:
         raise ValueError('bundle differs from frozen RC1')
     prior_evidence = RECIPE.parent / 'code-comparison.json'
-    if sha256(prior_evidence.read_bytes()) != evidence['priorComparisonSha256']:
+    prior_bytes = prior_evidence.read_bytes()
+    if sha256(prior_bytes) != evidence['priorComparisonSha256']:
         raise ValueError('prior comparison evidence changed')
     expected_path = HERE / 'technical-findings.json'
     expected_bytes = expected_path.read_bytes()
@@ -257,7 +277,7 @@ def main():
         if sha256(data) != source['sha256']:
             raise ValueError('source digest differs: ' + source['id'])
         sources[source['id']] = data
-    actual = technical_findings(sources, bundle_bytes, prior)
+    actual = technical_findings(sources, bundle_bytes, prior, json.loads(prior_bytes))
     expected = json.loads(expected_bytes)
     if actual != expected:
         raise ValueError('technical findings differ from the committed review')

@@ -1,5 +1,6 @@
 """Regression checks for the dated scoped-review evidence replay."""
 
+import contextlib
 import copy
 import hashlib
 import importlib.util
@@ -7,6 +8,7 @@ import io
 import json
 from pathlib import Path
 import sys
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import call, patch
@@ -39,10 +41,11 @@ class ScopedLicenseReviewTest(unittest.TestCase):
     def test_import_does_not_execute_prior_recipe(self):
         spec = importlib.util.spec_from_file_location('scoped_no_import', HERE / 'reproduce.py')
         module = importlib.util.module_from_spec(spec)
-        with patch('builtins.exec', wraps=exec) as execute:
+        with patch.object(Path, 'read_bytes', autospec=True,
+                          side_effect=Path.read_bytes) as read:
             with patch.object(sys, 'dont_write_bytecode', True):
                 spec.loader.exec_module(module)
-        self.assertEqual(execute.call_count, 1)  # This module only; the prior recipe is lazy.
+        self.assertNotIn(call(C.RECIPE), read.call_args_list)
 
     def test_tampered_dependency_cannot_run_or_supply_the_hash_function(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -109,6 +112,19 @@ class ScopedLicenseReviewTest(unittest.TestCase):
         self.assertFalse(C.marker_scan('native interface')['erf'])
         self.assertTrue(C.marker_scan('MY_ERFF(x)')['erf'])
         self.assertTrue(C.marker_scan('ERFINVF(x)')['erfinv'])
+        for text, marker in (
+                ('https://creativecommons.org/licenses/by-sa/4.0/', 'ccUrl'),
+                ('Attribution-ShareAlike 4.0 International', 'shareAlike'),
+                ('licensed under BY-SA 4.0', 'bySa'),
+                ('BY\u2011SA', 'bySa'), ('share_alike', 'shareAlike'),
+                ('stackoverflow.com/a/49743348', 'stackOverflow'),
+                ('35148199', 'stackOverflow'), ('49743348', 'stackOverflow'),
+                ('erfc(x)', 'erf'), ('erf_inv', 'erfinv')):
+            with self.subTest(text=text):
+                self.assertTrue(C.marker_scan(text)[marker])
+        for text in ('interface', 'erfcx', 'erf_inverse', '1351481990', 'by-sample'):
+            with self.subTest(text=text):
+                self.assertFalse(any(C.marker_scan(text).values()))
 
     def test_nested_bundle_scans_all_meta_inf_files_and_records_notices_and_pom(self):
         sources = {'mlx-expm1f': b'Juffa expm1f license', 'fastermath': b'fastermath license',
@@ -119,7 +135,12 @@ class ScopedLicenseReviewTest(unittest.TestCase):
                          'META-INF/NOTICE': 'cc-by-sa',
                          'META-INF/LICENSE': 'Creative Commons Attribution-ShareAlike',
                          'META-INF/extra.txt': 'ERFINV and erf',
-                         'native.h': 'source'})
+                         'meta-inf/attribution': 'licensed under BY-SA 4.0',
+                         **{name: 'source' for name in
+                            ('native.h', 'native.HPP', 'native.CC', 'native.MM',
+                             'native.M', 'native.INC', 'native.CPP', 'native.C',
+                             'native.METAL')},
+                         'native.class': 'bytecode'})
         prefix = 'se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0'
         files = {prefix + suffix: jar for suffix in ('.jar', '-sources.jar', '-javadoc.jar')}
         files[prefix + '.pom'] = ('<project xmlns="http://maven.apache.org/POM/4.0.0">'
@@ -131,8 +152,11 @@ class ScopedLicenseReviewTest(unittest.TestCase):
             'url': 'https://example.test/mit', 'comments': 'Scoped comment'}])
         for entry in result['rc1Packaging']:
             self.assertTrue(all(entry['packagedNoticeMatchesSources'].values()))
-            self.assertEqual(entry['nativeSourceEntries'], ['native.h'])
+            self.assertEqual(entry['nativeSourceEntries'],
+                             ['native.h', 'native.HPP', 'native.CC', 'native.MM',
+                              'native.M', 'native.INC', 'native.CPP', 'native.C', 'native.METAL'])
             meta = entry['metaInfFiles']
+            self.assertTrue(meta['meta-inf/attribution']['markers']['bySa'])
             self.assertTrue(meta['META-INF/NOTICE']['markers']['ccBySa'])
             self.assertTrue(meta['META-INF/LICENSE']['markers']['creativeCommonsShareAlike'])
             self.assertTrue(meta['META-INF/extra.txt']['markers']['erf'])
@@ -163,32 +187,80 @@ class ScopedLicenseReviewTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'newest revision code differs'):
             C.revision_mapping(sources, baseline, prior)
 
-    def test_main_inspects_the_verified_bundle_bytes_even_if_path_changes(self):
-        data = b'the verified ZIP bytes'
+    def test_cephes_rejects_nonregular_members_and_missing_release_labels(self):
+        for kind, data, message in (
+                (tarfile.DIRTYPE, b'', 'not a regular file'),
+                (tarfile.SYMTYPE, b'', 'not a regular file'),
+                (tarfile.REGTYPE, b'no release label', 'release label missing')):
+            with self.subTest(kind=kind):
+                buffer = io.BytesIO()
+                with tarfile.open(fileobj=buffer, mode='w:gz') as archive:
+                    info = tarfile.TarInfo('./exp2f.c')
+                    info.type, info.size = kind, len(data)
+                    archive.addfile(info, io.BytesIO(data))
+                with tarfile.open(fileobj=io.BytesIO(buffer.getvalue()), mode='r:gz') as archive:
+                    with self.assertRaisesRegex(ValueError, message):
+                        C.cephes_member(archive, './exp2f.c')
+
+    def run_main(self, temp, bundle, output, evidence, inspect):
+        original_loads = json.loads
+        manifest_text = (HERE / 'review.json').read_text()
+        with patch.object(C, 'load_prior', return_value=object()), \
+                patch.object(C, 'technical_findings', side_effect=inspect) as findings, \
+                patch.object(C.json, 'loads', wraps=json.loads) as loads, \
+                patch.object(sys, 'argv', ['reproduce.py', '--inputs', temp,
+                                          '--bundle', str(bundle), '--output', str(output)]), \
+                contextlib.redirect_stdout(io.StringIO()):
+            loads.side_effect = lambda raw: (evidence if raw == manifest_text
+                                             else original_loads(raw))
+            C.main()
+        return findings
+
+    def main_evidence(self, data):
         evidence = copy.deepcopy(EVIDENCE)
         evidence['candidate']['bundleSha256'] = C.sha256(data)
         evidence['reproducerSha256'] = C.sha256((HERE / 'reproduce.py').read_bytes())
         evidence['technicalSources'] = []
-        original_loads = json.loads
-        manifest_text = (HERE / 'review.json').read_text()
+        return evidence
+
+    def test_main_rejects_wrong_bundle_before_findings_or_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            bundle = Path(temp) / 'bundle.zip'
+            bundle.write_bytes(b'wrong bundle')
+            output = Path(temp) / 'new-directory' / 'report.json'
+            def inspect(*args):
+                self.fail('wrong bundle must be rejected before inspection')
+            with self.assertRaisesRegex(ValueError, 'bundle differs from frozen RC1'):
+                self.run_main(temp, bundle, output, self.main_evidence(b'approved'), inspect)
+            self.assertFalse(output.parent.exists())
+
+    def test_main_rejects_changed_findings_before_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            bundle = Path(temp) / 'bundle.zip'
+            data = b'approved'
+            bundle.write_bytes(data)
+            output = Path(temp) / 'new-directory' / 'report.json'
+            with self.assertRaisesRegex(ValueError, 'technical findings differ'):
+                self.run_main(temp, bundle, output, self.main_evidence(data), lambda *args: {})
+            self.assertFalse(output.parent.exists())
+
+    def test_main_inspects_the_verified_bundle_bytes_even_if_path_changes(self):
+        data = b'the verified ZIP bytes'
+        evidence = self.main_evidence(data)
+        comparison = C.RECIPE.parent / 'code-comparison.json'
+        verified_comparison = comparison.read_bytes()
         with tempfile.TemporaryDirectory() as temp:
             bundle = Path(temp) / 'bundle.zip'
             bundle.write_bytes(data)
             output = Path(temp) / 'report.json'
-            def inspect(sources, actual, prior):
+            def inspect(sources, actual, prior, old):
                 bundle.write_bytes(b'replaced after verification')
                 self.assertEqual(actual, data)
+                self.assertEqual(old, json.loads(verified_comparison))
                 return json.loads((HERE / 'technical-findings.json').read_text())
-            with patch.object(C, 'load_prior', return_value=object()), \
-                    patch.object(C, 'technical_findings', side_effect=inspect), \
-                    patch.object(C.json, 'loads', wraps=json.loads) as loads, \
-                    patch.object(sys, 'argv', ['reproduce.py', '--inputs', temp,
-                                              '--bundle', str(bundle), '--output', str(output)]):
-                # Replace only the review manifest; all other JSON uses the real parser.
-                loads.side_effect = lambda raw: (evidence if raw == manifest_text
-                                                 else original_loads(raw))
-                with patch.object(C, 'sha256', wraps=C.sha256) as digest:
-                    # Source fetch integrity is exercised by the full replay, not this race test.
-                    C.main()
-                self.assertTrue(output.exists())
-                self.assertEqual(digest.call_args_list.count(call(data)), 1)
+            with patch.object(Path, 'read_bytes', autospec=True,
+                              side_effect=Path.read_bytes) as read:
+                self.run_main(temp, bundle, output, evidence, inspect)
+            self.assertTrue(output.exists())
+            self.assertEqual(read.call_args_list.count(call(bundle)), 1)
+            self.assertEqual(read.call_args_list.count(call(comparison)), 1)

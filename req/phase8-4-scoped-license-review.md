@@ -30,7 +30,9 @@ affected verification. Preserve RC1 and its receipt as historical evidence.
 
 [Minimum-host run 44834519307][minimum-run]
 passed against this ZIP. It establishes technical execution, not permission to distribute.
-The two reviewed headers also hash-match those installed by the pinned wheel. The existing
+In a local inspection outside the replay, the two reviewed headers hash-matched those
+installed by the pinned wheel (`native/scratch/wheel/mlx/include/mlx/backend/metal/kernels/erf.h`
+and `native/scratch/wheel/mlx/include/mlx/backend/cpu/simd/math.h`). The existing
 audit's vendor-binary/source association remains a limitation: no reproducible wheel rebuild
 or complete compilation record is claimed.
 
@@ -57,7 +59,8 @@ finding; its PyTorch provenance was already handled separately.
 versions by contribution date and exposes the applicable revision license. The
 [CC BY-SA 4.0 terms](https://creativecommons.org/licenses/by-sa/4.0/legalcode.en), sections
 2–3, permit sharing and adaptation subject to attribution, retained notices, source links,
-modification indications, applicable ShareAlike terms and downstream restrictions rules.
+modification indications, applicable ShareAlike terms and the no-downstream-restrictions
+condition (§2(a)(5)(C)).
 The reviewer must determine the adapted material and how those duties apply to the compiled
 MLX/Metal distribution. MIT labels alone do not settle that boundary.
 
@@ -74,10 +77,13 @@ The native main, sources and Javadoc JARs all contain the reviewed third-party n
 The replay matches the packaged `expm1f`, fastermath, NEON and Netlib notice fragments to
 their pinned sources, normalizing whitespace only. Every non-directory `META-INF` entry is
 hashed and scanned with case-insensitive function and license markers, including `CC BY-SA`,
-`CC-BY-SA` and the expanded Creative Commons Attribution-ShareAlike name. No `erf`/`erfinv`
+`CC-BY-SA`, bare BY-SA, ShareAlike, Creative Commons license URLs, Stack Overflow
+links/answer IDs and the expanded Creative Commons Attribution-ShareAlike name. No `erf`/`erfinv`
 function marker or CC ShareAlike marker appears in those entries. These are bounded marker
 observations, not a semantic proof about every possible attribution spelling. None of
-these JARs contains native `.h`, `.c`, `.cpp` or `.metal` source entries. The native POM's
+these JARs contains native source entries with the case-insensitive extensions
+`.h`, `.hpp`, `.c`, `.cc`,
+`.cpp`, `.m`, `.mm`, `.inc` or `.metal`. The native POM's
 license names, URLs and scoped comments are recorded in full: MIT for the jmlx artifact code
 and Apache-2.0 for compiled metal-cpp. These observations are reproducible from the signed ZIP.
 
@@ -171,7 +177,9 @@ inputs. CPU sequence equality is recorded separately from multiset equality. Fas
 snapshots for manual interpretation only. Their permission meaning is not replayed.
 
 A local `hashlib` SHA-256 verifies the prior recipe before executing those same bytes, with
-no dependency bytecode written. The bundle is read once; those bytes are hashed and inspected.
+no dependency bytecode written. The bundle and prior comparison JSON are each read once;
+those verified bytes are used for inspection. The reproducer hash is a drift check,
+not script authentication.
 The reviewed manifest is the trust anchor, not an authenticated publisher signature.
 Input integrity and equality to the committed technical report are checked; this is evidence
 reproduction, not automated legal clearance. Fresh-source changes require review of this dated
@@ -179,7 +187,8 @@ snapshot rather than silently updating the report. RC1's tag, ZIP and final rece
 
 Focused regressions in `tools/release-all/tests/test_scoped_license_review.py` cover the
 pre-execution hash guard, stable verified bytes, revision shape/completeness, marker variants,
-all-META-INF scans, source notice and POM recording, answer-code linkage and CPU literal order.
+all-META-INF scans, source notice and POM recording, answer-code linkage, CPU literal order,
+malformed Cephes members and rejection before output for wrong bundles or changed findings.
 They run through `bash tools/release-all/selftest.sh` alongside the existing regressions.
 
 

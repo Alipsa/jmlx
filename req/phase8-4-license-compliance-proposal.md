@@ -1,6 +1,6 @@
 # Phase 8.4 native-license compliance proposal
 
-2026-11-21. Draft for owner/legal review, based on PR #106 merge
+2026-11-21. Draft for owner review, based on PR #106 merge
 `59cc6c1` and the [scoped review](phase8-4-scoped-license-review.md).
 Status: proposed; no legal determination or permission grant recorded.
 Both `NATIVE-LICENSE-1` and `NATIVE-LICENSE-2` remain open.
@@ -315,13 +315,17 @@ new verified receipt. Approval of this proposal is not Central publication autho
 
 ## Decision record for the reviewer
 
-All fields are currently pending. Complete this record in a reviewed PR; identify the exact
-proposal revision and final legal text hashes. Implementation selection is not a recorded
-legal determination. No rights holder or outside reviewer has been contacted by this work.
+The [owner decision record](phase8-4-owner-license-decision.md) identifies Per Nyfelt as the
+project reviewer, with Sweden as the confirmed review context. Substantive decisions remain
+pending. Its tables are the authoritative decision template; the table below lists required
+coverage rather than a second template. Complete the owner record in a reviewed PR; identify
+the exact proposal revision and final legal text hashes. Implementation selection is not a
+recorded legal determination. This workflow does not require outside legal approval. No
+rights holder or outside reviewer has been contacted by this work.
 
 | Field | Required record |
 | --- | --- |
-| Reviewer | Name, role, date and applicable jurisdiction |
+| Reviewer | Name, role, date, review context and applicable law (pending if undetermined) |
 | Reviewed evidence | Candidate identity, proposal commit and scoped-review hashes |
 | Juffa source mapping | Accept/reject/need evidence, with rationale and references |
 | Adaptation scope | Exact source and compiled material, including surrounding-code treatment |

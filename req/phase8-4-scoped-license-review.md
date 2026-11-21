@@ -3,7 +3,7 @@
 2026-11-21. Technical review of frozen `jmlx-phase8.4-rc.1`, based on reviewed main
 `ddd2c33242502572aaa1a2a5e87a45f02815a615`. Both license findings remain open.
 This memo supplies evidence, a proposed compliance route and explicit decision questions;
-no owner/legal determination or new third-party permission has been obtained.
+no owner determination or new third-party permission has been obtained.
 
 ## Recommended disposition
 
@@ -135,11 +135,12 @@ No exact licensed-distribution chain has been established by this review.
 ## Decision record to complete
 
 The [compliance proposal](phase8-4-license-compliance-proposal.md) supplies a concrete draft
-notice, proposed packaging changes and a decision-record template for this review.
+notice and proposed packaging changes. The authoritative decision template and the policy
+on optional external advice are in the [owner record](phase8-4-owner-license-decision.md).
 
-An owner/legal reviewer should record their name, role, date, applicable jurisdiction and
-reasoned answers to these questions. Counsel review remains appropriate for the legal
-interpretations; the technical replay cannot supply those determinations.
+The owner should record their name, role, date, review context, applicable law (pending if
+undetermined) and reasoned answers to these questions. Independent legal advice is optional;
+the technical replay cannot supply those determinations.
 
 - **Juffa:** accept the source/license mapping or identify a different applicable grant;
   define the adapted material and lawful adapter-license treatment through compiled distribution.

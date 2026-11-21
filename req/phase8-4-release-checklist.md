@@ -56,9 +56,12 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   and review of any applicable grant or compliance decision.
   Rechecked 2026-11-20: the issue remains open with no comments; this gate is unchanged.
   The [2026-11-21 scoped review](phase8-4-scoped-license-review.md) supplies revision and
-  RC1 packaging evidence for an owner/legal compliance decision; no finding is closed.
+  RC1 packaging evidence for an owner compliance decision; no finding is closed.
   The [compliance proposal](phase8-4-license-compliance-proposal.md) provides a draft notice,
   concrete packaging changes and a decision record for that review; it is not approval.
+  The [owner decision record](phase8-4-owner-license-decision.md) confirms Per Nyfelt as
+  reviewer and Sweden as the review context; applicable law is undetermined and both
+  substantive determinations remain pending.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
   organization Usage Center values and the exact signed bundle remain outstanding.

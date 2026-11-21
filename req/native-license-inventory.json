@@ -204,7 +204,7 @@
       "packagedAs": "LICENSE-APACHE-2.0"
     },
     {
-      "component": "Cephes math provenance (upstream permission statement; review open)",
+      "component": "Cephes math provenance (original upstream permission statement)",
       "source": "https://www.netlib.org/cephes/readme",
       "sha256": "82004ae6ed8feb08fd16783b6b32e82adfe047f60cb2f238dbf5d4bf9dae42a2",
       "mlxPaths": [
@@ -222,7 +222,7 @@
   ],
   "packagedTexts": {
     "LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
-    "THIRD-PARTY-NOTICES": "4efc6e66304629e287bb7120b732a5784c2c1e398e28bf47e214eef885e34eb8",
+    "THIRD-PARTY-NOTICES": "1e571151cfa05d88148c2495bf4920e2127c54f409f8974c48070003905df7bd",
     "NOTICE": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
     "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9"
   },

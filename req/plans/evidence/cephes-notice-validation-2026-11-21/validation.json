@@ -1,0 +1,65 @@
+{
+  "schema": 1,
+  "date": "2026-11-21",
+  "ownerDecisionMerge": "05703375d372cc0bf5696e4320c01b204dc45c2e",
+  "kind": "local producer verification; not a candidate or publication receipt",
+  "packagedSectionTitle": "Cephes math provenance (original upstream permission statement)",
+  "onlyNoticeChangeIsTitle": true,
+  "staleSectionTitleRejected": true,
+  "nativePayloadMatchesPriorAudit": true,
+  "legalTexts": {
+    "LICENSE-APACHE-2.0": {
+      "sha256": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+      "size": 11344
+    },
+    "THIRD-PARTY-NOTICES": {
+      "sha256": "1e571151cfa05d88148c2495bf4920e2127c54f409f8974c48070003905df7bd",
+      "size": 40697
+    },
+    "NOTICE": {
+      "sha256": "3d162cd4a141174798a138dd851970047df54127d1f286f93190e5e2aa09cfdf",
+      "size": 1435
+    },
+    "LICENSE": {
+      "sha256": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9",
+      "size": 1063
+    }
+  },
+  "pom": {
+    "path": "jmlx-native-macos-arm64/build/publications/maven/pom-default.xml",
+    "sha256": "96f409e18e457f5c7d1904f9b74b1f9df674f8dc47781a875580653d74e18f05",
+    "size": 1784
+  },
+  "artifacts": {
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0.jar": {
+      "sha256": "9e2fb147777a023e8c75249386e87db58b68c98e361ba80e468228e3f27759d4",
+      "size": 77821140
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-sources.jar": {
+      "sha256": "5b8fab0f2583759f98df7cde97c9acb526aa433732819b7b744c09fa97bc311e",
+      "size": 15591
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-javadoc.jar": {
+      "sha256": "04a32171483e4232764bad4a60eba22f0aa9dd01b741883f5f199ffb99d111b7",
+      "size": 4167536
+    }
+  },
+  "validation": {
+    "gradle": [
+      ":jmlx-native-macos-arm64:check",
+      ":jmlx-native-macos-arm64:verifyNativeReleasePayload",
+      ":jmlx-native-macos-arm64:generatePomFileForMavenPublication"
+    ],
+    "nativeLicenseTests": 17
+  },
+  "releaseReady": false,
+  "unresolvedFindings": [
+    "NATIVE-LICENSE-1",
+    "NATIVE-LICENSE-2"
+  ],
+  "limits": [
+    "Cephes finding awaits implementation review and final candidate validation.",
+    "Juffa licensing decision remains pending.",
+    "RC1 and historical verification hashes are unchanged."
+  ]
+}

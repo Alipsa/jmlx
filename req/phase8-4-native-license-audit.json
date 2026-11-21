@@ -176,7 +176,16 @@
         "https://www.netlib.org/cephes/readme"
       ],
       "finding": "MLX explicitly traces exp/sincos to Cephes through fastermath and neon_mathfun.h. The direct BSD-3-Clause and zlib notices and the original Cephes permission statement are now retained. The original statement has no standard license identifier; no additional Cephes grant for this exact provenance chain was established.",
-      "resolutionRequired": "Document why the retained original permission covers this redistribution, or retain an applicable grant for the exact derived material. Do not label this chain BSD solely because another project received permission."
+      "resolutionRequired": "Document why the retained original permission covers this redistribution, or retain an applicable grant for the exact derived material. Do not label this chain BSD solely because another project received permission.",
+      "implementationFollowUp": {
+        "ownerDecision": "req/phase8-4-owner-license-decision.md",
+        "ownerDecisionMerge": "05703375d372cc0bf5696e4320c01b204dc45c2e",
+        "packagedSectionTitle": "Cephes math provenance (original upstream permission statement)",
+        "status": "Original-permission interpretation accepted; updated notice title and artifact validation await implementation review. Finding remains open.",
+        "historicalVerification": "Existing verification and artifact hashes below describe the 2026-11-16 audit, not the changed notice.",
+        "verification": "req/plans/evidence/cephes-notice-validation-2026-11-21/validation.json",
+        "sourceNoticeReport": "req/plans/evidence/cephes-notice-validation-2026-11-21/source-notice-report.json"
+      }
     }
   ],
   "nativeFiles": {

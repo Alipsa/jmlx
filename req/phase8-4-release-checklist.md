@@ -62,8 +62,10 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   The [owner decision record](phase8-4-owner-license-decision.md) confirms Per Nyfelt as
   reviewer and Sweden as the review context; applicable law is undetermined. On 2026-11-21
   the owner accepted the scoped Cephes original-permission interpretation, subject to retaining
-  notices and artifact validation. The Cephes finding remains open pending that validation;
-  the Juffa determination remains pending.
+  notices and artifact validation. The
+  [Cephes local verification](plans/evidence/cephes-notice-validation-2026-11-21/validation.json)
+  records the revised title and checks all three native JARs; implementation review and final
+  candidate validation remain outstanding. Both findings stay open; Juffa remains undecided.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
   organization Usage Center values and the exact signed bundle remain outstanding.

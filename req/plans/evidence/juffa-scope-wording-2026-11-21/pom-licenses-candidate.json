@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "status": "proposed license entries; comment template requires an approved-notice permalink before packaging",
+  "permalinkToken": "{{APPROVED_NOTICE_PERMALINK}}",
+  "permalinkRule": "After approved notice bytes are committed to jmlx-native-macos-arm64/THIRD-PARTY-NOTICES, replace this token in a later implementation commit with https://github.com/Alipsa/jmlx/blob/<full earlier notice commit SHA>/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES. Preserve that commit through a merge commit, require reviewed-main/candidate ancestry and compare the linked Juffa section raw bytes with the local and packaged sections. Record the literal final comment and its hash for review.",
+  "licenses": [
+    {
+      "name": "MIT License",
+      "url": "https://opensource.org/license/mit",
+      "comments": "Applies to the jmlx native artifact code and Apple/MLX contributions covered by their existing MIT grants. The reviewed Juffa expression has separately identified CC BY-SA 4.0 terms."
+    },
+    {
+      "name": "Apache License, Version 2.0",
+      "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+      "comments": "Applies to vendored metal-cpp compiled into libmlx.dylib."
+    },
+    {
+      "name": "Creative Commons Attribution-ShareAlike 4.0 International",
+      "url": "https://creativecommons.org/licenses/by-sa/4.0/",
+      "comments": "Applies to Norbert Juffa's covered expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material, including corresponding compiled forms in libmlx.dylib and mlx.metallib. Apple/MLX contributions rely separately on existing MIT grants; no CC adapter's license is identified. Scope and redistribution basis: {{APPROVED_NOTICE_PERMALINK}}. Also packaged in META-INF/THIRD-PARTY-NOTICES."
+    }
+  ]
+}

@@ -109,6 +109,10 @@ versions. Applicable law remains undetermined as recorded above.
 | Accept/reject/need evidence; conditions and responsible owner | Conditional accept; Per Nyfelt |
 | Named implementation/review owner and unresolved questions | Follow-up below |
 
+The [scope and wording packet][juffa-wording] supplies concrete candidates for the next owner
+review. Its manifest pins proposed section/file bytes and the POM template separately; the
+literal final permalink/POM is still pending. This preparation does not approve those items.
+
 **Follow-up:** apply proposal Decision 3 using the accepted MIT/direct-offer basis; no CC
 adapter's license is identified. Replace the draft notice's unresolved paragraph with that
 basis and the approved scope, retaining (B)'s counterargument rather than naming MIT as a
@@ -249,3 +253,5 @@ Central publication still needs the owner's separate approval of the exact verif
 [cephes-source-report]: plans/evidence/cephes-notice-validation-2026-11-21/source-notice-report.json
 
 [juffa-binaries]: plans/evidence/juffa-license-interpretation-2026-11-21/binary-observation.json
+
+[juffa-wording]: plans/evidence/juffa-scope-wording-2026-11-21/README.md

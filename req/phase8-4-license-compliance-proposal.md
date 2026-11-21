@@ -19,6 +19,10 @@ The concrete [draft notice](plans/evidence/license-compliance-proposal-2026-11-2
 is review material outside the native module. Its unresolved adapter-license paragraph must
 be replaced with approved wording before packaging. No production task includes that file.
 
+The [current scope and wording packet][scope-wording] supplies candidate notice, native NOTICE,
+full CC text and POM template under the accepted interpretation. It supersedes the earlier
+draft's unresolved-paragraph prompt for review; its scope and wording remain unapproved.
+
 ## Material and distribution to decide
 
 The reference is the unchanged RC1 ZIP with SHA-256
@@ -359,3 +363,5 @@ the separately digest-pinned snapshots in the scoped review. No new raw-page has
 [netlib]: https://netlib.org/cephes/readme
 [cephes-email]: https://lists.debian.org/debian-legal/2004/12/msg00295.html
 [cephes-reply]: https://lists.debian.org/debian-legal/2004/12/msg00297.html
+
+[scope-wording]: plans/evidence/juffa-scope-wording-2026-11-21/README.md

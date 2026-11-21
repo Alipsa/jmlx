@@ -1,0 +1,119 @@
+{
+  "schema": 1,
+  "date": "2026-11-21",
+  "baseCommit": "332d8e1bee00140f7c2f6901ac93e75623d67d46",
+  "status": "proposed scope and wording; substantive owner approval outstanding",
+  "ownerInterpretation": {
+    "pr": 112,
+    "mergeCommit": "332d8e1bee00140f7c2f6901ac93e75623d67d46",
+    "record": "req/phase8-4-owner-license-decision.md",
+    "recordAtMergeSha256": "5f72bf809f56d6872df888b045a616251611b84b9c7cbe4afc412455590a91f9"
+  },
+  "sourceCommit": "36969c094354086e15d2a327a9c50feb20b9cf11",
+  "scopeMappings": [
+    {
+      "mlxPath": "mlx/backend/metal/kernels/erf.h",
+      "headerSha256": "31d88004390bbe08636c5f64a3cb3180ebc8d79a89267347de9f6c33aba0e9f9",
+      "function": "erf(float)",
+      "answer": 35148199,
+      "revision": 4,
+      "revisionDate": "2022-06-18"
+    },
+    {
+      "mlxPath": "mlx/backend/metal/kernels/erf.h",
+      "headerSha256": "31d88004390bbe08636c5f64a3cb3180ebc8d79a89267347de9f6c33aba0e9f9",
+      "function": "erfinv(float)",
+      "answer": 49743348,
+      "revision": 3,
+      "revisionDate": "2021-06-10"
+    },
+    {
+      "mlxPath": "mlx/backend/cpu/simd/math.h",
+      "headerSha256": "5dbe79caa33a228d1354b2621876dc0fb3629dd6733c8ee4ebd0471790b0a94a",
+      "function": "mlx::core::simd::erfinv<T, N>",
+      "answer": 49743348,
+      "revision": 3,
+      "revisionDate": "2021-06-10"
+    }
+  ],
+  "proposedCompiledScope": [
+    "libmlx.dylib",
+    "mlx.metallib"
+  ],
+  "evidenceInputs": [
+    {
+      "path": "req/plans/evidence/scoped-license-review-2026-11-21/review.json",
+      "sha256": "b36e6b36b5a28730fb098ff8f5c205aa99efb57e3a473c2ee322117bfd4c5346"
+    },
+    {
+      "path": "req/plans/evidence/scoped-license-review-2026-11-21/technical-findings.json",
+      "sha256": "d37cba5d97188a2936abfb784603c5e19bbc94cc9c5e876b32ce09a20d3b1124"
+    },
+    {
+      "path": "req/plans/evidence/juffa-license-interpretation-2026-11-21/binary-observation.json",
+      "sha256": "b4d91f0dfb5ef53875b1ba75956a5d9a5cb22121d28111a789799987d1967277"
+    }
+  ],
+  "licenseRetrieval": {
+    "source": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.txt",
+    "linkedFrom": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.en",
+    "retrieved": "2026-11-21",
+    "transformation": "none; raw response bytes retained",
+    "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5"
+  },
+  "artifacts": [
+    {
+      "path": "juffa-notice-candidate.txt",
+      "kind": "literal candidate section including separator",
+      "proposedTarget": "jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
+      "sha256": "a67dc184dfef6648d34f150ee5f1b27354f3a73fdc5e799c142a6df3f36ceb37",
+      "bytes": 3334,
+      "sectionSha256": "c54e657e6059307762ed1f3a3f36b6b8a8e1edeb8ea1c3a74ddb73333054b1f6",
+      "sectionBytes": 3289,
+      "sectionRule": "Exclude the separator line and its LF; preserve every following byte through EOF, including the leading blank line and final LF."
+    },
+    {
+      "path": "native-NOTICE-candidate.txt",
+      "kind": "literal candidate file",
+      "proposedTarget": "jmlx-native-macos-arm64/NOTICE",
+      "sha256": "f005db181e3b8105fca6aa807e8124814d770334ce09acb025fac2b9dd90b1e2",
+      "bytes": 1967
+    },
+    {
+      "path": "LICENSE-CC-BY-SA-4.0",
+      "kind": "unmodified official license bytes",
+      "proposedTarget": "jmlx-native-macos-arm64/LICENSE-CC-BY-SA-4.0",
+      "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+      "bytes": 20138
+    },
+    {
+      "path": "pom-licenses-candidate.json",
+      "kind": "license/comment template; final permalink and literal POM pending",
+      "proposedTarget": "jmlx-native-macos-arm64/build.gradle",
+      "sha256": "13f5d825fc994431f09d08578d8d5d9eb9f3bb14190a534a3d41cdff5c2f0405",
+      "bytes": 1778
+    },
+    {
+      "path": "publication-paragraph.txt",
+      "kind": "literal candidate paragraph; final surrounding files pending",
+      "proposedTarget": "native README and Phase 8.4 release notes",
+      "sha256": "861acfddd5f3569aee231f6a18485eecd48b58d8e86dcf0e0f955cc2bf8712d8",
+      "bytes": 630
+    }
+  ],
+  "scopeApproved": false,
+  "wordingApproved": false,
+  "finalPomLiteralPending": true,
+  "releaseReady": false,
+  "unresolvedFindingIds": [
+    "NATIVE-LICENSE-1",
+    "NATIVE-LICENSE-2"
+  ],
+  "limits": [
+    "Drafts outside the native module; no production packaging or artifact verification claim.",
+    "A proposed logical boundary is not proof of a separable compiled/legal boundary.",
+    "The POM comment template hash is not the hash of a final generated POM.",
+    "Owner downstream-terms conclusion, implementation checks and new candidate validation remain pending.",
+    "No rights grant, finding closure or publication approval is created by this packet."
+  ]
+}

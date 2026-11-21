@@ -1,0 +1,29 @@
+jmlx-native-macos-arm64 bundles precompiled binaries built from:
+
+- MLX (https://github.com/ml-explore/mlx) -- existing MIT grant for Apple/MLX contributions,
+  Copyright (c) 2023 Apple Inc.; separately identified third-party material retains its terms.
+- mlx-c (https://github.com/ml-explore/mlx-c) -- MIT License, Copyright (c) 2023 ml-explore.
+- metal-cpp (Apple's header-only Metal C++ interface, vendored inside MLX and compiled into
+  libmlx.dylib) -- Apache License 2.0, Copyright Apple Inc.
+
+See META-INF/LICENSE for the MIT grant covering the jmlx native artifact code,
+META-INF/LICENSE-APACHE-2.0 for the complete Apache License 2.0 text, and
+META-INF/THIRD-PARTY-NOTICES for the retained MLX MIT grant and other upstream terms.
+META-INF/LICENSE-CC-BY-SA-4.0 contains the complete CC BY-SA 4.0 text for Juffa's covered
+expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material. Its scope and
+redistribution basis are identified in the Norbert Juffa notice section. No CC adapter's
+license is identified for Apple/MLX contributions.
+META-INF/THIRD-PARTY-NOTICES carries the additional MLX/JACCL compiled-in dependency texts,
+including JSON, fmt, gguflib/FP16, pocketfft, V8, ThreadPool, NumPy/opt_einsum,
+supervised-lda, SIMD math, PyTorch, TensorFlow and GPU/PRNG algorithm references.
+MLX adaptations remain modifications of the attributed upstream code; the listed reference
+versions are license-evidence snapshots where MLX does not pin an upstream revision.
+The release audit and unresolved provenance findings are recorded in
+req/phase8-4-native-license-audit.md in the jmlx source repository.
+
+Provenance: mlx-metal 0.32.4, wheel SHA-256
+514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936;
+mlx-c commit a26f2d584a14ec619ae8db9a09be03becd47598a.
+See native-pin.properties (packaged alongside the binaries in
+this jar, at se/alipsa/jmlx/native/macos-aarch64/native-pin.properties) for the pin baked into this
+specific build.

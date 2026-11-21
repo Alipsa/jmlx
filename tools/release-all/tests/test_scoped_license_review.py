@@ -119,10 +119,13 @@ class ScopedLicenseReviewTest(unittest.TestCase):
                 ('BY\u2011SA', 'bySa'), ('share_alike', 'shareAlike'),
                 ('stackoverflow.com/a/49743348', 'stackOverflow'),
                 ('35148199', 'stackOverflow'), ('49743348', 'stackOverflow'),
-                ('erfc(x)', 'erf'), ('erf_inv', 'erfinv')):
+                ('erfc(x)', 'erf'), ('erfcf', 'erf'), ('erf_inv', 'erfinv'),
+                ('erf_inverse', 'erfinv'), ('erfinv_f', 'erfinv'),
+                ('inverse error function', 'erfinv'), ('MY_ERF_INVERSE_F(x)', 'erfinv')):
             with self.subTest(text=text):
                 self.assertTrue(C.marker_scan(text)[marker])
-        for text in ('interface', 'erfcx', 'erf_inverse', '1351481990', 'by-sample'):
+        for text in ('interface', 'erfcx', 'erfinventory', 'inverse error functional',
+                     '1351481990', 'by-sample'):
             with self.subTest(text=text):
                 self.assertFalse(any(C.marker_scan(text).values()))
 

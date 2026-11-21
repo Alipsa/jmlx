@@ -77,15 +77,16 @@ The native main, sources and Javadoc JARs all contain the reviewed third-party n
 The replay matches the packaged `expm1f`, fastermath, NEON and Netlib notice fragments to
 their pinned sources, normalizing whitespace only. Every non-directory `META-INF` entry is
 hashed and scanned with case-insensitive function and license markers, including `CC BY-SA`,
-`CC-BY-SA`, bare BY-SA, ShareAlike, Creative Commons license URLs, Stack Overflow
-links/answer IDs and the expanded Creative Commons Attribution-ShareAlike name. No `erf`/`erfinv`
-function marker or CC ShareAlike marker appears in those entries. These are bounded marker
-observations, not a semantic proof about every possible attribution spelling. None of
-these JARs contains native source entries with the case-insensitive extensions
-`.h`, `.hpp`, `.c`, `.cc`,
-`.cpp`, `.m`, `.mm`, `.inc` or `.metal`. The native POM's
-license names, URLs and scoped comments are recorded in full: MIT for the jmlx artifact code
-and Apache-2.0 for compiled metal-cpp. These observations are reproducible from the signed ZIP.
+`CC-BY-SA`, bare BY-SA, ShareAlike, Creative Commons license URLs, Stack Overflow links/answer
+IDs and the expanded Creative Commons Attribution-ShareAlike name. None of the `erf`/`erfinv`
+function, CC ShareAlike license or Stack Overflow markers appears in those entries. Function
+markers cover `erfcf`, `erf_inverse`, `erfinv_f` and "inverse error function" as well as
+`erf`/`erfinv`. These are bounded marker observations, not a semantic proof about every
+possible attribution spelling. None of these JARs contains native source entries with the
+case-insensitive extensions `.h`, `.hpp`, `.c`, `.cc`, `.cpp`, `.m`, `.mm`, `.inc` or
+`.metal`. The native POM's license names, URLs and scoped comments are recorded in full: MIT
+for the jmlx artifact code and Apache-2.0 for compiled metal-cpp. These observations are
+reproducible from the signed ZIP.
 
 For a compliance implementation, prepare the following for reviewer approval:
 
@@ -165,16 +166,19 @@ python3 req/plans/evidence/scoped-license-review-2026-11-21/reproduce.py \
   --output build/releaseAll/scoped-license-review-2026-11-21/replayed.json
 ```
 
-Omit `--fetch-missing` for cached-input replay. The API projection rejects malformed/empty
-responses, mixed post IDs and noncontiguous or duplicate revision numbers/GUIDs. It sorts the
-validated complete snapshot by revision number and retains post ID, revision number/GUID/date,
-license, body and owner user ID. It excludes quota and mutable user-profile metadata. Byte
-inputs are hashed unchanged. The script reuses the earlier function extractor/decimal regex,
-reads selected Cephes tar members in memory and inspects the three nested native JARs without
-executing them. The newest answer code blocks must hash-match the earlier audit's comparison
-inputs. CPU sequence equality is recorded separately from multiset equality. Fastermath's Cephes
-2.8 reference and both CPU source citations are recorded; the two correspondence inputs pin
-snapshots for manual interpretation only. Their permission meaning is not replayed.
+Omit `--fetch-missing` for cached-input replay. The `validation.replayInputs` paths record
+local, gitignored caches under `build/`; these caches are not committed evidence. Reviewers
+can populate their own cache with `--fetch-missing` using the recorded URLs and digests. The
+API projection rejects malformed/empty responses, mixed post IDs and noncontiguous or
+duplicate revision numbers/GUIDs. It sorts the validated complete snapshot by revision number
+and retains post ID, revision number/GUID/date, license, body and owner user ID. It excludes
+quota and mutable user-profile metadata. Byte inputs are hashed unchanged. The script reuses
+the earlier function extractor/decimal regex, reads selected Cephes tar members in memory and
+inspects the three nested native JARs without executing them. The newest answer code blocks
+must hash-match the earlier audit's comparison inputs. CPU sequence equality is recorded
+separately from multiset equality. Fastermath's Cephes 2.8 reference and both CPU source
+citations are recorded; the two correspondence inputs pin snapshots for manual interpretation
+only. Their permission meaning is not replayed.
 
 A local `hashlib` SHA-256 verifies the prior recipe before executing those same bytes, with
 no dependency bytecode written. The bundle and prior comparison JSON are each read once;

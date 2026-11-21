@@ -166,10 +166,7 @@ def cephes_member(archive, member):
     info = archive.getmember(member)
     if not info.isfile():
         raise ValueError('Cephes member is not a regular file: ' + member)
-    handle = archive.extractfile(info)
-    if handle is None:
-        raise ValueError('Cephes member is not a regular file: ' + member)
-    with handle:
+    with archive.extractfile(info) as handle:
         data = handle.read()
     text = data.decode('ascii')
     match = re.search(r'Cephes Math Library Release [^\n]+', text)
@@ -179,8 +176,8 @@ def cephes_member(archive, member):
 
 
 MARKERS = {
-    'erf': r'\b(?:my_)?erf[fc]?\b',
-    'erfinv': r'\b(?:my_)?erf_?invf?\b',
+    'erf': r'\b(?:my_)?erfc?f?\b',
+    'erfinv': r'\b(?:(?:my_)?erf_?inv(?:erse)?_?f?|inverse\s+error\s+function)\b',
     'ccBySa': r'\bcc[\s_\-\u2010-\u2015]*by[\s_\-\u2010-\u2015]*sa\b',
     'creativeCommonsShareAlike': r'\bcreative\s+commons\s+attribution'
                                 r'[\s_\-\u2010-\u2015]*share[\s_\-\u2010-\u2015]*alike\b',

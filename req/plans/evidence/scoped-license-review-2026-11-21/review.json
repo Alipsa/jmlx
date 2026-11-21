@@ -121,10 +121,11 @@
     "Netlib archives and public API histories are mutable; digests bind this dated snapshot.",
     "Source/wheel association inherits the existing vendor-wheel audit; it is not a reproducible rebuild of the wheel.",
     "No legally conclusive adaptation boundary or license grant is inferred from numeric matches.",
-    "cephes-email and cephes-followup only pin correspondence snapshots for manual interpretation; the replay does not interpret permission scope or establish a grant."
+    "cephes-email and cephes-followup only pin correspondence snapshots for manual interpretation; the replay does not interpret permission scope or establish a grant.",
+    "validation.replayInputs paths are local, gitignored cache provenance, not committed evidence; reviewers can fetch their own inputs from technicalSources URLs and verify the recorded digests."
   ],
   "technicalFindingsSha256": "d37cba5d97188a2936abfb784603c5e19bbc94cc9c5e876b32ce09a20d3b1124",
-  "reproducerSha256": "d8ad417a58e8f0cd4a49e5503e5ee47b80c06668358b6f28c69cc6e66a9673e6",
+  "reproducerSha256": "330be751167a77da900b3dead3be478d09260457403d55330fcfcaa8dc89c618",
   "validation": {
     "freshAndCachedReportsEqual": true,
     "wrongBundleRejectedBeforeOutput": true,
@@ -132,7 +133,7 @@
     "legalClearance": false,
     "releaseSelftests": {
       "tests": 97,
-      "seconds": 62.31,
+      "seconds": 49.467,
       "result": "passed",
       "newFocusedTests": 12,
       "testFile": "tools/release-all/tests/test_scoped_license_review.py"

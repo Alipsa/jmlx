@@ -230,21 +230,31 @@ notice separator followed by LF or CRLF. A section starts immediately after its 
 line and runs up to, but excludes, the next separator line; the final section runs to EOF.
 Compare those untouched bytes, including leading blank lines, the title, spaces, blank lines
 and original line endings. The file's trailing newline belongs to its final section when
-present; adding or removing it is a byte difference.
+present; adding or removing it is a byte difference. Before selecting sections, detect
+separator lines accepted by the excerpt parser's lenient `[ \t]*` suffix rule but containing
+trailing spaces/tabs. Reject them with an explicit malformed-separator diagnostic, including
+the line number; do not treat them as ordinary section content or report a stale permalink.
 
 For identification only, find the first non-blank line in each section: skip leading lines
-containing only spaces/tabs after removing their line terminators, then remove only the
-title line's terminator and require the exact title. Keep skipped leading blank lines in the
-compared bytes. Accept both a title immediately after the separator and a title after blank
-lines, but do not treat those layouts as byte-identical. Reject duplicate titles and retain
-all section bytes for comparison. The draft now uses the existing notice file's layout,
-with a blank line between separator and title.
+containing only spaces/tabs after removing their line terminators, then remove only the title
+line's terminator and require the exact title. For this identification pass, split physical
+lines only on LF/CRLF and decode them as strict UTF-8; do not use `splitlines()`, which also
+splits at form feeds and vertical tabs. Reject other Unicode whitespace before the title,
+including form feed, vertical tab and U+00A0, with an unsupported-leading-whitespace
+diagnostic. Thus broader `str.strip()` whitespace cannot silently produce a different title.
+Keep skipped spaces/tabs-only lines in the compared bytes. Accept both a title immediately
+after the separator and a title after blank lines, but do not treat those layouts as
+byte-identical. Reject duplicate titles and retain all section bytes for comparison. The draft
+now uses the existing notice file's layout, with a blank line between separator and title.
 
 Do not reuse `audit_native_licenses.py:notice_sections()`, which strips/splits/rejoins text
 for excerpt matching. Test both accepted title layouts, leading and internal blank-line
 changes, trailing spaces, LF-versus-CRLF changes, changed content and missing sections.
 Include a fixture with Juffa as the last section and no closing separator; verify extraction
-through EOF and mismatches when the final newline is added or removed.
+through EOF and mismatches when the final newline is added or removed. Add fixtures with
+separator suffix spaces/tabs and leading form-feed, vertical-tab and U+00A0 lines; require
+the respective malformed-separator or unsupported-leading-whitespace error before any
+freshness comparison, rather than a merged section, wrong title or stale-notice error.
 
 For consumer verification, register `verifyNativePomLicenses` in the `pom-check` project
 inside `smokeRegisterPomTask`. Resolve the selected native coordinate's published `@pom`

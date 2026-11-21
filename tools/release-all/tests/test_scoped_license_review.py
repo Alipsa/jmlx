@@ -124,6 +124,12 @@ class ScopedLicenseReviewTest(unittest.TestCase):
                 ('inverse error function', 'erfinv'), ('MY_ERF_INVERSE_F(x)', 'erfinv')):
             with self.subTest(text=text):
                 self.assertTrue(C.marker_scan(text)[marker])
+        for separator in (' ', '\t', '_', '-', *map(chr, range(0x2010, 0x2016))):
+            for suffix in ('', 's'):
+                text = separator.join(('error', 'function' + suffix))
+                with self.subTest(text=text):
+                    self.assertTrue(C.marker_scan(text)['erf'])
+                    self.assertTrue(C.marker_scan('inverse' + separator + text)['erfinv'])
         for text in ('interface', 'erfcx', 'erfinventory', 'inverse error functional',
                      '1351481990', 'by-sample'):
             with self.subTest(text=text):

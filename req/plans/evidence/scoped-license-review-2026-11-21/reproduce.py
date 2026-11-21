@@ -176,8 +176,9 @@ def cephes_member(archive, member):
 
 
 MARKERS = {
-    'erf': r'\b(?:my_)?erfc?f?\b',
-    'erfinv': r'\b(?:(?:my_)?erf_?inv(?:erse)?_?f?|inverse\s+error\s+function)\b',
+    'erf': r'\b(?:(?:my_)?erfc?f?|error[\s_\-\u2010-\u2015]+functions?)\b',
+    'erfinv': r'\b(?:(?:my_)?erf_?inv(?:erse)?_?f?'
+              r'|inverse[\s_\-\u2010-\u2015]+error[\s_\-\u2010-\u2015]+functions?)\b',
     'ccBySa': r'\bcc[\s_\-\u2010-\u2015]*by[\s_\-\u2010-\u2015]*sa\b',
     'creativeCommonsShareAlike': r'\bcreative\s+commons\s+attribution'
                                 r'[\s_\-\u2010-\u2015]*share[\s_\-\u2010-\u2015]*alike\b',

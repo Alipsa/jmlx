@@ -60,8 +60,10 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   The [compliance proposal](phase8-4-license-compliance-proposal.md) provides a draft notice,
   concrete packaging changes and a decision record for that review; it is not approval.
   The [owner decision record](phase8-4-owner-license-decision.md) confirms Per Nyfelt as
-  reviewer and Sweden as the review context; applicable law is undetermined and both
-  substantive determinations remain pending.
+  reviewer and Sweden as the review context; applicable law is undetermined. On 2026-11-21
+  the owner accepted the scoped Cephes original-permission interpretation, subject to retaining
+  notices and artifact validation. The Cephes finding remains open pending that validation;
+  the Juffa determination remains pending.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
   organization Usage Center values and the exact signed bundle remain outstanding.

@@ -1,6 +1,6 @@
 # Phase 8.4 owner license decision record
 
-Prepared 2026-11-21. Status: reviewer confirmed; substantive decisions pending.
+Prepared 2026-11-21. Status: Cephes interpretation approved; Juffa decision pending.
 
 | Field | Record |
 | --- | --- |
@@ -11,7 +11,7 @@ Prepared 2026-11-21. Status: reviewer confirmed; substantive decisions pending.
 | Applicable law | Not determined; pending assessment of relevant rights and grants |
 | Assessment | Owner judgment based on the evidence; reviewer is not a lawyer |
 | Juffa disposition | Pending owner assessment and final wording |
-| Cephes disposition | Pending owner assessment and rationale |
+| Cephes disposition | Existing-permission interpretation accepted; validation pending |
 | Release gate | Open; neither finding has been resolved |
 
 The owner makes jmlx's acceptance and release decisions. This workflow does not require an
@@ -97,40 +97,54 @@ Choose a disposition and supply the reasoning:
 | Accept/reject/need evidence; conditions and responsible owner | Pending |
 | Named implementation/review owner and unresolved questions | Pending |
 
-## Cephes: the separate decision to make
+## Cephes: approved owner interpretation
 
-**Supported by the recorded evidence:** MLX cites fastermath and NEON math for the relevant
-CPU approximations. Their notices and the [original Netlib permission][netlib] are retained.
-Netlib says the material may be used freely and disclaims support/guarantees. Selected
-coefficients match Netlib files labeled Release 2.2; fastermath refers to 2.8.
+On 2026-11-21, Per Nyfelt approved the following interpretation in the preparation
+conversation. This is a substantive owner decision, separate from approval to merge PR #108.
+The reviewed proposal and decision template are the versions on `main` at
+`e639c3d52c805641d0fdabb182d07c14b5106bd5`.
 
-**Still to assess:** whether that original permission covers the actual modifications,
-redistribution and downstream use. The [2004 correspondence][cephes-email] and
-[reply][cephes-reply] provide context; they do not by themselves trace MLX's exact chain to a
-BSD-licensed distribution. Do not turn an interpretation of the original permission into a
-claim that a new BSD grant was obtained.
+**Approved rationale:** the owner interprets Stephen Moshier's original permission that the
+material "may be used freely" as permitting the identified Cephes-derived modifications and
+their redistribution through jmlx, including downstream use. The wording is broad but does
+not expressly enumerate those activities; this conclusion is the owner's interpretation of
+the existing permission. Approval is limited to the material identified in the scoped review
+and requires retaining the original permission and applicable intermediary notices. It does
+not establish a new grant or relabel the material as BSD-licensed.
 
-Choose a disposition and supply the reasoning:
+**Recorded scope and evidence:** MLX cites fastermath and NEON math for its CPU exponential
+and sine/cosine approximations. The [scoped review](phase8-4-scoped-license-review.md) and
+its [technical report][technical-report] identify the reviewed material. Selected coefficient
+magnitudes match Netlib files labeled Release 2.2; fastermath refers to 2.8. These observations
+do not establish an exact BSD-licensed provenance chain. The
+[2004 correspondence][cephes-email] and [reply][cephes-reply] remain contextual evidence,
+not the grant relied on by this decision.
 
-- **Accept the original permission as covering this use:** explain why its wording, source
-  context and recorded provenance cover modification, distribution and downstream scope.
-  Identify any conditions and the notices to retain. This would be the owner's documented
-  interpretation of the existing permission, not a newly established grant.
-- **Rely on another applicable grant:** identify its grantor, scope, covered material,
-  downstream applicability and evidence linking it to these functions.
-- **Need more evidence or replace:** state which route and what must be established next.
+The rights holder identified for the original Cephes material is Stephen L. Moshier. The
+[Netlib statement][netlib] identifies him and describes the material as copyrighted by its
+author. The owner relies on that author's original permission for the identified underlying
+material, while retaining the separate fastermath/NEON notices for intermediary contributions.
+This decision does not extend an intermediary contributor's grant to Moshier's rights.
 
 | Owner decision field | Current value |
 | --- | --- |
-| Decision date and reviewed proposal commit | Pending |
-| Permission/grant relied on | Pending |
-| Rights holder(s) and authority for the permission relied on | Pending |
-| Modification, redistribution and downstream rationale | Pending |
-| Exact material/provenance covered | Pending |
-| Required notices and conditions | Pending |
-| Final notice/license/POM paths, exact wording and SHA-256 hashes | Pending |
-| Accept/reject/need evidence; conditions and responsible owner | Pending |
-| Named implementation/review owner and unresolved questions | Pending |
+| Decision date and reviewed proposal commit | 2026-11-21; full commit recorded above |
+| Permission/grant relied on | Original Netlib permission; not a new or inferred BSD grant |
+| Rights holder(s) and authority for the permission relied on | Moshier; author's statement above |
+| Modification, redistribution and downstream rationale | Approved rationale above |
+| Exact material/provenance covered | Identified CPU exp/sincos material in scoped review |
+| Required notices and conditions | Retain original permission and applicable intermediary notices |
+| Final notice/license/POM paths, exact wording and SHA-256 hashes | Pending artifact review |
+| Accept/reject/need evidence; conditions and responsible owner | Conditional accept; Per Nyfelt |
+| Named implementation/review owner and unresolved questions | Follow-up below |
+
+**Follow-up:** Per Nyfelt owns review and acceptance. Implementation ownership has not yet
+been assigned. Validate retained notices against the actual release artifacts and record
+final notice/license/POM wording, paths and reviewed hashes before closing the Cephes
+finding. Any newly identified material outside the reviewed scope needs another assessment.
+Applicable law remains undetermined as recorded above. `NATIVE-LICENSE-2` remains open for
+artifact validation; `NATIVE-LICENSE-1` remains open pending the separate Juffa decision.
+Neither a replacement candidate nor Central publication is approved by this decision.
 
 ## What follows the owner's decisions
 

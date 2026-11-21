@@ -211,6 +211,7 @@
     }
   },
   "wheelSha256": "514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936",
+  "verificationScope": "Historical 2026-11-16 audit; verification.packagedTexts and artifacts retain the superseded notice hash. See unresolvedFindings[id=NATIVE-LICENSE-2].implementationFollowUp for current Cephes notice verification.",
   "verification": {
     "componentCount": 26,
     "packagedTexts": {

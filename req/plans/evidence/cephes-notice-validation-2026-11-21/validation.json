@@ -1,12 +1,30 @@
 {
   "schema": 1,
   "date": "2026-11-21",
+  "baseCommit": "05703375d372cc0bf5696e4320c01b204dc45c2e",
+  "sourceCommit": "7892d186c881030150fefa622a230fd8314eead3",
+  "sourceState": "Native build inputs match sourceCommit: baseCommit plus this PR\u2019s Cephes notice title change. Other PR changes are audit/inventory metadata, documentation and evidence; later review fixes do not change native build inputs.",
+  "java": {
+    "vendor": "Eclipse Temurin",
+    "version": "25.0.4.1+1-LTS",
+    "roles": [
+      "compiler",
+      "javadoc"
+    ]
+  },
+  "gradle": "9.9.0",
+  "gradleJvm": {
+    "vendor": "BellSoft",
+    "version": "21.0.12.1+1-LTS"
+  },
+  "toolchainVerification": "Forced rerun of compileJava, jar, sourcesJar, javadoc, javadocJar and POM generation reproduced all recorded JAR and POM hashes.",
   "ownerDecisionMerge": "05703375d372cc0bf5696e4320c01b204dc45c2e",
   "kind": "local producer verification; not a candidate or publication receipt",
   "packagedSectionTitle": "Cephes math provenance (original upstream permission statement)",
   "onlyNoticeChangeIsTitle": true,
   "staleSectionTitleRejected": true,
   "nativePayloadMatchesPriorAudit": true,
+  "nativePayloadReference": "req/phase8-4-native-license-audit.json#nativeFiles",
   "legalTexts": {
     "LICENSE-APACHE-2.0": {
       "sha256": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",

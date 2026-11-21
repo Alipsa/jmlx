@@ -73,8 +73,8 @@ Record each answer in the decision record below, with evidence and rationale.
    on another grant, identify its grantor, recipients, covered code and downstream applicability.
 
 The [CC BY-SA 4.0 legal code][cc-legal], sections 1–3, governs attribution, changes, adapter
-licensing and downstream conditions. The [licensing-authority FAQ][cc-authority] cautions
-against applying licenses without authority; the [software FAQ][cc-software] explains
+licensing and downstream conditions. The first entry in [Choosing a license][cc-authority]
+cautions against applying licenses without authority; the [software FAQ][cc-software] explains
 software-specific limitations. Section 1(b) defines the adapter's license in terms of rights
 in the adapter's contributions. Section 2(a)(5)(B) addresses the offer recipients of adapted
 material receive from the Licensor under the adapter's license; section 2(a)(5)(C) prohibits
@@ -179,9 +179,10 @@ Add a separate authored-attribution policy and check, with the following respons
   requirements against the packaged section. Do not require authored phrases to occur in
   upstream headers or answer bodies. Keep upstream evidence validation and authored-text
   validation distinct, and fail if the required Juffa policy/section is absent.
-- `notice_sections()` uses the first line after the separator as the component key. Use
-  exactly `Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)` in the draft
-  policy and section; any approved title change must update both together. Do not create a
+- `notice_sections()` strips outer section whitespace and uses the first non-blank line
+  as the component key. Use exactly this title in the draft policy and section:
+  `Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)`.
+  Any approved title change must update both together. Do not create a
   legacy excerpt-component entry for this authored section. If a component-key reference is
   added to the inventory, require the same exact title there too.
 - Extend `release_inputs.py:native_notice_report` to require and check the approved authored
@@ -225,13 +226,25 @@ release task, that job must explicitly use `actions/checkout` with `fetch-depth:
 
 For permalink freshness, add a separate `raw_notice_sections(bytes)` extractor in
 `release_inputs.py`. Recognize only complete separator lines containing the exact ASCII
-notice separator followed by LF or CRLF; compare the untouched bytes between those delimiter
-lines, including the title, spaces, blank lines and their original line endings. Locate the
-section by its exact title (remove only that title line's terminator for identification),
-reject duplicate titles and preserve all section bytes for comparison. Do not reuse
-`audit_native_licenses.py:notice_sections()`, which strips/splits/rejoins text for excerpt
-matching. Test trailing spaces, extra blank lines and LF-versus-CRLF changes inside the
-section as byte mismatches, as well as changed content and missing sections.
+notice separator followed by LF or CRLF. A section starts immediately after its separator
+line and runs up to, but excludes, the next separator line; the final section runs to EOF.
+Compare those untouched bytes, including leading blank lines, the title, spaces, blank lines
+and original line endings. The file's trailing newline belongs to its final section when
+present; adding or removing it is a byte difference.
+
+For identification only, find the first non-blank line in each section: skip leading lines
+containing only spaces/tabs after removing their line terminators, then remove only the
+title line's terminator and require the exact title. Keep skipped leading blank lines in the
+compared bytes. Accept both a title immediately after the separator and a title after blank
+lines, but do not treat those layouts as byte-identical. Reject duplicate titles and retain
+all section bytes for comparison. The draft now uses the existing notice file's layout,
+with a blank line between separator and title.
+
+Do not reuse `audit_native_licenses.py:notice_sections()`, which strips/splits/rejoins text
+for excerpt matching. Test both accepted title layouts, leading and internal blank-line
+changes, trailing spaces, LF-versus-CRLF changes, changed content and missing sections.
+Include a fixture with Juffa as the last section and no closing separator; verify extraction
+through EOF and mismatches when the final newline is added or removed.
 
 For consumer verification, register `verifyNativePomLicenses` in the `pom-check` project
 inside `smokeRegisterPomTask`. Resolve the selected native coordinate's published `@pom`

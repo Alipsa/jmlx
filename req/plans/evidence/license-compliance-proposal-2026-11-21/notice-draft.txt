@@ -5,6 +5,7 @@ The adapter-license/scope decision below is unresolved. Replace this draft with
 approved final text before using it in a release artifact.
 
 ======== JMLX NATIVE NOTICE SECTION ========
+
 Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)
 
 Creator: Norbert Juffa (Stack Overflow user ID 780717)

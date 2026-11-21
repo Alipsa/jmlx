@@ -63,6 +63,9 @@ substantive owner decision, separate from approval to merge the research PR #111
 research and proposal are the versions on `main` at
 `1b0a81723d4cd4ac473d47faf3313b738a4fe051`.
 
+The owner's approval and merge of [PR #112](https://github.com/Alipsa/jmlx/pull/112) is the
+repository record approving this text.
+
 **Approved rationale:**
 
 > I rely on Juffa’s CC BY-SA 4.0 grant for his covered material and MLX’s MIT grant for

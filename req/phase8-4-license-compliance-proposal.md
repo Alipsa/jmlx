@@ -67,6 +67,11 @@ Record each answer in the decision record below, with evidence and rationale.
    authorize choosing a license for Apple's or other adapters' contributions. If that basis
    cannot be established, seek clarification, an applicable grant or a reviewed replacement
    before changing release metadata. Any future adaptation by jmlx needs its own assessment.
+   Under the accepted owner interpretation, Decision 3 is answered by MIT for Apple/MLX
+   contributions plus the direct section 2(a)(5)(A) offer for Juffa's expression; no CC
+   adapter's license is identified. Replace the draft notice's unresolved paragraph with
+   that basis and the approved scope, preserving (B)'s condition as the counterargument;
+   do not present MIT as a CC adapter's license. Final wording still requires owner approval.
 4. **Downstream terms:** review the actual distribution terms and any technological measures
    against the approved treatment. Review all publication surfaces together, including licenses
    consumers see in the POM. Do not infer compliance from Maven availability or a notice test.

@@ -76,6 +76,8 @@ repository record approving this text.
 > attribution, license/POM wording and downstream terms, followed by artifact validation. This
 > does not establish an MIT-only grant for Juffa’s contribution.
 
+The subsection references in the approved rationale are to the [CC legal code][cc-legal].
+
 The [existing-license investigation](phase8-4-juffa-license-interpretation.md) supplies the
 argument and counterargument. The owner accepts its existing-grants interpretation as the
 conditional redistribution basis; that judgment does not establish that the unresolved
@@ -107,8 +109,13 @@ versions. Applicable law remains undetermined as recorded above.
 | Accept/reject/need evidence; conditions and responsible owner | Conditional accept; Per Nyfelt |
 | Named implementation/review owner and unresolved questions | Follow-up below |
 
-**Follow-up:** Per Nyfelt owns review and acceptance. Implementation ownership has not yet
-been assigned. Finalize the technical mapping acceptance and source/compiled scope, including
+**Follow-up:** apply proposal Decision 3 using the accepted MIT/direct-offer basis; no CC
+adapter's license is identified. Replace the draft notice's unresolved paragraph with that
+basis and the approved scope, retaining (B)'s counterargument rather than naming MIT as a
+CC adapter's license. Final wording remains subject to owner approval.
+
+Per Nyfelt owns review and acceptance. Implementation ownership has not yet been assigned.
+Finalize the technical mapping acceptance and source/compiled scope, including
 surrounding-code treatment. Approve attribution, retained modification notices, license/POM
 wording and the downstream-terms assessment, with exact paths and reviewed hashes. Then
 implement and validate the approved treatment in a new candidate. Future changes by jmlx need
@@ -235,7 +242,6 @@ Central publication still needs the owner's separate approval of the exact verif
 [netlib]: https://netlib.org/cephes/readme
 [technical-report]: plans/evidence/scoped-license-review-2026-11-21/technical-findings.json
 [review-manifest]: plans/evidence/scoped-license-review-2026-11-21/review.json
-[mlx-issue]: https://github.com/ml-explore/mlx/issues/4902
 [cephes-email]: https://lists.debian.org/debian-legal/2004/12/msg00295.html
 [cephes-reply]: https://lists.debian.org/debian-legal/2004/12/msg00297.html
 

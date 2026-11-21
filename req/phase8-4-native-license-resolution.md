@@ -12,6 +12,10 @@ The [2026-11-21 scoped review](phase8-4-scoped-license-review.md) now maps the J
 answer revisions, inspects RC1 packaging and narrows the Cephes source-generation question.
 It proposes a compliance decision route alongside upstream clarification; both findings remain open.
 
+The [compliance proposal](phase8-4-license-compliance-proposal.md) turns that route into
+draft notice text, a concrete implementation/verification sequence and a reviewer decision
+record. It is pending owner/legal review; it does not close either finding.
+
 The owner submitted [MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902) on
 2026-11-16, covering both provenance questions. It is open with no comments at this check;
 the next action is to review any upstream response against the exact code and license terms.

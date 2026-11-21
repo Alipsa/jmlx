@@ -101,9 +101,8 @@ Choose a disposition and supply the reasoning:
 
 On 2026-11-21, Per Nyfelt approved the following interpretation in the preparation
 conversation. This is a substantive owner decision, separate from approval to merge PR #108.
-The owner's approval and merge of [PR #109](https://github.com/Alipsa/jmlx/pull/109)
-will be the repository record of approval of the final text; until then, this PR records the
-conversation-sourced decision for review; final repository approval remains pending.
+The owner's approval and merge of [PR #109](https://github.com/Alipsa/jmlx/pull/109) is the
+repository record approving this text.
 The reviewed proposal and decision template are the versions on `main` at
 `e639c3d52c805641d0fdabb182d07c14b5106bd5`.
 

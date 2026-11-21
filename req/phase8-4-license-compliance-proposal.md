@@ -318,12 +318,12 @@ new verified receipt. Approval of this proposal is not Central publication autho
 The [owner decision record](phase8-4-owner-license-decision.md) identifies Per Nyfelt as the
 project reviewer, with Sweden as the confirmed review context. The owner accepted the Cephes
 original-permission interpretation on 2026-11-21, subject to retained notices and artifact
-validation. The Juffa decision remains pending. The owner record is the authoritative decision
-template; the table below lists required coverage rather than a second template. Complete
-the owner record in a reviewed PR; identify the exact proposal revision and final legal text
-hashes. Implementation selection is not a
-recorded legal determination. This workflow does not require outside legal approval. No
-rights holder or outside reviewer has been contacted by this work.
+validation. The Juffa decision remains pending. The owner record is the authoritative
+decision template; the table below lists required coverage rather than a second template.
+Complete the owner record in a reviewed PR; identify the exact proposal revision and final
+legal text hashes. Implementation selection is not a recorded legal determination. This
+workflow does not require outside legal approval. No rights holder or outside reviewer has
+been contacted by this work.
 
 | Field | Required record |
 | --- | --- |

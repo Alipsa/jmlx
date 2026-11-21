@@ -74,6 +74,11 @@ the existing rights basis and its scope; jmlx's project approval does not itself
 Apple's or Juffa's contributions. This is the question for the owner's assessment, not an assertion
 that a separate permission request is always required.
 
+The [existing-license investigation](phase8-4-juffa-license-interpretation.md) examines
+reliance on MIT for MLX contributions together with Juffa's direct CC grant. It records both
+the distributor-role argument and the remaining adapter-license counterargument. Its proposed
+rationale remains unapproved; the owner's request to investigate is not acceptance.
+
 Choose a disposition and supply the reasoning:
 
 - **Accept an existing licensing basis:** identify the license(s)/grant(s) relied on, why they

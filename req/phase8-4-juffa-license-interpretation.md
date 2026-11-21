@@ -1,10 +1,15 @@
 # Phase 8.4 Juffa existing-license interpretation
 
-2026-11-21. Research based on main `ea78fa6bb1a45fc87c4e7213bcf08f7bf92234ca`. Status:
-proposed interpretation for owner review; no Juffa approval or finding closure.
+2026-11-21. Research based on main `ea78fa6bb1a45fc87c4e7213bcf08f7bf92234ca`.
+Status: research preserved as reviewed before the subsequent conditional owner decision.
 
 Author: Codex (assistant). Assessments and the proposed rationale below are the assistant's
 research, not the owner's determination.
+
+The subsequent [owner decision](phase8-4-owner-license-decision.md) conditionally accepts the
+existing-grants interpretation. This memo preserves the research and draft rationale as
+reviewed before that decision. Scope, final wording, downstream terms and artifact validation
+remain outstanding; no finding is closed.
 
 ## Assessment
 

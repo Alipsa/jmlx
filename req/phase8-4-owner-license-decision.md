@@ -1,6 +1,6 @@
 # Phase 8.4 owner license decision record
 
-Prepared 2026-11-21. Status: Cephes interpretation and scope confirmed; Juffa decision pending.
+Prepared 2026-11-21. Status: both owner interpretations accepted; remaining conditions open.
 
 | Field | Record |
 | --- | --- |
@@ -10,7 +10,7 @@ Prepared 2026-11-21. Status: Cephes interpretation and scope confirmed; Juffa de
 | Confirmation date | 2026-11-21; owner statements in the preparation conversation |
 | Applicable law | Not determined; pending assessment of relevant rights and grants |
 | Assessment | Owner judgment based on the evidence; reviewer is not a lawyer |
-| Juffa disposition | Pending owner assessment and final wording |
+| Juffa disposition | Interpretation accepted; scope, terms and artifact conditions pending |
 | Cephes disposition | Interpretation and Netlib-material basis accepted; validation pending |
 | Release gate | Open; neither finding has been resolved |
 
@@ -55,52 +55,62 @@ The [audit](phase8-4-native-license-audit.md) and
 [resolution research](phase8-4-native-license-resolution.md) supply the provenance context.
 No replacement candidate, new grant or changed notice is established by this record.
 
-## Juffa: the decision to make
+## Juffa: approved conditional owner interpretation
 
-**Supported by the recorded evidence:** the bounded comparisons link Metal `erf` to answer
-35148199 revision 4, and Metal/CPU SIMD `erfinv` to answer 49743348 revision 3. Those revision
-records identify CC BY-SA 4.0. CPU `erf` is separate PyTorch-derived material. RC1 lacks the
-proposed attribution and CC notice. The reviewed MLX headers retain Apple copyrights.
+On 2026-11-21, Per Nyfelt approved the following interpretation in the preparation
+conversation, expressly keeping the finding open until its conditions are satisfied. This is a
+substantive owner decision, separate from approval to merge the research PR #111. The reviewed
+research and proposal are the versions on `main` at
+`1b0a81723d4cd4ac473d47faf3313b738a4fe051`.
 
-**Still to assess:** the scope and license basis for redistributing the adapted source and
-compiled material, including Apple's/MLX contributors' modifications. The general MLX MIT
-grant and Juffa's answer licenses are evidence to consider together; the review has not
-established how they settle the adapter-license treatment for these exact adaptations.
-The differing BSD forum examples do not establish an alternative grant for this code.
+**Approved rationale:**
 
-The [CC legal code][cc-legal], sections 1(b), 2(a)(5) and 3, distinguishes the adapter's
-contributions, downstream offers/restrictions and attribution. The owner's decision should identify
-the existing rights basis and its scope; jmlx's project approval does not itself license
-Apple's or Juffa's contributions. This is the question for the owner's assessment, not an assertion
-that a separate permission request is always required.
+> I rely on Juffa’s CC BY-SA 4.0 grant for his covered material and MLX’s MIT grant for
+> Apple/MLX contributions. I interpret §2(a)(5)(A)’s offer as continuing for Juffa’s
+> expression within the adaptations, with (B) providing an additional offer. I recognize that
+> (B)’s adapter-license condition remains the counterargument. I accept this interpretation as
+> the basis for redistributing the identified existing binaries, subject to approved scope,
+> attribution, license/POM wording and downstream terms, followed by artifact validation. This
+> does not establish an MIT-only grant for Juffa’s contribution.
 
-The [existing-license investigation](phase8-4-juffa-license-interpretation.md) examines
-reliance on MIT for MLX contributions together with Juffa's direct CC grant. It records both
-the distributor-role argument and the remaining adapter-license counterargument. Its proposed
-rationale remains unapproved; the owner's request to investigate is not acceptance.
+The [existing-license investigation](phase8-4-juffa-license-interpretation.md) supplies the
+argument and counterargument. The owner accepts its existing-grants interpretation as the
+conditional redistribution basis; that judgment does not establish that the unresolved
+adapter-license condition is legally settled, create a new grant, or approve final artifacts.
 
-Choose a disposition and supply the reasoning:
+**Reference material for the remaining scope review:** the recorded mappings link Metal `erf`
+to answer 35148199 revision 4 and Metal/CPU SIMD `erfinv` to answer 49743348 revision 3. The
+reviewed source paths are `mlx/backend/metal/kernels/erf.h` and `mlx/backend/cpu/simd/math.h`
+at MLX commit `36969c094354086e15d2a327a9c50feb20b9cf11`. The proposal records their full
+header hashes. The identified compiled forms are in `libmlx.dylib` and `mlx.metallib`. The
+[binary observation][juffa-binaries] records unchanged vendor bytes, the `libmlxc.dylib`
+import observations and sources-JAR contents, with the stated technical limits.
 
-- **Accept an existing licensing basis:** identify the license(s)/grant(s) relied on, why they
-  cover these adaptations and their compiled distribution, and the scope of each. Specify
-  how that scope treats surrounding MLX code. Then approve final attribution, license and
-  POM wording plus the downstream-terms assessment before closing the finding.
-- **Need more evidence:** identify the exact unresolved question and the evidence needed.
-  The existing [MLX issue #4902][mlx-issue] is one route; additional advice is optional.
-- **Replace the affected material:** choose a separately reviewed implementation/pin change
-  and repeat the numerical, license and candidate verification required by the release plan.
+Those mappings identify the evidence considered; this approval does not separately finalize
+the technical mapping acceptance or source/compiled legal boundary. The surrounding MLX code
+and combined-binary treatment still require an explicit scope decision. CPU `erf` has separate
+PyTorch provenance. The differing BSD forum samples do not supply a new grant for these exact
+versions. Applicable law remains undetermined as recorded above.
 
 | Owner decision field | Current value |
 | --- | --- |
-| Decision date and reviewed proposal commit | Pending |
-| Technical source/revision mapping accepted, with rationale/references? | Pending |
-| Source and compiled adaptation boundary | Pending |
-| Rights holders and existing licensing basis | Pending |
-| Reasoned adapter-license interpretation | Pending |
-| Downstream terms examined and conclusion | Pending |
-| Final notice/license/POM paths, exact wording and SHA-256 hashes | Pending; notice is a draft |
-| Accept/reject/need evidence; conditions and responsible owner | Pending |
-| Named implementation/review owner and unresolved questions | Pending |
+| Decision date and reviewed proposal commit | 2026-11-21; full research/proposal commit above |
+| Technical source/revision mapping accepted, with rationale/references? | Scope review pending |
+| Source and compiled adaptation boundary | Pending, including surrounding-code treatment |
+| Rights holders and existing licensing basis | Juffa: CC BY-SA 4.0; Apple/MLX: MIT contributions |
+| Reasoned adapter-license interpretation | Approved above; counterargument remains explicit |
+| Downstream terms examined and conclusion | Pending; no compatibility conclusion yet |
+| Final notice/license/POM paths, exact wording and SHA-256 hashes | Pending artifact review |
+| Accept/reject/need evidence; conditions and responsible owner | Conditional accept; Per Nyfelt |
+| Named implementation/review owner and unresolved questions | Follow-up below |
+
+**Follow-up:** Per Nyfelt owns review and acceptance. Implementation ownership has not yet
+been assigned. Finalize the technical mapping acceptance and source/compiled scope, including
+surrounding-code treatment. Approve attribution, retained modification notices, license/POM
+wording and the downstream-terms assessment, with exact paths and reviewed hashes. Then
+implement and validate the approved treatment in a new candidate. Future changes by jmlx need
+their own assessment. `NATIVE-LICENSE-1` remains open until these conditions are met; this
+decision authorizes neither a replacement candidate nor Central publication.
 
 ## Cephes: approved owner interpretation
 
@@ -202,7 +212,7 @@ Review the changed title, retained notices and recorded hashes, then validate th
 candidate before closing the Cephes finding. Any newly identified material outside the
 reviewed scope needs another assessment. Applicable law remains undetermined as recorded
 above. `NATIVE-LICENSE-2` remains open for implementation review and final candidate
-validation; `NATIVE-LICENSE-1` remains open pending the separate Juffa decision. Neither a
+validation; `NATIVE-LICENSE-1` remains open pending its recorded acceptance conditions. Neither a
 replacement candidate nor Central publication is approved by this decision.
 
 ## What follows the owner's decisions
@@ -228,3 +238,5 @@ Central publication still needs the owner's separate approval of the exact verif
 
 [cephes-validation]: plans/evidence/cephes-notice-validation-2026-11-21/validation.json
 [cephes-source-report]: plans/evidence/cephes-notice-validation-2026-11-21/source-notice-report.json
+
+[juffa-binaries]: plans/evidence/juffa-license-interpretation-2026-11-21/binary-observation.json

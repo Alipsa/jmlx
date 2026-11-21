@@ -16,7 +16,9 @@ The [compliance proposal](phase8-4-license-compliance-proposal.md) turns that ro
 draft notice text, a concrete implementation/verification sequence and a reviewer decision
 record. It is pending owner review; it does not close either finding. The
 [owner record](phase8-4-owner-license-decision.md) defines the decision template and policy:
-the owner decides; external legal advice is optional.
+the owner decides; external legal advice is optional. On 2026-11-21 the owner accepted the
+scoped Cephes original-permission interpretation recorded there. Artifact validation remains
+outstanding, and both findings remain open.
 
 The owner submitted [MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902) on
 2026-11-16, covering both provenance questions. It is open with no comments at this check;

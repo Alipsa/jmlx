@@ -129,12 +129,12 @@ permalink in this order:
    Merely being an accessible GitHub object is insufficient.
 3. Read the linked notice offline with
    `git show <sha>:jmlx-native-macos-arm64/THIRD-PARTY-NOTICES`. Extract its Juffa section
-   and compare it byte-for-byte with that section in each packaged native JAR, using identical
-   section-boundary rules without whitespace normalization. Fail on missing Git history,
-   absent sections or any byte difference. Also compare the local notice before packaging.
-   A permalink is immutable but can become stale after later edits; repeat this comparison
-   on every local verification and candidate check. Add regressions for stale notice text
-   and a linked commit that is not an ancestor.
+   and compare it byte-for-byte with that section in each packaged native JAR using the new
+   raw-byte extractor specified below. Fail on missing Git history, absent sections or any
+   byte difference in explicit release verification. Also compare the local notice before
+   packaging. A permalink is immutable but can become stale after later edits; repeat this
+   comparison on each explicit pre-tag release verification and candidate check. Add
+   regressions for stale notice text and a linked commit that is not an ancestor.
 
 The URL must be a public repository permalink available independently of the JAR. Verify its
 availability before candidate cut and retain it in release evidence; do not use mutable
@@ -206,30 +206,63 @@ approved license name/URL/scoped-comment tuples, including the immutable notice 
 expectations independent of the producer's `withXml` block. Do not use the POM's own entries
 as the expected list.
 
-Add a producer verification task depending on `generatePomFileForMavenPublication`, wired
-into the native module's `check`, that invokes the same helper on the locally generated
-`build/publications/maven/pom-default.xml`. Check its notice permalink against local source
-and packaged sections too. This runs before tagging; it must not call `check_bundle`, whose
-candidate-tag/HEAD guard is appropriate only after a candidate exists.
+Keep Python and Git-history checks in an explicit producer release task, proposed as
+`verifyNativeReleaseLicenses`, depending on `generatePomFileForMavenPublication` and all
+three native JAR tasks. It invokes the helper on the locally generated
+`build/publications/maven/pom-default.xml` and checks the permalink against local and packaged
+sections. Run it before tagging, and require it in bundle preparation alongside
+`verifyNativeReleasePayload`; update the release task-execution inventory accordingly.
+Do not wire it into `check` or `verifyPackagedNativeResources`. Ordinary contributor builds
+must retain no Python or deep-history prerequisite, including an unstaged checkout.
+The pre-tag task must not call `check_bundle`, whose tag/HEAD guard is candidate-only.
+
+Only explicit release verification requires the linked commit and its ancestry locally.
+Document fetching the required history before that task; fail with a clear diagnostic if it
+is unavailable, without silently skipping or fetching. Ordinary PR CI remains compatible
+with its current depth-1 merge checkout. Consumer smoke checks POM tuples and permalink
+syntax/value without reading Git history. If a future CI job runs the history-dependent
+release task, that job must explicitly use `actions/checkout` with `fetch-depth: 0`.
+
+For permalink freshness, add a separate `raw_notice_sections(bytes)` extractor in
+`release_inputs.py`. Recognize only complete separator lines containing the exact ASCII
+notice separator followed by LF or CRLF; compare the untouched bytes between those delimiter
+lines, including the title, spaces, blank lines and their original line endings. Locate the
+section by its exact title (remove only that title line's terminator for identification),
+reject duplicate titles and preserve all section bytes for comparison. Do not reuse
+`audit_native_licenses.py:notice_sections()`, which strips/splits/rejoins text for excerpt
+matching. Test trailing spaces, extra blank lines and LF-versus-CRLF changes inside the
+section as byte mismatches, as well as changed content and missing sections.
 
 For consumer verification, register `verifyNativePomLicenses` in the `pom-check` project
 inside `smokeRegisterPomTask`. Resolve the selected native coordinate's published `@pom`
-through its POM-only consumer repositories and invoke the same comparator through a small
-Python CLI. Make `:app:verifyPublishedArtifacts` depend on
+through its POM-only consumer repositories. Keep an independent Groovy XML/tuple comparator
+in a new `tools/release-smoke/native-pom-licenses.gradle`; do not call the Python comparator
+from consumer smoke. Make `:app:verifyPublishedArtifacts` depend on
 `:pom-check:verifyNativePomLicenses`; `:app:smoke` already depends on published-artifact
 verification. Skip registration/wiring for the pure-Java profile. Do not attach the license
 check to `writeRuntimeCoordinates`, which remains a cached coordinate-report task.
 The existing POM-versus-module graph check does not inspect license entries.
 
-Implement the license-tuple comparison as a pure function over POM bytes with independently
-reviewed expected tuples. Add fixtures in `tools/release-all/tests/test_native_licenses.py`
-covering missing, changed and duplicate entries, scoped comments and permalink values. Test
-both the function and the CLI used by Gradle against those fixtures without a native runtime
-or candidate tag. This gives portable regression coverage; do not claim that
-`tools/release-smoke/selftest.sh` executes Gradle tasks, since it tests parser/preflight only.
-Use the normal full native smoke on macOS to cover actual POM-only resolution and Gradle
-wiring. The comparator/CLI fixtures remain portable release regressions, separate from that
-native end-to-end execution.
+Store the approved full name/URL/comment tuples as a literal `REQUIRED_NATIVE_POM_LICENSES`
+constant in `release_inputs.py` for producer/bundle verification. Store a separately reviewed
+literal expected-tuple list in `native-pom-licenses.gradle` for the consumer. Both include the
+approved permalink. Neither list is generated from the POM, the producer `withXml` block or
+`req/native-authored-attributions.json`; a policy edit alone must not change expectations.
+Update both lists only in a reviewed change tied to the completed decision record, including
+any later notice/permalink revision. Producer and bundle checks intentionally share the
+Python comparator; the consumer uses its own Groovy comparator and explicit expectations
+so a Python implementation bug does not automatically pass consumer smoke.
+
+Implement the Python comparison as a pure function over POM bytes. Add fixtures in
+`tools/release-all/tests/test_native_licenses.py` covering missing, changed and duplicate
+entries, scoped comments and permalink values. Test the function and explicit-release CLI
+without a native runtime or candidate tag. Add a standalone Gradle fixture applying
+`native-pom-licenses.gradle` to those POM fixtures; invoke it from the release regression
+suite using `JMLX_RELEASE_TEST_GRADLE`, as with existing portable Gradle fixtures. This tests
+both implementations on Linux-capable JVMs without MLX, Git history or model execution.
+Do not claim that `tools/release-smoke/selftest.sh` executes these Gradle tasks; it remains
+the parser/preflight harness. Use full native smoke on macOS for actual published POM-only
+resolution and end-to-end task wiring.
 
 ## Validation and candidate replacement
 
@@ -285,7 +318,7 @@ the separately digest-pinned snapshots in the scoped review. No new raw-page has
 [erfinv-r3]: https://stackoverflow.com/revisions/49743348/3
 [cc-legal]: https://creativecommons.org/licenses/by-sa/4.0/legalcode.en
 [cc-software]: https://creativecommons.org/faq/#can-i-apply-a-creative-commons-license-to-software
-[cc-authority]: https://creativecommons.org/faq/#what-things-should-i-think-about-before-i-apply-a-creative-commons-license
+[cc-authority]: https://creativecommons.org/faq/#choosing-a-license
 [netlib]: https://netlib.org/cephes/readme
 [cephes-email]: https://lists.debian.org/debian-legal/2004/12/msg00295.html
 [cephes-reply]: https://lists.debian.org/debian-legal/2004/12/msg00297.html

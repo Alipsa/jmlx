@@ -55,6 +55,8 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   [MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902); awaiting an upstream response
   and review of any applicable grant or compliance decision.
   Rechecked 2026-11-20: the issue remains open with no comments; this gate is unchanged.
+  The [2026-11-21 scoped review](phase8-4-scoped-license-review.md) supplies revision and
+  RC1 packaging evidence for an owner/legal compliance decision; no finding is closed.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
   organization Usage Center values and the exact signed bundle remain outstanding.

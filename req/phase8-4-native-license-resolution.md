@@ -8,6 +8,10 @@ The next release step is an owner/legal decision on the two findings in the
 sources, but did not establish an applicable additional grant for the shipped code.
 Both findings and the license release gate remain open.
 
+The [2026-11-21 scoped review](phase8-4-scoped-license-review.md) now maps the Juffa
+answer revisions, inspects RC1 packaging and narrows the Cephes source-generation question.
+It proposes a compliance decision route alongside upstream clarification; both findings remain open.
+
 The owner submitted [MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902) on
 2026-11-16, covering both provenance questions. It is open with no comments at this check;
 the next action is to review any upstream response against the exact code and license terms.

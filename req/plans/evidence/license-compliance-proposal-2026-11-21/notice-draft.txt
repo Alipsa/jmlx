@@ -1,4 +1,4 @@
-DRAFT FOR OWNER/LEGAL REVIEW -- DO NOT PACKAGE
+DRAFT FOR OWNER REVIEW -- DO NOT PACKAGE
 
 This is proposed attribution text, not an approved license treatment or grant.
 The adapter-license/scope decision below is unresolved. Replace this draft with
@@ -46,7 +46,7 @@ and disclaimers after comparison with the reviewed answer and header snapshots.
 No endorsement by Norbert Juffa, Apple or Stack Overflow is implied.
 
 UNRESOLVED -- NOT FINAL NOTICE TEXT:
-The owner/legal reviewer must identify the exact adapted-material boundary and
+The owner reviewer must identify the exact adapted-material boundary and
 the adapter's license under which jmlx may redistribute the contributions,
 including the compiled forms in libmlx.dylib and mlx.metallib. Record the evidence
 and rights/authority supporting that basis, then replace this paragraph with the

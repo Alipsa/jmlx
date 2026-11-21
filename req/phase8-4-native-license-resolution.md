@@ -3,7 +3,7 @@
 Investigation date: 2026-11-16. Baseline: PR #100 merge
 `ee807c99e89f06f63ef326e2bbb976b7cb247989`.
 
-The next release step is an owner/legal decision on the two findings in the
+The next release step is an owner decision on the two findings in the
 [native audit](phase8-4-native-license-audit.md). This investigation found useful primary
 sources, but did not establish an applicable additional grant for the shipped code.
 Both findings and the license release gate remain open.
@@ -14,7 +14,9 @@ It proposes a compliance decision route alongside upstream clarification; both f
 
 The [compliance proposal](phase8-4-license-compliance-proposal.md) turns that route into
 draft notice text, a concrete implementation/verification sequence and a reviewer decision
-record. It is pending owner/legal review; it does not close either finding.
+record. It is pending owner review; it does not close either finding. The
+[owner record](phase8-4-owner-license-decision.md) defines the decision template and policy:
+the owner decides; external legal advice is optional.
 
 The owner submitted [MLX issue #4902](https://github.com/ml-explore/mlx/issues/4902) on
 2026-11-16, covering both provenance questions. It is open with no comments at this check;
@@ -83,7 +85,7 @@ not a fresh grant from the copyright holder. It does not establish the path by w
 Cephes-derived material reached the pinned MLX SIMD implementation.
 
 The existing Netlib permission statement and immediate BSD/zlib notices remain packaged.
-The owner/legal reviewer must decide whether those records already cover this distribution,
+The owner reviewer must decide whether those records already cover this distribution,
 or obtain an applicable grant or a documented licensed provenance chain. This investigation
 does not label the material prohibited, GPL-only or automatically BSD-licensed.
 

@@ -321,8 +321,7 @@ pending. Its tables are the authoritative decision template; the table below lis
 coverage rather than a second template. Complete the owner record in a reviewed PR; identify
 the exact proposal revision and final legal text hashes. Implementation selection is not a
 recorded legal determination. This workflow does not require outside legal approval. No
-rights holder or outside reviewer has
-been contacted by this work.
+rights holder or outside reviewer has been contacted by this work.
 
 | Field | Required record |
 | --- | --- |

@@ -124,6 +124,7 @@ Choose a disposition and supply the reasoning:
 | --- | --- |
 | Decision date and reviewed proposal commit | Pending |
 | Permission/grant relied on | Pending |
+| Rights holder(s) and authority for the permission relied on | Pending |
 | Modification, redistribution and downstream rationale | Pending |
 | Exact material/provenance covered | Pending |
 | Required notices and conditions | Pending |

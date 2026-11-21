@@ -1,0 +1,109 @@
+{
+  "schema": 1,
+  "date": "2026-11-21",
+  "reviewBaseCommit": "ea78fa6bb1a45fc87c4e7213bcf08f7bf92234ca",
+  "kind": "read-only local inspection; not a signed candidate or legal determination",
+  "method": "Read the named members with Python zipfile.ZipFile, read the staged files as bytes, compare all three byte strings and compute each SHA-256 with hashlib.sha256. Verify the wheel against its recorded pin and the producer JAR against the linked validation record before inspection. For libmlxc, compare staged and packaged bytes, inspect the complete /usr/bin/nm output for the two core imports and SIMD symbols, and scan direct include directives in the pinned mlx-c/mlx source tree. Verify the sources JAR hash against producerValidation and enumerate all non-directory members.",
+  "wheel": {
+    "path": "native/scratch/mlx_metal.whl",
+    "sha256": "514df92d41a286895d2564b4b18f4da45096bd7a4a0c47e1042f345ad5a7f936",
+    "size": 78106861
+  },
+  "producerJar": {
+    "path": "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0.jar",
+    "sha256": "9e2fb147777a023e8c75249386e87db58b68c98e361ba80e468228e3f27759d4",
+    "size": 77821140
+  },
+  "producerValidation": {
+    "path": "req/plans/evidence/cephes-notice-validation-2026-11-21/validation.json",
+    "sha256": "8b3c9e0fe41302c063fd4ef1c4962fe16bc7ae092f234b9eede56e47fabcd7d4"
+  },
+  "files": [
+    {
+      "name": "libmlx.dylib",
+      "wheelMember": "mlx/lib/libmlx.dylib",
+      "stagedPath": "native/install/lib/libmlx.dylib",
+      "jarMember": "se/alipsa/jmlx/native/macos-aarch64/libmlx.dylib",
+      "wheelSha256": "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6",
+      "stagedSha256": "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6",
+      "jarSha256": "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6",
+      "size": 21720704,
+      "byteIdentical": true
+    },
+    {
+      "name": "mlx.metallib",
+      "wheelMember": "mlx/lib/mlx.metallib",
+      "stagedPath": "native/install/lib/mlx.metallib",
+      "jarMember": "se/alipsa/jmlx/native/macos-aarch64/mlx.metallib",
+      "wheelSha256": "c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893",
+      "stagedSha256": "c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893",
+      "jarSha256": "c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893",
+      "size": 214156448,
+      "byteIdentical": true
+    },
+    {
+      "name": "libmlxc.dylib",
+      "kind": "locally built mlx-c wrapper; not copied from wheel",
+      "stagedPath": "native/install/lib/libmlxc.dylib",
+      "jarMember": "se/alipsa/jmlx/native/macos-aarch64/libmlxc.dylib",
+      "stagedSha256": "15a08b85d40333093a38043d0545f9ff6d12ab532e58e7c1af067a23c93a238d",
+      "jarSha256": "15a08b85d40333093a38043d0545f9ff6d12ab532e58e7c1af067a23c93a238d",
+      "size": 2364080,
+      "stagedAndJarByteIdentical": true,
+      "symbolInspection": {
+        "command": [
+          "/usr/bin/nm",
+          "native/install/lib/libmlxc.dylib"
+        ],
+        "toolVersion": [
+          "llvm-nm, compatible with GNU nm",
+          "Apple LLVM version 21.0.0",
+          "  Optimized build."
+        ],
+        "undefinedImports": [
+          {
+            "function": "mlx::core::erf",
+            "type": "U",
+            "symbol": "__ZN3mlx4core3erfERKNS0_5arrayENSt3__17variantIJNS4_9monostateENS0_6StreamENS0_17ThreadLocalStreamENS0_6DeviceENS9_10DeviceTypeEEEE"
+          },
+          {
+            "function": "mlx::core::erfinv",
+            "type": "U",
+            "symbol": "__ZN3mlx4core6erfinvERKNS0_5arrayENSt3__17variantIJNS4_9monostateENS0_6StreamENS0_17ThreadLocalStreamENS0_6DeviceENS9_10DeviceTypeEEEE"
+          }
+        ],
+        "matchingDefinedSymbols": [],
+        "simdMatchRule": "Case-sensitive substring 'simd' in the complete nm output, including mangled names.",
+        "simdSymbolMatches": []
+      },
+      "directIncludeScan": {
+        "root": "native/scratch/mlx-c/mlx",
+        "mlxCCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a",
+        "filesInspected": 70,
+        "rule": "Preprocessor include directives containing backend/cpu in the include target.",
+        "matches": [],
+        "sourceTreeStatus": "git status --porcelain --untracked-files=all -- mlx was empty at inspection."
+      }
+    }
+  ],
+  "limits": [
+    "Covers two vendor files, the locally built mlx-c wrapper and sources JAR in the identified producer artifacts; not a newly signed candidate.",
+    "Does not prove vendor source/build provenance or reconstruct compiled functions.",
+    "Byte identity supports a distributor-role argument; it does not establish copyright or license compliance.",
+    "nm observations and a direct include scan are corroborating evidence, not a complete preprocessed include graph or proof excluding every inlined implementation."
+  ],
+  "sourcesJar": {
+    "path": "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-sources.jar",
+    "sha256": "5b8fab0f2583759f98df7cde97c9acb526aa433732819b7b744c09fa97bc311e",
+    "size": 15591,
+    "fileMembers": [
+      "META-INF/MANIFEST.MF",
+      "se/alipsa/jmlx/nativelib/macosarm64/NativeArtifact.java",
+      "META-INF/LICENSE-APACHE-2.0",
+      "META-INF/THIRD-PARTY-NOTICES",
+      "META-INF/LICENSE",
+      "META-INF/NOTICE"
+    ],
+    "mlxHeadersPresent": false
+  }
+}

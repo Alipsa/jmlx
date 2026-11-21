@@ -27,6 +27,11 @@ The [prepared request](plans/evidence/native-license-resolution-2026-11-16/upstr
 is retained as a historical draft; the owner posted an adapted version. Native code, pins,
 bindings, notices, artifact hashes and the publication flow are unchanged.
 
+The [existing-license investigation](phase8-4-juffa-license-interpretation.md), dated
+2026-11-21, evaluates the MIT/direct-CC redistribution argument and qualifies the earlier
+recommendation to await upstream evidence. Its proposed interpretation remains for owner
+review; it does not change either finding or the historical evidence below.
+
 ## Juffa implementations: the BSD samples differ
 
 CPU `erf` is outside this Juffa comparison: its SIMD implementation cites PyTorch's

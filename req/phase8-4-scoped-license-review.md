@@ -83,11 +83,13 @@ function, CC ShareAlike license or Stack Overflow markers appears in those entri
 markers cover `erfcf`, `erf_inverse`, `erfinv_f` and the text forms "error function" and
 "inverse error function", including plurals and space, underscore or hyphen separators (ASCII
 and U+2010–U+2015), as well as `erf`/`erfinv`. These are bounded marker observations, not a
-semantic proof about every possible attribution spelling. None of these JARs contains native
-source entries with the case-insensitive extensions `.h`, `.hpp`, `.c`, `.cc`, `.cpp`, `.m`,
-`.mm`, `.inc` or `.metal`. The native POM's license names, URLs and scoped comments are
-recorded in full: MIT for the jmlx artifact code and Apache-2.0 for compiled metal-cpp. These
-observations are reproducible from the signed ZIP.
+semantic proof about every possible attribution spelling. Markers may overlap: "inverse error
+function" sets both `erf` and `erfinv`. A hit flags text for review; `erf: true` alone does
+not establish an attribution specifically to `erf`. None of these JARs contains native source
+entries with the case-insensitive extensions `.h`, `.hpp`, `.c`, `.cc`, `.cpp`, `.m`, `.mm`,
+`.inc` or `.metal`. The native POM's license names, URLs and scoped comments are recorded in
+full: MIT for the jmlx artifact code and Apache-2.0 for compiled metal-cpp. These observations
+are reproducible from the signed ZIP.
 
 For a compliance implementation, prepare the following for reviewer approval:
 

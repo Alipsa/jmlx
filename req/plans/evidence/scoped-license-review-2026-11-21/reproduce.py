@@ -175,6 +175,8 @@ def cephes_member(archive, member):
     return data, text, match.group()
 
 
+# Presence markers may overlap: "inverse error function" sets both erf and erfinv.
+# A hit flags text for review; it does not establish attribution to a specific function.
 MARKERS = {
     'erf': r'\b(?:(?:my_)?erfc?f?|error[\s_\-\u2010-\u2015]+functions?)\b',
     'erfinv': r'\b(?:(?:my_)?erf_?inv(?:erse)?_?f?'

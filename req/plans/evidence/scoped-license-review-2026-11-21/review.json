@@ -125,7 +125,7 @@
     "validation.replayInputs paths are local, gitignored cache provenance, not committed evidence; reviewers can fetch their own inputs from technicalSources URLs and verify the recorded digests."
   ],
   "technicalFindingsSha256": "d37cba5d97188a2936abfb784603c5e19bbc94cc9c5e876b32ce09a20d3b1124",
-  "reproducerSha256": "24cfcb535594dc969facbb4167c1cb00743b4426f37f85319b9d57d2f7032552",
+  "reproducerSha256": "84e96e64bbfb118818084e68b9ab22490eedca9e525dfa319ff61fbc14cf46ff",
   "validation": {
     "freshAndCachedReportsEqual": true,
     "wrongBundleRejectedBeforeOutput": true,

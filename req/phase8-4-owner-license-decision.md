@@ -1,6 +1,6 @@
 # Phase 8.4 owner license decision record
 
-Prepared 2026-11-21. Status: Cephes interpretation recorded; scope clarification and Juffa pending.
+Prepared 2026-11-21. Status: Cephes interpretation and scope confirmed; Juffa decision pending.
 
 | Field | Record |
 | --- | --- |
@@ -11,7 +11,7 @@ Prepared 2026-11-21. Status: Cephes interpretation recorded; scope clarification
 | Applicable law | Not determined; pending assessment of relevant rights and grants |
 | Assessment | Owner judgment based on the evidence; reviewer is not a lawyer |
 | Juffa disposition | Pending owner assessment and final wording |
-| Cephes disposition | Interpretation accepted; provenance clarification and validation pending |
+| Cephes disposition | Interpretation and Netlib-material basis accepted; validation pending |
 | Release gate | Open; neither finding has been resolved |
 
 The owner makes jmlx's acceptance and release decisions. This workflow does not require an
@@ -103,7 +103,7 @@ On 2026-11-21, Per Nyfelt approved the following interpretation in the preparati
 conversation. This is a substantive owner decision, separate from approval to merge PR #108.
 The owner's approval and merge of [PR #109](https://github.com/Alipsa/jmlx/pull/109)
 will be the repository record of approval of the final text; until then, this PR records the
-conversation-sourced decision for review and does not claim that its amendments are approved.
+conversation-sourced decision for review; final repository approval remains pending.
 The reviewed proposal and decision template are the versions on `main` at
 `e639c3d52c805641d0fdabb182d07c14b5106bd5`.
 
@@ -113,15 +113,16 @@ their redistribution through jmlx, including downstream use. The wording is broa
 not expressly enumerate those activities; this conclusion is the owner's interpretation of
 the existing permission. Approval is limited to the material identified in the scoped review
 and requires retaining the original permission, applicable intermediary notices and the
-MLX MIT notice for Apple/MLX contributions. It does
-not establish a new grant or relabel the material as BSD-licensed.
+MLX MIT notice for Apple/MLX contributions. It does not establish a new grant or relabel the
+material as BSD-licensed.
 
-**Pending rationale clarification:** "what you see here" refers to the Netlib archive, not
-a blanket grant for other distributions. The original approval above does not say whether
-the owner treats the matching Netlib archive material as the permission-covered basis
-despite fastermath's 2.8 label, or accepts the unresolved 2.2/2.8 provenance gap as a known
-limitation. That choice has been requested from the owner; neither interpretation is added
-to the approved rationale until confirmed.
+The owner confirmed on 2026-11-21 that "what you see here" is applied to the matching Netlib
+archive material as the permission-covered basis for this scoped decision, despite
+fastermath's 2.8 label. The basis is the identified archive material in `./exp2f.c` and
+`./sinf.c`, labeled Release 2.2 and pinned below, rather than an assumed permission covering
+all Cephes 2.8 distributions. This is the owner's interpretation of the permission's reach
+to the identified MLX-derived material; the selected coefficient matches do not establish
+an exact provenance chain or complete implementation equivalence.
 
 **Recorded scope and evidence:** MLX cites fastermath and NEON math for its CPU exponential
 and sine/cosine approximations. The [scoped review](phase8-4-scoped-license-review.md) and
@@ -173,7 +174,7 @@ This decision does not extend an intermediary contributor's grant to Moshier's r
 | Decision date and reviewed proposal commit | 2026-11-21; full commit recorded above |
 | Permission/grant relied on | Original Netlib permission; not a new or inferred BSD grant |
 | Rights holder(s) and authority for the permission relied on | Moshier; author's statement above |
-| Modification, redistribution and downstream rationale | Approved; scope clarification pending |
+| Modification, redistribution and downstream rationale | Approved; see Netlib basis above |
 | Exact material/provenance covered | Pinned header, functions, Netlib members and binary above |
 | Required notices and conditions | Retain Netlib, fastermath/NEON and MLX MIT notices |
 | Final notice/license/POM paths, exact wording and SHA-256 hashes | Pending artifact review |
@@ -186,10 +187,8 @@ final notice/license/POM wording, paths and reviewed hashes before closing the C
 finding. Revise the Cephes section title currently ending in "review open" and update its
 matching audit excerpt and inventory entry; the attribution parser keys sections on that
 title. Any newly identified material outside the reviewed scope needs another assessment.
-Resolve the pending Netlib archive/provenance rationale before closing the finding.
 Applicable law remains undetermined as recorded above. `NATIVE-LICENSE-2` remains open for
-that clarification and artifact validation. `NATIVE-LICENSE-1` remains open pending the
-separate Juffa decision.
+artifact validation. `NATIVE-LICENSE-1` remains open pending the separate Juffa decision.
 Neither a replacement candidate nor Central publication is approved by this decision.
 
 ## What follows the owner's decisions

@@ -188,7 +188,8 @@ matching audit excerpt and inventory entry; the attribution parser keys sections
 title. Any newly identified material outside the reviewed scope needs another assessment.
 Resolve the pending Netlib archive/provenance rationale before closing the finding.
 Applicable law remains undetermined as recorded above. `NATIVE-LICENSE-2` remains open for
-that clarification and artifact validation; `NATIVE-LICENSE-1` remains open pending the separate Juffa decision.
+that clarification and artifact validation. `NATIVE-LICENSE-1` remains open pending the
+separate Juffa decision.
 Neither a replacement candidate nor Central publication is approved by this decision.
 
 ## What follows the owner's decisions

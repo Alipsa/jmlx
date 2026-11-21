@@ -127,6 +127,11 @@ grant for the derived material, before closing the gate. Another project's separ
 permission is not used as proof here. This is an unresolved review question, not a finding
 that the code is prohibited or GPL-licensed.
 
+On 2026-11-21, the [owner decision](phase8-4-owner-license-decision.md) accepted the scoped
+original-permission interpretation. The [local artifact validation][cephes-validation]
+records the revised section title and checks all three JARs. The finding remains open for
+implementation review and final candidate validation.
+
 ## Verification and reproduction
 
 The original 2026-11-16 verification passed 63 release selftests and the native Gradle checks.
@@ -219,3 +224,5 @@ All 74 release selftests passed (59.161 seconds), including 17 focused license t
 Gradle checks passed (15 tasks: 6 executed, 9 up-to-date), and the warm-cache source/notice
 check verified all 57 URL/digest pairs and all three rebuilt JARs under the same ISO-8859-1
 environment. `--require-clear` retained its expected exit 1 for the two open legal findings.
+
+[cephes-validation]: plans/evidence/cephes-notice-validation-2026-11-21/validation.json

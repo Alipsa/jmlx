@@ -176,19 +176,29 @@ This decision does not extend an intermediary contributor's grant to Moshier's r
 | Modification, redistribution and downstream rationale | Approved; see Netlib basis above |
 | Exact material/provenance covered | Pinned header, functions, Netlib members and binary above |
 | Required notices and conditions | Retain Netlib, fastermath/NEON and MLX MIT notices |
-| Final notice/license/POM paths, exact wording and SHA-256 hashes | Pending artifact review |
+| Final notice/license/POM paths, exact wording and SHA-256 hashes | Hashes below; review pending |
 | Accept/reject/need evidence; conditions and responsible owner | Conditional accept; Per Nyfelt |
 | Named implementation/review owner and unresolved questions | Follow-up below |
 
-**Follow-up:** Per Nyfelt owns review and acceptance. Implementation ownership has not yet
-been assigned. Validate retained notices against the actual release artifacts and record
-final notice/license/POM wording, paths and reviewed hashes before closing the Cephes
-finding. Revise the Cephes section title currently ending in "review open" and update its
-matching audit excerpt and inventory entry; the attribution parser keys sections on that
-title. Any newly identified material outside the reviewed scope needs another assessment.
-Applicable law remains undetermined as recorded above. `NATIVE-LICENSE-2` remains open for
-artifact validation. `NATIVE-LICENSE-1` remains open pending the separate Juffa decision.
-Neither a replacement candidate nor Central publication is approved by this decision.
+**Implementation and local validation:** the Cephes section title is now
+`Cephes math provenance (original upstream permission statement)`. Its permission text is
+unchanged. The matching inventory component and packaged-text hash are updated; the audit's
+Cephes follow-up entry links the owner decision and new verification. Historical audit
+verification and artifact hashes remain unchanged.
+
+The [local validation record][cephes-validation] pins the final local legal-text and generated
+POM hashes and all three JAR hashes. The [source/notice report][cephes-source-report] checks
+26 components and the legal texts in the main, sources and Javadoc JARs. Native Gradle checks,
+explicit payload verification and 17 native-license tests passed. The native payload remains
+byte-identical to the earlier audit. These are producer checks, not candidate verification.
+
+**Follow-up:** Per Nyfelt owns review and acceptance. Implementation review remains pending.
+Review the changed title, retained notices and recorded hashes, then validate the final new
+candidate before closing the Cephes finding. Any newly identified material outside the
+reviewed scope needs another assessment. Applicable law remains undetermined as recorded
+above. `NATIVE-LICENSE-2` remains open for implementation review and final candidate
+validation; `NATIVE-LICENSE-1` remains open pending the separate Juffa decision. Neither a
+replacement candidate nor Central publication is approved by this decision.
 
 ## What follows the owner's decisions
 
@@ -210,3 +220,6 @@ Central publication still needs the owner's separate approval of the exact verif
 [mlx-issue]: https://github.com/ml-explore/mlx/issues/4902
 [cephes-email]: https://lists.debian.org/debian-legal/2004/12/msg00295.html
 [cephes-reply]: https://lists.debian.org/debian-legal/2004/12/msg00297.html
+
+[cephes-validation]: plans/evidence/cephes-notice-validation-2026-11-21/validation.json
+[cephes-source-report]: plans/evidence/cephes-notice-validation-2026-11-21/source-notice-report.json

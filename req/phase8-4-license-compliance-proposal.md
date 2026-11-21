@@ -2,16 +2,18 @@
 
 2026-11-21. Draft for owner review, based on PR #106 merge
 `59cc6c1` and the [scoped review](phase8-4-scoped-license-review.md).
-Status: proposed; no legal determination or permission grant recorded.
+Status: implementation proposed; conditional owner interpretations are recorded separately.
+No new permission grant is recorded by this proposal.
 Both `NATIVE-LICENSE-1` and `NATIVE-LICENSE-2` remain open.
 
 ## Proposed disposition
 
-Prepare a CC BY-SA 4.0 compliance implementation for the three identified Juffa
-adaptations, conditional on the decisions below. For Cephes, seek a written assessment
-of the retained original permission against the actual redistribution; otherwise require
-an applicable grant or a traced licensed distribution. Notice additions alone close neither
-finding. This proposal authorizes no publication and makes no changes to release artifacts.
+Prepare a CC BY-SA 4.0 compliance implementation for the three identified Juffa adaptations,
+conditional on completing the scope, wording and validation decisions below. The owner has
+accepted the existing-grants interpretation for Juffa and the scoped original permission
+interpretation for Cephes in the owner record. Their remaining conditions still apply; notice
+additions alone close neither finding. This proposal authorizes no publication and makes no
+changes to release artifacts.
 
 The concrete [draft notice](plans/evidence/license-compliance-proposal-2026-11-21/notice-draft.txt)
 is review material outside the native module. Its unresolved adapter-license paragraph must
@@ -65,6 +67,11 @@ Record each answer in the decision record below, with evidence and rationale.
    authorize choosing a license for Apple's or other adapters' contributions. If that basis
    cannot be established, seek clarification, an applicable grant or a reviewed replacement
    before changing release metadata. Any future adaptation by jmlx needs its own assessment.
+   Under the accepted owner interpretation, Decision 3 is answered by MIT for Apple/MLX
+   contributions plus the direct section 2(a)(5)(A) offer for Juffa's expression; no CC
+   adapter's license is identified. Replace the draft notice's unresolved paragraph with
+   that basis and the approved scope, preserving (B)'s condition as the counterargument;
+   do not present MIT as a CC adapter's license. Final wording still requires owner approval.
 4. **Downstream terms:** review the actual distribution terms and any technological measures
    against the approved treatment. Review all publication surfaces together, including licenses
    consumers see in the POM. Do not infer compliance from Maven availability or a notice test.
@@ -318,12 +325,13 @@ new verified receipt. Approval of this proposal is not Central publication autho
 The [owner decision record](phase8-4-owner-license-decision.md) identifies Per Nyfelt as the
 project reviewer, with Sweden as the confirmed review context. The owner accepted the Cephes
 original-permission interpretation on 2026-11-21, subject to retained notices and artifact
-validation. The Juffa decision remains pending. The owner record is the authoritative
-decision template; the table below lists required coverage rather than a second template.
-Complete the owner record in a reviewed PR; identify the exact proposal revision and final
-legal text hashes. Implementation selection is not a recorded legal determination. This
-workflow does not require outside legal approval. No rights holder or outside reviewer has
-been contacted by this work.
+validation. The owner also accepted the Juffa existing-grants interpretation conditionally;
+scope, final wording, downstream terms and artifact validation remain outstanding. The owner
+record is the authoritative decision template; the table below lists required coverage rather
+than a second template. Complete the owner record in a reviewed PR; identify the exact
+proposal revision and final legal text hashes. Implementation selection is not a recorded
+legal determination. This workflow does not require outside legal approval. No rights holder
+or outside reviewer has been contacted by this work.
 
 | Field | Required record |
 | --- | --- |

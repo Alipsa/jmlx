@@ -114,6 +114,10 @@ exact code mapping, or review and fulfill the applicable attribution/share-alike
 A separately reviewed upstream/pin or implementation change is another possible resolution.
 This audit does not change the native code or claim those obligations have been satisfied.
 
+On 2026-11-21, the [owner record](phase8-4-owner-license-decision.md) records conditional
+acceptance of the existing MIT/direct-CC grants interpretation. Scope, final notices and
+metadata, downstream terms and artifact validation remain outstanding; this finding is open.
+
 ### NATIVE-LICENSE-2: Cephes provenance chain
 
 CPU SIMD `math.h` explicitly traces its exponential and sine/cosine implementations through

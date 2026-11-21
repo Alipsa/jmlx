@@ -72,13 +72,15 @@ Record each answer in the decision record below, with evidence and rationale.
    identified modifications and redistribution, including downstream recipients. If relying
    on another grant, identify its grantor, recipients, covered code and downstream applicability.
 
-The [CC BY-SA 4.0 legal code][cc-legal], sections 1–3, governs attribution, changes,
-adapter licensing and downstream conditions. The [licensing-authority FAQ][cc-authority]
-cautions against applying licenses without authority; the [software FAQ][cc-software]
-explains software-specific limitations. Section 1(b) defines the adapter's license in terms
-of rights in the adapter's contributions; sections 2(a)(5)(C) and 3(b)(3) address downstream
-restrictions. The reviewer must distinguish those roles rather than treating jmlx as the
-adapter of the existing MLX code. These sources frame the review questions; this proposal
+The [CC BY-SA 4.0 legal code][cc-legal], sections 1–3, governs attribution, changes, adapter
+licensing and downstream conditions. The [licensing-authority FAQ][cc-authority] cautions
+against applying licenses without authority; the [software FAQ][cc-software] explains
+software-specific limitations. Section 1(b) defines the adapter's license in terms of rights
+in the adapter's contributions. Section 2(a)(5)(B) addresses the offer recipients of adapted
+material receive from the Licensor under the adapter's license; section 2(a)(5)(C) prohibits
+downstream restrictions on the licensed material. Section 3(b)(3) binds the adapter applying
+an adapter's license. The reviewer must distinguish those roles rather than treating jmlx as
+the adapter of the existing MLX code. These sources frame the review questions; this proposal
 does not decide the compiled adaptation boundary or establish an adapter's license.
 
 For Cephes, retain the [Netlib permission][netlib] and the immediate fastermath/NEON notices.
@@ -108,18 +110,36 @@ Only if the reviewer establishes this license's applicability, add a POM entry n
 `https://creativecommons.org/licenses/by-sa/4.0/` and this **conditional draft comment**:
 
 ```text
-Identifies the applicable license for the reviewed Norbert Juffa-derived Metal erf
+Identifies the applicable license(s) for the reviewed Norbert Juffa-derived Metal erf
 and Metal/CPU SIMD erfinv material, within the established source/compiled scope.
 Scope and licensing basis: [immutable approved-notice URL]. Also packaged in
 META-INF/THIRD-PARTY-NOTICES.
 ```
 
-Replace that comment with the exact established scope and licensing basis. Replace the URL
-placeholder with a public repository permalink to the approved notice at its full reviewed
-implementation commit, available independently of the JAR. Check that URL before candidate
-cut and retain it in the release evidence; do not point to mutable `main` or a missing future
-tag. A POM reader must be able to inspect the scope without downloading the JAR. If another
-license is established for the adapter's contributions, reflect that distinction explicitly
+Replace that comment with the exact established scope and licensing basis. Establish the
+permalink in this order:
+
+1. Commit the approved notice first, then record that commit's full SHA. In a later commit,
+   add the POM comment linking to that earlier SHA and the exact notice path. A commit cannot
+   contain its own SHA. If the notice changes again, commit that change before updating its
+   POM permalink in another commit.
+2. Preserve the linked commit through a merge commit (`gh pr merge --merge`); do not squash
+   or rebase the implementation branch. Before candidate cut, require the linked SHA to be
+   an ancestor of reviewed `main`; after tagging, also require ancestry of the candidate.
+   Merely being an accessible GitHub object is insufficient.
+3. Read the linked notice offline with
+   `git show <sha>:jmlx-native-macos-arm64/THIRD-PARTY-NOTICES`. Extract its Juffa section
+   and compare it byte-for-byte with that section in each packaged native JAR, using identical
+   section-boundary rules without whitespace normalization. Fail on missing Git history,
+   absent sections or any byte difference. Also compare the local notice before packaging.
+   A permalink is immutable but can become stale after later edits; repeat this comparison
+   on every local verification and candidate check. Add regressions for stale notice text
+   and a linked commit that is not an ancestor.
+
+The URL must be a public repository permalink available independently of the JAR. Verify its
+availability before candidate cut and retain it in release evidence; do not use mutable
+`main` or a missing future tag. A POM reader must be able to inspect the scope without the
+JAR. If another license applies to the adapter's contributions, reflect that distinction
 instead of labeling those contributions BY-SA by assumption. The comment is not a decision.
 Retain the existing MIT/Apache texts and other upstream notices, with scope descriptions
 consistent with the approved treatment. Review both Gradle metadata and POM-only consumption.
@@ -166,8 +186,11 @@ Add a separate authored-attribution policy and check, with the following respons
   added to the inventory, require the same exact title there too.
 - Extend `release_inputs.py:native_notice_report` to require and check the approved authored
   policy against each native JAR's notice, independently of `packagedTexts` hashes. Add the
-  corresponding requirement to the independent consumer checks. A missing authored section
-  must fail even if someone also updates the enclosing notice digest.
+  corresponding requirement to the independent consumer checks. Hard-code the mandatory
+  Juffa section title in a new `REQUIRED_NATIVE_AUTHORED_SECTIONS` constant next to
+  `REQUIRED_NATIVE_LEGAL_TEXTS`, and independently in consumer smoke. Validate both policy
+  coverage and actual sections against those constants. Removing the policy entry/file and
+  section together must fail, even if someone also updates the enclosing notice digest.
 
 Extend `release_inputs.py:REQUIRED_NATIVE_LEGAL_TEXTS` with `LICENSE-CC-BY-SA-4.0` and keep
 `validate_native_legal_inventory` as a mandatory precondition to JAR validation. In
@@ -176,20 +199,37 @@ required-text set check before iterating `inventory.packagedTexts`. It must also
 CC text. Merely listing its digest in the inventory is insufficient: removing the file from
 both inventory and all three JARs must fail both release verification and consumer smoke.
 
-For native POM licenses, add a proposed `native_pom_report` helper in `release_inputs.py`
-and invoke it on the actual native `.pom` read by `check_bundle`. It must assert the complete
+For native POM licenses, add a proposed `native_pom_report` helper in `release_inputs.py`.
+Extend `check_bundle` to read the actual native `.pom` bytes out of the ZIP and pass them to
+that helper; today it only requires POM/signature entries to exist. Assert the complete
 approved license name/URL/scoped-comment tuples, including the immutable notice URL, against
 expectations independent of the producer's `withXml` block. Do not use the POM's own entries
-as the expected list. Cover missing, altered and duplicate entries in
-`tools/release-all/tests/test_native_licenses.py`.
+as the expected list.
 
-Add an independent `verifyNativePomLicenses` task to `smoke-conventions.gradle`, resolving
-the selected native coordinate's published `@pom` through the consumer repositories and
-asserting the approved tuples. Wire it into `verifyPublishedArtifacts` and the `pom-check`
-project's `writeRuntimeCoordinates` task, via `smokeRegisterPomTask`; skip it for the
-pure-Java profile. Keep its expected tuples independent of producer Gradle declarations.
-The existing POM-versus-module graph check does not inspect license entries. Extend smoke
-selftests with malformed/missing native POM license fixtures, including a POM-only run.
+Add a producer verification task depending on `generatePomFileForMavenPublication`, wired
+into the native module's `check`, that invokes the same helper on the locally generated
+`build/publications/maven/pom-default.xml`. Check its notice permalink against local source
+and packaged sections too. This runs before tagging; it must not call `check_bundle`, whose
+candidate-tag/HEAD guard is appropriate only after a candidate exists.
+
+For consumer verification, register `verifyNativePomLicenses` in the `pom-check` project
+inside `smokeRegisterPomTask`. Resolve the selected native coordinate's published `@pom`
+through its POM-only consumer repositories and invoke the same comparator through a small
+Python CLI. Make `:app:verifyPublishedArtifacts` depend on
+`:pom-check:verifyNativePomLicenses`; `:app:smoke` already depends on published-artifact
+verification. Skip registration/wiring for the pure-Java profile. Do not attach the license
+check to `writeRuntimeCoordinates`, which remains a cached coordinate-report task.
+The existing POM-versus-module graph check does not inspect license entries.
+
+Implement the license-tuple comparison as a pure function over POM bytes with independently
+reviewed expected tuples. Add fixtures in `tools/release-all/tests/test_native_licenses.py`
+covering missing, changed and duplicate entries, scoped comments and permalink values. Test
+both the function and the CLI used by Gradle against those fixtures without a native runtime
+or candidate tag. This gives portable regression coverage; do not claim that
+`tools/release-smoke/selftest.sh` executes Gradle tasks, since it tests parser/preflight only.
+Use the normal full native smoke on macOS to cover actual POM-only resolution and Gradle
+wiring. The comparator/CLI fixtures remain portable release regressions, separate from that
+native end-to-end execution.
 
 ## Validation and candidate replacement
 
@@ -201,7 +241,8 @@ The implementation PR should demonstrate all of the following before resolution:
   authored-attribution or packaging check to fail, including when notice hashes are updated.
 - Removing the CC text from both inventory and JARs fails the independent required-text checks.
   The new bundle and consumer POM checks reject absent/altered name, URL, scoped comment or
-  approved-notice permalink. Test section-title mismatches and a missing authored policy too.
+  approved-notice permalink, before and after tagging. Test section-title mismatches and
+  simultaneous policy/section deletion, plus permalink ancestry and byte-level freshness.
 - New inventory source bytes and packaged text digests are checked independently. Positive
   marker hits are expected in the new candidate; they neither fail it nor prove legal clearance.
 - Root/shared-build checks, release regressions, native payload checks and both consumer

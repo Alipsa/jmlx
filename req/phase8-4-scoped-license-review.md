@@ -134,6 +134,9 @@ No exact licensed-distribution chain has been established by this review.
 
 ## Decision record to complete
 
+The [compliance proposal](phase8-4-license-compliance-proposal.md) supplies a concrete draft
+notice, proposed packaging changes and a decision-record template for this review.
+
 An owner/legal reviewer should record their name, role, date, applicable jurisdiction and
 reasoned answers to these questions. Counsel review remains appropriate for the legal
 interpretations; the technical replay cannot supply those determinations.

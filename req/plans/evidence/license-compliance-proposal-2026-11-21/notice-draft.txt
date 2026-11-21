@@ -1,0 +1,55 @@
+DRAFT FOR OWNER/LEGAL REVIEW -- DO NOT PACKAGE
+
+This is proposed attribution text, not an approved license treatment or grant.
+The adapter-license/scope decision below is unresolved. Replace this draft with
+approved final text before using it in a release artifact.
+
+======== JMLX NATIVE NOTICE SECTION ========
+Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)
+
+Creator: Norbert Juffa (Stack Overflow user njuffa, user ID 780717)
+
+Reviewed source material:
+- Error-function implementation, answer 35148199, revision 4, 2022-06-18:
+  https://stackoverflow.com/a/35148199
+  https://stackoverflow.com/revisions/35148199/4
+- Inverse-error-function implementation, answer 49743348, revision 3, 2021-06-10:
+  https://stackoverflow.com/a/49743348
+  https://stackoverflow.com/revisions/49743348/3
+
+The reviewed answer revision records identify Creative Commons
+Attribution-ShareAlike 4.0 International (CC BY-SA 4.0):
+https://creativecommons.org/licenses/by-sa/4.0/
+Legal code: https://creativecommons.org/licenses/by-sa/4.0/legalcode.en
+The proposed package includes its complete text at META-INF/LICENSE-CC-BY-SA-4.0,
+including its disclaimer of warranties and limitation of liability (section 5).
+
+Identified MLX adaptations at source commit
+36969c094354086e15d2a327a9c50feb20b9cf11:
+- mlx/backend/metal/kernels/erf.h: erf and erfinv
+- mlx/backend/cpu/simd/math.h: erfinv
+
+Modifications visible in the reviewed material include Metal translation,
+Metal math intrinsics, and CPU SIMD/vectorized evaluation. Metal erf uses the
+separately attributed expm1f implementation; that substitution is recorded in
+MLX commit 634b148dd4203f80b8cc8db3e33452a91785fad8. These descriptions do not
+claim a complete reconstruction of the implementation history.
+
+Retain the existing Apple file-header notices:
+- Copyright © 2023 Apple Inc. -- Metal erf.h
+- Copyright © 2024 Apple Inc. -- CPU simd/math.h
+Retain all other applicable supplied upstream notices, modification indications
+and disclaimers after comparison with the reviewed answer and header snapshots.
+No endorsement by Norbert Juffa, Apple or Stack Overflow is implied.
+
+UNRESOLVED -- NOT FINAL NOTICE TEXT:
+The owner/legal reviewer must approve the exact adapted-material boundary and
+adapter-license treatment, including the compiled forms in libmlx.dylib and
+mlx.metallib. Record the rights/authority supporting that treatment and replace
+this paragraph with the approved scope and adapter-license statement.
+The source-record attribution above does not supply that decision or authorize
+relicensing Apple's or another contributor's rights.
+
+Cephes remains a separate unresolved finding. Preserve the existing fastermath,
+NEON math and Netlib permission sections. This draft does not label Cephes as
+BSD-licensed or establish the scope of permission for its derived material.

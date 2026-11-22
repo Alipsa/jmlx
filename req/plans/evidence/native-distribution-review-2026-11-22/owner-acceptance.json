@@ -94,5 +94,5 @@
   "releaseReady": false,
   "signedCandidateAccepted": false,
   "publicationAuthorized": false,
-  "preparationStatus": "The unchanged review.json records pending owner decisions at preparation; this separate record supersedes only those pending decision fields."
+  "preparationStatus": "The review.json at approvedReviewCommit records pending owner decisions at preparation; this acceptance supersedes those pending fields. Later provenance clarifications identify the original source snapshot and checked inputs without changing approved metadata bytes or the accepted conclusion."
 }

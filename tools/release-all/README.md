@@ -152,13 +152,16 @@ Explicit license verification is a separate pre-tag command:
 `./gradlew :jmlx-native-macos-arm64:verifyNativeReleaseLicenses`. It checks the generated
 POM and all three native JARs, the authored-attribution policy and its pinned approval
 records, and the raw Juffa section against the POM's immutable notice permalink. The linked
-commit must be an ancestor of fetched `refs/remotes/origin/main` and `HEAD`. Run
-`git fetch origin` before this command to refresh the reviewed-main reference. Local `main`
-is not trusted. Missing history reports a fetch diagnostic; a known non-ancestor names the
-ref it fails. The task never fetches or skips. Run it after merging the implementation with a merge commit, before cutting a new
-candidate. Bundle verification repeats ancestry against the candidate SHA. Do not squash
-or rebase away the notice commit. The new task is neither an ordinary `check` dependency
-nor a consumer-history prerequisite; ordinary shallow PR CI stays supported.
+commit must be an ancestor of fetched `refs/remotes/origin/main` and `HEAD`.
+Run `git fetch origin` before this command to refresh the reviewed-main reference.
+Local `main` is not trusted. Origin must point to Alipsa/jmlx on GitHub (HTTPS or Git SSH URL).
+Shallow checkouts must first obtain full history with `git fetch --unshallow origin`;
+future release CI must use `fetch-depth: 0`. Missing history reports a fetch diagnostic;
+a known non-ancestor names the ref it fails. The task never fetches or skips. Run it
+after merging the implementation with a merge commit, before cutting a new candidate.
+Bundle verification repeats ancestry against the candidate SHA. Do not squash or rebase
+away the notice commit. The new task is neither an ordinary `check` dependency nor a
+consumer-history prerequisite; ordinary shallow PR CI stays supported.
 
 The independent consumer resolves the native POM through its POM-only repositories and
 compares literal scoped tuples in `native-pom-licenses.gradle`. Full smoke requires that

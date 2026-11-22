@@ -430,6 +430,7 @@ class AuthoredNativeLicensesTest(unittest.TestCase):
         def git(*args):
             return subprocess.check_output(['git', '-C', str(self.root), *args], stderr=subprocess.PIPE)
         git('init', '--quiet', '--initial-branch=main')
+        git('remote', 'add', 'origin', 'https://github.com/Alipsa/jmlx.git')
         (self.root / 'baseline.txt').write_text('baseline')
         git('add', 'baseline.txt')
         git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
@@ -467,6 +468,50 @@ class AuthoredNativeLicensesTest(unittest.TestCase):
         pom.write_bytes((self.fixtures / 'valid.pom').read_bytes().replace(
             R.APPROVED_NOTICE_PERMALINK.encode(), permalink.encode()))
         return git, jars, module, pom, commit
+
+    def test_shallow_history_is_unavailable_even_when_linked_commit_object_exists(self):
+        git, jars, module, pom, commit = self.make_release_fixture()
+        for number in (1, 2):
+            (self.root / 'baseline.txt').write_text(str(number))
+            git('add', 'baseline.txt')
+            git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+                'commit', '--quiet', '-m', 'later change')
+        shallow = self.root / 'shallow'
+        subprocess.check_output(['git', 'clone', '--quiet', '--depth', '1', '--branch',
+                                 'candidate', self.root.as_uri(), str(shallow)], stderr=subprocess.PIPE)
+        def shallow_git(*args):
+            return subprocess.run(['git', '-C', str(shallow), *args],
+                                  stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.assertEqual(shallow_git('fetch', '--depth', '1', self.root.as_uri(), commit).returncode, 0)
+        self.assertEqual(shallow_git('cat-file', '-e', commit + '^{commit}').returncode, 0)
+        self.assertEqual(shallow_git('rev-parse', '--is-shallow-repository').stdout.strip(), b'true')
+        self.assertEqual(shallow_git('merge-base', '--is-ancestor', commit, 'HEAD').returncode, 1)
+        self.assertEqual(shallow_git('remote', 'set-url', 'origin',
+                                     'https://github.com/Alipsa/jmlx.git').returncode, 0)
+        self.assertEqual(shallow_git('update-ref', 'refs/remotes/origin/main', 'HEAD').returncode, 0)
+        data = (self.root / 'jmlx-native-macos-arm64/THIRD-PARTY-NOTICES').read_bytes()
+        with self.assertRaisesRegex(ValueError, 'history unavailable; shallow checkout'):
+            module.verify_notice_permalink(shallow, data)
+        # Filling in the same local fixture's history makes this exact check succeed.
+        self.assertEqual(shallow_git('fetch', '--unshallow', self.root.as_uri(),
+                                     'candidate').returncode, 0)
+        self.assertEqual(module.verify_notice_permalink(shallow, data), commit)
+
+    def test_origin_must_match_approved_notice_repository(self):
+        git, jars, module, pom, commit = self.make_release_fixture()
+        data = (self.root / 'jmlx-native-macos-arm64/THIRD-PARTY-NOTICES').read_bytes()
+        for origin in ('https://github.com/Alipsa/jmlx.git', 'git@github.com:Alipsa/jmlx.git',
+                       'ssh://git@github.com/Alipsa/jmlx.git', 'https://github.com/alipsa/jmlx'):
+            with self.subTest(origin=origin):
+                git('remote', 'set-url', 'origin', origin)
+                self.assertEqual(module.verify_notice_permalink(self.root, data), commit)
+        for origin in ('https://github.com/fork/jmlx.git', 'git@github.com:fork/jmlx.git',
+                       'https://example.invalid/Alipsa/jmlx.git',
+                       'https://github.com/Alipsa/jmlx-other.git'):
+            with self.subTest(origin=origin):
+                git('remote', 'set-url', 'origin', origin)
+                with self.assertRaisesRegex(ValueError, 'origin must point to Alipsa/jmlx'):
+                    module.verify_notice_permalink(self.root, data)
 
     def test_explicit_cli_and_permalink_history_freshness(self):
         git, jars, R, pom, commit = self.make_release_fixture()

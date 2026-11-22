@@ -272,6 +272,10 @@ class FinalReceiptTest(unittest.TestCase):
             info["sha256"] = sha256(info["path"])
         self.write("final.json", self.receipt)
         def git(command, **kwargs):
+            if command[3:] == ['rev-parse', '--is-shallow-repository']:
+                return b'false\n'
+            if command[3:] == ['remote', 'get-url', 'origin']:
+                return b'https://github.com/Alipsa/jmlx.git\n'
             if command[3] == 'show':
                 return (original / 'jmlx-native-macos-arm64/THIRD-PARTY-NOTICES').read_bytes()
             if not kwargs.get('text'):

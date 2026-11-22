@@ -406,6 +406,15 @@ def verify_notice_permalink(root, data, *, reviewed_ref="refs/remotes/origin/mai
     def git(*args):
         return subprocess.check_output(["git", "-C", str(root), *args], stderr=subprocess.PIPE)
     try:
+        if git("rev-parse", "--is-shallow-repository").strip() == b"true":
+            raise ValueError("approved notice history unavailable; shallow checkout requires "
+                             "full history: run git fetch --unshallow origin before explicit "
+                             "release verification")
+        origin = git("remote", "get-url", "origin").decode("utf-8").strip()
+        if not re.fullmatch(r"(?:https://github\.com/|ssh://git@github\.com/|git@github\.com:)"
+                            r"Alipsa/jmlx(?:\.git)?/?", origin, flags=re.IGNORECASE):
+            raise ValueError("origin must point to Alipsa/jmlx on github.com for approved "
+                             "notice verification")
         git("cat-file", "-e", commit + "^{commit}")
         for ref in (reviewed_ref, candidate_ref):
             git("rev-parse", "--verify", ref + "^{commit}")

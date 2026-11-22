@@ -10,15 +10,15 @@
     "jmlx-native-macos-arm64/build.gradle": "ce3aab26648c300d145d1ca021d91375e3cea4b7d7e00c197259027ada79c674",
     "req/native-license-inventory.json": "07f50ebdf90df419a6a0642b361979ff95e02ed4d36ed3a91ca25f471da09259",
     "req/native-authored-attributions.json": "458fda282f777e1ff135380e962fb0ab4749a4baab60fac3af25711e2ffa4e3c",
-    "tools/release-all/release_inputs.py": "8e7823016245b4c9897a05a0205bc1251cd53b17b52bb67e186e3bc267ae0f7d",
+    "tools/release-all/release_inputs.py": "8c632138f6dd034f626d7d3aaaea8fd4259d52fb00d2aaaa51e6f75591a0e572",
     "tools/release-all/audit_native_licenses.py": "c24180152db55bdbda9fe691cc48f1f7a1e972fb81bac669769f35dfd8341fbc",
     "tools/release-all/native_suites.py": "812c5cc8475b17a395278d2247eca1e63fe0d97eadb1ba5ef4411f9e59218913",
     "tools/release-smoke/native-pom-licenses.gradle": "dace3bccb219e232b28684c02697c86d776333393a012badc7fe85405ba155d8",
     "tools/release-smoke/native-legal-texts.gradle": "40ff188a8bd5a4f0b7d50863151190267cbb0f8874b5cbb9adf0f55c50cd795d",
     "tools/release-smoke/smoke-conventions.gradle": "75a669bf40b199c54d6c29dd66541005049aa40cbcfcf1e53b21b4dd5d3ffa6e",
-    "tools/release-all/tests/test_native_licenses.py": "cf49bc7ace7ded0ab0ab7296261112268bbabc75042db36afe2dea134d24de93",
+    "tools/release-all/tests/test_native_licenses.py": "8659e4f2d09dc8e077e16173fb863f6417ee84c9cc488551c9f10b367f9a348c",
     "tools/release-all/tests/test_native_publish.py": "5264a242320afcbf823236c9d3075841677085fff1b3634727a8c6a18ba51df1",
-    "tools/release-all/tests/test_final_receipt.py": "1df66b51819a7823499012fa7293e8acd0fe02009c2b57463191acd7202e6663",
+    "tools/release-all/tests/test_final_receipt.py": "4cf9cf254cd12fb1a635fadc865ac4cccda0de2f29cb8e742d89c542a41901c9",
     "tools/release-all/tests/test_release_inputs.py": "fbdcec489e9b5f59e82e3365e1418331603263e86ecadd6153ba359d4568b8a6",
     "tools/release-all/tests/native_license_fixtures.py": "c6bb72a22e891f7a9bc09c0957e852ca94edc378d16d692f22302f835a6bffe6",
     "tools/release-all/tests/fixtures/native-pom/stale-permalink.pom": "98cc2972c57d1fa5f31e3c2049f7713831bc5248b783d6639da1c1a0d4bd3369",
@@ -91,14 +91,14 @@
       "command": "bash tools/release-all/selftest.sh",
       "exitCode": 0,
       "log": "build/releaseAll/juffa-implementation-2026-11-22/macos-release-regressions.log",
-      "sha256": "40d8fd68463138ab309dbfdc5940adedaeca2b1e19c07a1e67fe901cabb50360"
+      "sha256": "5375a08c5ba54b4eaeb9f049a4aafe4d41011e93ae645977f4952cd79503e878"
     },
     {
       "name": "linux-release-regressions",
       "command": "linux-exec bash -lc \"cd /projects/jmlx && bash tools/release-all/selftest.sh\"",
       "exitCode": 0,
       "log": "build/releaseAll/juffa-implementation-2026-11-22/linux-release-regressions.log",
-      "sha256": "e496355f0687c20927a369700c1c24b8894063f35c2be86b5f0664551ec89ff5"
+      "sha256": "6603bf7e9881134802218f74d1b69930b8564be35d0445c7c2fd8a25c9514071"
     },
     {
       "name": "macos-full-smoke",
@@ -137,10 +137,10 @@
     },
     {
       "name": "premerge-ancestry-refusal",
-      "command": "./gradlew :jmlx-native-macos-arm64:generatePomFileForMavenPublication :jmlx-native-macos-arm64:verifyNativeReleaseLicenses",
+      "command": "./gradlew :jmlx-native-macos-arm64:verifyNativeReleaseLicenses",
       "exitCode": 1,
       "log": "build/releaseAll/juffa-implementation-2026-11-22/premerge-ancestry-refusal.log",
-      "sha256": "2e7f850f8698e46c4e2947c71d807f175872e34b901f8928e42e9b3eb2477e9d"
+      "sha256": "74d516c4e6c51997fd32308b8849cba3dd886e40791288a7ff3da482086df81b"
     },
     {
       "name": "smoke-parser-preflight",
@@ -152,14 +152,14 @@
   ],
   "regressions": {
     "macosFullSuite": {
-      "tests": 105,
+      "tests": 107,
       "skipped": 0,
-      "seconds": 60.976
+      "seconds": 86.559
     },
     "linuxArm64FullSuite": {
-      "tests": 105,
+      "tests": 107,
       "skipped": 0,
-      "seconds": 57.61
+      "seconds": 81.421
     },
     "finalFocused": {
       "macosNative": 25,
@@ -191,6 +191,14 @@
       "Remove duplicate per-JAR authored validation in check_bundle."
     ],
     "generatedPomBytesUnchanged": true,
-    "validation": "Full 105-test suites pass on macOS and Linux ARM64, including synthetic local/remote-main divergence, missing-history/non-ancestor CLI diagnostics and real Gradle POM name drift."
+    "validation": "Full 105-test suites pass on macOS and Linux ARM64, including synthetic local/remote-main divergence, missing-history/non-ancestor CLI diagnostics and real Gradle POM name drift.",
+    "shallowHistoryAndOriginFollowup": {
+      "changes": [
+        "Reject shallow repositories with the full-history diagnostic before testing ancestry, even when the linked commit object exists.",
+        "Require origin to identify Alipsa/jmlx on GitHub using canonical HTTPS or Git SSH URLs.",
+        "Rewrap both README prose passages; check all newly added prose lines there against 100 columns."
+      ],
+      "validation": "All 107 release tests pass on macOS and Linux ARM64. The shallow clone has the linked object and Git returns ancestry exit 1; explicit verification reports truncated history, then passes after unshallowing. Wrong repository/fork origins are rejected; canonical URL forms pass. The real checkout retains the expected pre-merge non-ancestor error."
+    }
   }
 }

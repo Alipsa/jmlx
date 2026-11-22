@@ -82,3 +82,11 @@ validation. Producer POM name drift reports the missing license entry explicitly
 a real Gradle fixture. Both original owner conditions about BSD forum samples and future
 jmlx modifications remain in the authoritative decision record. The generated POM bytes
 are unchanged. The full 105-test suites pass on macOS and Linux ARM64 after these fixes.
+
+A subsequent review reproduced false non-ancestry in truncated history. Explicit verification
+now rejects shallow checkouts before ancestry checks and requests full history. A real local
+depth-1 clone fixture retains the linked object, reproduces Git's exit 1, verifies the fetch
+diagnostic and succeeds after unshallowing. Origin must identify Alipsa/jmlx on GitHub using
+a canonical HTTPS or Git SSH URL; fork and wrong-host URLs are rejected. Both README prose
+passages were rewrapped. The expanded full suite passes all 107 tests on macOS and Linux
+ARM64; the updated validation record retains the results and input hashes.

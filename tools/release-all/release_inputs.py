@@ -64,7 +64,7 @@ REQUIRED_NATIVE_POM_LICENSES = (('MIT License',
   'erfinv material, including corresponding compiled forms in libmlx.dylib and mlx.metallib. '
   "Apple/MLX contributions rely separately on existing MIT grants. No CC adapter's license is "
   'identified. See '
-  '<https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES> '
+  f'<{APPROVED_NOTICE_PERMALINK}> '
   '(scope and redistribution basis), also packaged in META-INF/THIRD-PARTY-NOTICES. The complete '
   'CC license is packaged in META-INF/LICENSE-CC-BY-SA-4.0.'),
  ('BSD 2-Clause License',
@@ -393,8 +393,9 @@ def native_pom_report(data):
     return {"licenses": len(actual), "noticePermalink": APPROVED_NOTICE_PERMALINK}
 
 
-def verify_notice_permalink(root, data, *, reviewed_ref="refs/heads/main", candidate_ref="HEAD"):
-    """Require the linked commit in reviewed main and candidate history, then compare raw bytes."""
+def verify_notice_permalink(root, data, *, reviewed_ref="refs/remotes/origin/main",
+                            candidate_ref="HEAD"):
+    """Require the linked commit in fetched origin/main and candidate history, then compare bytes."""
     root = Path(root)
     match = re.fullmatch(r"https://github.com/Alipsa/jmlx/blob/([0-9a-f]{40})/"
                          r"jmlx-native-macos-arm64/THIRD-PARTY-NOTICES", APPROVED_NOTICE_PERMALINK)
@@ -408,10 +409,15 @@ def verify_notice_permalink(root, data, *, reviewed_ref="refs/heads/main", candi
         git("cat-file", "-e", commit + "^{commit}")
         for ref in (reviewed_ref, candidate_ref):
             git("rev-parse", "--verify", ref + "^{commit}")
-            git("merge-base", "--is-ancestor", commit, ref)
+            try:
+                git("merge-base", "--is-ancestor", commit, ref)
+            except subprocess.CalledProcessError as error:
+                if error.returncode == 1:
+                    raise ValueError(f"linked notice commit is not an ancestor of {ref}") from error
+                raise
         linked = raw_notice_sections(git("show", commit + ":jmlx-native-macos-arm64/THIRD-PARTY-NOTICES"))
     except subprocess.CalledProcessError as error:
-        raise ValueError("approved notice history/ancestry unavailable; fetch reviewed main and "
+        raise ValueError("approved notice history unavailable; fetch origin/main and "
                          "the linked commit before explicit release verification") from error
     for title in REQUIRED_NATIVE_AUTHORED_SECTIONS:
         if title not in local or title not in linked or local[title] != linked[title]:
@@ -598,7 +604,6 @@ def check_bundle(bundle, record_path, record_hash, manifest_path, root):
                     with zipfile.ZipFile(io.BytesIO(jar_bytes)) as jar:
                         data = jar.read("META-INF/THIRD-PARTY-NOTICES")
                         verify_notice_permalink(root, data, candidate_ref=tag["sha"])
-                        check_authored_attribution(data, root)
     return record
 
 

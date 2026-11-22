@@ -218,17 +218,24 @@ publishing {
                 }
                 withXml {
                     def entries = asNode().licenses[0].license
-                    entries.find { it.name.text() == 'MIT License' }.appendNode('comments',
+                    def requireLicense = { String name ->
+                        def entry = entries.find { it.name.text() == name }
+                        if (entry == null) {
+                            throw new GradleException("Expected native POM license entry: ${name}")
+                        }
+                        entry
+                    }
+                    requireLicense('MIT License').appendNode('comments',
                             'Applies to the jmlx native artifact code, mlx-c, Apple/MLX contributions covered by their existing MIT grants, and the other MIT components listed in META-INF/THIRD-PARTY-NOTICES, including nlohmann/json, fmt, gguf-tools, FP16 and supervised-lda. MIT notices are also retained there for the opt_einsum algorithm attribution and VkFFT algorithm reference. The reviewed Juffa expression has separately identified CC BY-SA 4.0 terms.')
-                    entries.find { it.name.text() == 'Apache License, Version 2.0' }.appendNode('comments',
+                    requireLicense('Apache License, Version 2.0').appendNode('comments',
                             'Applies to Apache-2.0 components identified in META-INF/THIRD-PARTY-NOTICES, including vendored metal-cpp compiled into libmlx.dylib and the NVIDIA/Filipe RNC Maia cexpf and TensorFlow adaptations. An Apache-2.0 notice is also retained there for the JAX Threefry algorithm reference.')
-                    entries.find { it.name.text() == 'Creative Commons Attribution-ShareAlike 4.0 International' }.appendNode('comments',
+                    requireLicense('Creative Commons Attribution-ShareAlike 4.0 International').appendNode('comments',
                             'Applies to Norbert Juffa\'s covered expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material, including corresponding compiled forms in libmlx.dylib and mlx.metallib. Apple/MLX contributions rely separately on existing MIT grants. No CC adapter\'s license is identified. See <https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES> (scope and redistribution basis), also packaged in META-INF/THIRD-PARTY-NOTICES. The complete CC license is packaged in META-INF/LICENSE-CC-BY-SA-4.0.')
-                    entries.find { it.name.text() == 'BSD 2-Clause License' }.appendNode('comments',
+                    requireLicense('BSD 2-Clause License').appendNode('comments',
                             'Applies to BSD-2-Clause material identified in META-INF/THIRD-PARTY-NOTICES, including Norbert Juffa expm1f.')
-                    entries.find { it.name.text() == 'BSD 3-Clause License' }.appendNode('comments',
+                    requireLicense('BSD 3-Clause License').appendNode('comments',
                             'Applies to BSD-3-Clause components identified in META-INF/THIRD-PARTY-NOTICES, including pocketfft, V8, NumPy, fastermath and PyTorch (including Metal hypot). BSD-3-Clause notices are also retained there for the Random123 Threefry attribution and CUB merge-sort algorithm reference.')
-                    entries.find { it.name.text() == 'zlib License' }.appendNode('comments',
+                    requireLicense('zlib License').appendNode('comments',
                             'Applies to zlib components identified in META-INF/THIRD-PARTY-NOTICES, including ThreadPool and the Julien Pommier NEON math adaptation.')
                 }
                 developers {

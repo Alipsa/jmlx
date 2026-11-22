@@ -55,8 +55,8 @@ The main, sources and Javadoc JARs carry `LICENSE`, `NOTICE`, `LICENSE-APACHE-2.
 `LICENSE-CC-BY-SA-4.0` and `THIRD-PARTY-NOTICES` under `META-INF`. Run
 `./gradlew :jmlx-native-macos-arm64:verifyNativeReleasePayload` to verify their reviewed digests.
 Before tagging a release, also run
-`./gradlew :jmlx-native-macos-arm64:verifyNativeReleaseLicenses` with reviewed `main` and
-the linked notice commit available locally. This explicit check verifies scoped POM terms,
+`./gradlew :jmlx-native-macos-arm64:verifyNativeReleaseLicenses` after `git fetch origin`, with
+`origin/main` and the linked notice commit available locally. This explicit check verifies scoped POM terms,
 approval evidence and notice ancestry/freshness; see the
 [release runbook](../tools/release-all/README.md) for the required history.
 The [Phase 8.4 native license audit](../req/phase8-4-native-license-audit.md) records compiled-in

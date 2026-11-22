@@ -451,6 +451,8 @@ class AuthoredNativeLicensesTest(unittest.TestCase):
         git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
             'commit', '--quiet', '-m', 'approved fixture notice')
         commit = git('rev-parse', 'HEAD').decode().strip()
+        git('update-ref', 'refs/remotes/origin/main', commit)
+        git('switch', '--quiet', '-c', 'candidate')
         permalink = ('https://github.com/Alipsa/jmlx/blob/' + commit +
                      '/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES')
         # A standalone copy binds the same CLI to synthetic Git history. No checked-out
@@ -470,17 +472,22 @@ class AuthoredNativeLicensesTest(unittest.TestCase):
         git, jars, R, pom, commit = self.make_release_fixture()
         report = R.native_release_licenses(self.root, pom, jars)
         self.assertEqual(len(report['checkedJars']), 3)
+        # Stale local main is irrelevant while the fetched remote and candidate contain it.
+        git('update-ref', 'refs/heads/main', 'HEAD^')
+        self.assertEqual(R.native_release_licenses(self.root, pom, jars)['noticeCommit'], commit)
+        git('update-ref', 'refs/heads/main', commit)
         data = (self.root / 'jmlx-native-macos-arm64/THIRD-PARTY-NOTICES').read_bytes()
         for changed in (data.rstrip(b'\n'), data.replace(b'Creator:', b'Creator: ')):
             with self.assertRaisesRegex(ValueError, 'stale approved notice permalink'):
                 R.verify_notice_permalink(self.root, changed)
         # Candidate ancestry is independent from the reviewed-main check.
-        with self.assertRaisesRegex(ValueError, 'history/ancestry unavailable'):
+        with self.assertRaisesRegex(ValueError, r'linked notice commit is not an ancestor of HEAD\^'):
             R.verify_notice_permalink(self.root, data, candidate_ref='HEAD^')
-        git('update-ref', 'refs/heads/main', 'HEAD^')
-        with self.assertRaisesRegex(ValueError, 'history/ancestry unavailable'):
+        git('update-ref', 'refs/remotes/origin/main', 'HEAD^')
+        with self.assertRaisesRegex(
+                ValueError, 'linked notice commit is not an ancestor of refs/remotes/origin/main'):
             R.verify_notice_permalink(self.root, data)
-        git('update-ref', 'refs/heads/main', commit)
+        git('update-ref', 'refs/remotes/origin/main', commit)
         cli = Path(R.__file__).resolve()
         args = [sys.executable, str(cli), 'licenses', '--root', str(self.root), '--pom', str(pom)]
         for jar in jars:
@@ -492,10 +499,16 @@ class AuthoredNativeLicensesTest(unittest.TestCase):
         bad = subprocess.run(bad_args, text=True, capture_output=True)
         self.assertEqual(bad.returncode, 2)
         self.assertIn('literal tuples', bad.stderr)
-        git('update-ref', 'refs/heads/main', 'HEAD^')
+        git('update-ref', 'refs/remotes/origin/main', 'HEAD^')
         unavailable = subprocess.run(args, text=True, capture_output=True)
         self.assertEqual(unavailable.returncode, 2)
-        self.assertIn('history/ancestry unavailable', unavailable.stderr)
+        self.assertIn('linked notice commit is not an ancestor of refs/remotes/origin/main',
+                      unavailable.stderr)
+        self.assertNotIn('fetch', unavailable.stderr)
+        git('update-ref', '-d', 'refs/remotes/origin/main')
+        missing = subprocess.run(args, text=True, capture_output=True)
+        self.assertEqual(missing.returncode, 2)
+        self.assertIn('approved notice history unavailable; fetch origin/main', missing.stderr)
 
 
 

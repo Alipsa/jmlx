@@ -152,9 +152,10 @@ Explicit license verification is a separate pre-tag command:
 `./gradlew :jmlx-native-macos-arm64:verifyNativeReleaseLicenses`. It checks the generated
 POM and all three native JARs, the authored-attribution policy and its pinned approval
 records, and the raw Juffa section against the POM's immutable notice permalink. The linked
-commit must be an ancestor of both local reviewed `main` and `HEAD`; fetch that history
-before running this command. The task fails clearly if it is missing and never fetches or
-skips. Run it after merging the implementation with a merge commit, before cutting a new
+commit must be an ancestor of fetched `refs/remotes/origin/main` and `HEAD`. Run
+`git fetch origin` before this command to refresh the reviewed-main reference. Local `main`
+is not trusted. Missing history reports a fetch diagnostic; a known non-ancestor names the
+ref it fails. The task never fetches or skips. Run it after merging the implementation with a merge commit, before cutting a new
 candidate. Bundle verification repeats ancestry against the candidate SHA. Do not squash
 or rebase away the notice commit. The new task is neither an ordinary `check` dependency
 nor a consumer-history prerequisite; ordinary shallow PR CI stays supported.

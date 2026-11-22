@@ -7,17 +7,17 @@
   "noticePermalink": "https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
   "acceptanceRecord": "req/plans/evidence/juffa-implementation-2026-11-22/acceptance.json",
   "verificationInputSha256": {
-    "jmlx-native-macos-arm64/build.gradle": "7f933c8faa1b3b2198a4d66077d6b281d98846d565e92f8bc8ba3b6db9b44010",
+    "jmlx-native-macos-arm64/build.gradle": "ce3aab26648c300d145d1ca021d91375e3cea4b7d7e00c197259027ada79c674",
     "req/native-license-inventory.json": "07f50ebdf90df419a6a0642b361979ff95e02ed4d36ed3a91ca25f471da09259",
     "req/native-authored-attributions.json": "458fda282f777e1ff135380e962fb0ab4749a4baab60fac3af25711e2ffa4e3c",
-    "tools/release-all/release_inputs.py": "f47bb8bc09356eba28757cd781149b0ea697c9b4cd7abfa7f3ffdba1f0926e84",
+    "tools/release-all/release_inputs.py": "8e7823016245b4c9897a05a0205bc1251cd53b17b52bb67e186e3bc267ae0f7d",
     "tools/release-all/audit_native_licenses.py": "c24180152db55bdbda9fe691cc48f1f7a1e972fb81bac669769f35dfd8341fbc",
     "tools/release-all/native_suites.py": "812c5cc8475b17a395278d2247eca1e63fe0d97eadb1ba5ef4411f9e59218913",
     "tools/release-smoke/native-pom-licenses.gradle": "dace3bccb219e232b28684c02697c86d776333393a012badc7fe85405ba155d8",
     "tools/release-smoke/native-legal-texts.gradle": "40ff188a8bd5a4f0b7d50863151190267cbb0f8874b5cbb9adf0f55c50cd795d",
     "tools/release-smoke/smoke-conventions.gradle": "75a669bf40b199c54d6c29dd66541005049aa40cbcfcf1e53b21b4dd5d3ffa6e",
-    "tools/release-all/tests/test_native_licenses.py": "383772377bcff96d48ef2ecd82f45b1d5da04d9bd532cd9474f98733798add8e",
-    "tools/release-all/tests/test_native_publish.py": "babc5ee77f8a49eb63e81cfa1d8024a230b86a1525d9db97a00ff49e3a2271fb",
+    "tools/release-all/tests/test_native_licenses.py": "cf49bc7ace7ded0ab0ab7296261112268bbabc75042db36afe2dea134d24de93",
+    "tools/release-all/tests/test_native_publish.py": "5264a242320afcbf823236c9d3075841677085fff1b3634727a8c6a18ba51df1",
     "tools/release-all/tests/test_final_receipt.py": "1df66b51819a7823499012fa7293e8acd0fe02009c2b57463191acd7202e6663",
     "tools/release-all/tests/test_release_inputs.py": "fbdcec489e9b5f59e82e3365e1418331603263e86ecadd6153ba359d4568b8a6",
     "tools/release-all/tests/native_license_fixtures.py": "c6bb72a22e891f7a9bc09c0957e852ca94edc378d16d692f22302f835a6bffe6",
@@ -70,7 +70,7 @@
       "command": "./gradlew check",
       "exitCode": 0,
       "log": "build/releaseAll/juffa-implementation-2026-11-22/root-check.log",
-      "sha256": "c7c2be174058f7c82f5265c84f98c6a13f4659423dd6550fe12f1080dc753ad7"
+      "sha256": "4258905ece35fb62ccc85722c3a8aa1a0751079c29100e9e4d9ab3da0d590245"
     },
     {
       "name": "buildsrc-check",
@@ -91,14 +91,14 @@
       "command": "bash tools/release-all/selftest.sh",
       "exitCode": 0,
       "log": "build/releaseAll/juffa-implementation-2026-11-22/macos-release-regressions.log",
-      "sha256": "1aafe409ca50553734bdedec92cdaa201effd88fb6118e5c54102ffe40d6fc79"
+      "sha256": "40d8fd68463138ab309dbfdc5940adedaeca2b1e19c07a1e67fe901cabb50360"
     },
     {
       "name": "linux-release-regressions",
       "command": "linux-exec bash -lc \"cd /projects/jmlx && bash tools/release-all/selftest.sh\"",
       "exitCode": 0,
       "log": "build/releaseAll/juffa-implementation-2026-11-22/linux-release-regressions.log",
-      "sha256": "82ab4b9b6cbfd5b8c9383daa8a7eea1089e744ad35f0ae546931fa6b1f4c3d28"
+      "sha256": "e496355f0687c20927a369700c1c24b8894063f35c2be86b5f0664551ec89ff5"
     },
     {
       "name": "macos-full-smoke",
@@ -137,10 +137,10 @@
     },
     {
       "name": "premerge-ancestry-refusal",
-      "command": "./gradlew :jmlx-native-macos-arm64:verifyNativeReleasePayload :jmlx-native-macos-arm64:verifyNativeReleaseLicenses",
+      "command": "./gradlew :jmlx-native-macos-arm64:generatePomFileForMavenPublication :jmlx-native-macos-arm64:verifyNativeReleaseLicenses",
       "exitCode": 1,
       "log": "build/releaseAll/juffa-implementation-2026-11-22/premerge-ancestry-refusal.log",
-      "sha256": "40a9210dfe2e341fa57916f00cae3b5e22e6aff31a3ca49a076ca4871f65e0de"
+      "sha256": "2e7f850f8698e46c4e2947c71d807f175872e34b901f8928e42e9b3eb2477e9d"
     },
     {
       "name": "smoke-parser-preflight",
@@ -154,12 +154,12 @@
     "macosFullSuite": {
       "tests": 105,
       "skipped": 0,
-      "seconds": 85.879
+      "seconds": 60.976
     },
     "linuxArm64FullSuite": {
       "tests": 105,
       "skipped": 0,
-      "seconds": 82.469
+      "seconds": 57.61
     },
     "finalFocused": {
       "macosNative": 25,
@@ -169,7 +169,7 @@
     },
     "note": "Full suites include real independent Groovy POM/legal-text mutation fixtures and unstaged-publish refusal. Final focused suites were rerun after replacing checkout-history fixtures with synthetic history and adding revision-identity/task-outcome cases. The final Linux focused run omits only the Groovy fixture already exercised by the full Linux suite."
   },
-  "expectedPremergeFailure": "The actual explicit release task rejects the notice commit because it is not yet an ancestor of reviewed main. Synthetic-history CLI fixtures cover successful three-JAR execution, stale raw bytes and non-ancestor rejection. Rerun the actual task after a merge commit and main sync, before tagging.",
+  "expectedPremergeFailure": "The actual explicit release task rejects the known notice commit as not an ancestor of refs/remotes/origin/main, without a fetch suggestion. Missing history has a separate fetch diagnostic. Synthetic-history CLI fixtures prove local main cannot authorize a commit absent from origin/main and stale local main does not cause rejection. Fetch origin and rerun the actual task after merge, before tagging.",
   "limits": [
     "Local packaging and consumer smoke artifacts are not a signed immutable release candidate.",
     "Root/buildSrc checks include ordinary up-to-date tasks; no claim of a fresh release test invocation is made.",
@@ -178,5 +178,19 @@
     "Both license findings and the release gate remain open; RC1 and its receipts are unchanged.",
     "No candidate tag, classifier, external release asset or publication was created."
   ],
-  "releaseReady": false
+  "releaseReady": false,
+  "reviewFixes": {
+    "date": "2026-11-22",
+    "pr": 114,
+    "changes": [
+      "Use fetched origin/main, not local main, for the reviewed ancestry gate.",
+      "Distinguish merge-base exit 1 non-ancestry from missing history and name the failing ref.",
+      "Restore the BSD-forum-samples and future-jmlx-changes conditions in the owner record.",
+      "Give all six producer license lookups an explicit missing-entry diagnostic.",
+      "Construct the Python CC comment from the single approved permalink constant; retain independent Groovy literals.",
+      "Remove duplicate per-JAR authored validation in check_bundle."
+    ],
+    "generatedPomBytesUnchanged": true,
+    "validation": "Full 105-test suites pass on macOS and Linux ARM64, including synthetic local/remote-main divergence, missing-history/non-ancestor CLI diagnostics and real Gradle POM name drift."
+  }
 }

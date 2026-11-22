@@ -104,6 +104,7 @@ compiled forms in the identified vendor libmlx.dylib and mlx.metallib. Other MLX
 unrelated combined-binary material and jmlx Java code retain their applicable terms. This is
 an owner scope judgment under the conditional interpretation above, not proof of a separable
 compiled/legal boundary. CPU erf, BSD expm1f and Cephes remain separately attributed.
+The differing BSD forum samples do not supply a new grant for these exact versions.
 
 The exact notice, native NOTICE, full CC text and publication paragraph are approved, along
 with the six-entry POM template and its substitution rule. The final literal POM and module
@@ -128,7 +129,8 @@ Commit the approved notice before adding its POM permalink in a later commit; pr
 through a merge commit. Review the final literal metadata and actual downstream terms,
 validate the changed artifacts and prepare a new immutable candidate under the release
 runbook. Applicable law remains undetermined. Both findings and the release gate remain
-open. This approval does not authorize Central publication.
+open. Future changes by jmlx need their own assessment.
+This approval does not authorize Central publication.
 
 ## Cephes: approved owner interpretation
 

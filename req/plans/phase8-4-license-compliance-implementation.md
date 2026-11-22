@@ -27,7 +27,8 @@ including when someone deletes their inventory/policy entries and refreshes encl
 `release_inputs.py` extracts raw sections without normalizing line endings or whitespace.
 It rejects malformed separator suffixes, unsupported leading whitespace and duplicate titles.
 Explicit release verification compares full license name/URL/comment tuples with independent
-literal expectations and requires the notice commit in reviewed main and candidate history.
+literal expectations and requires the notice commit in fetched origin/main and candidate
+history. Missing history and known non-ancestry have separate diagnostics.
 It compares the linked, local and packaged raw Juffa sections, including the last section's
 final LF. Bundle validation checks the native POM and all three JARs from the actual ZIP.
 
@@ -56,7 +57,7 @@ section and policy deletion. Both actual consumer profiles are exercised separat
 ## Remaining release work
 
 Merge this implementation with a merge commit; do not squash or rebase the notice commit.
-Sync reviewed main and run `verifyNativeReleaseLicenses` before tagging. Its real-checkout
+Fetch origin and run `verifyNativeReleaseLicenses` before tagging. Its real-checkout
 pre-merge ancestry refusal is expected; positive execution is covered in an isolated history
 fixture. Shallow contributor/PR builds must not run this explicit task.
 
@@ -69,3 +70,15 @@ After review, follow the release runbook for a new immutable candidate, fresh si
 exact-bundle consumer and physical minimum-host verification. RC1, its tag, ZIP and receipts
 are unchanged. This implementation does not create a candidate, provenance classifier or
 release asset, and does not authorize Maven Central publication.
+
+## PR review fixes
+
+PR #114 review distinguished missing Git history from known non-ancestry. The verifier now
+names the failing ref for merge-base exit 1 and uses fetched origin/main instead of local
+main. Synthetic CLI tests cover missing history, local main ahead of origin/main and stale
+local main. The Python CC comment uses the same permalink constant as the ancestry check;
+the independent Groovy expectations remain separate. Bundle checks avoid duplicate authored
+validation. Producer POM name drift reports the missing license entry explicitly, covered by
+a real Gradle fixture. Both original owner conditions about BSD forum samples and future
+jmlx modifications remain in the authoritative decision record. The generated POM bytes
+are unchanged. The full 105-test suites pass on macOS and Linux ARM64 after these fixes.

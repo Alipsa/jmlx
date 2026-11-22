@@ -111,7 +111,10 @@ versions. Applicable law remains undetermined as recorded above.
 
 The [scope and wording packet][juffa-wording] supplies concrete candidates for the next owner
 review. Its manifest pins proposed section/file bytes and the POM template separately; the
-literal final permalink/POM is still pending. This preparation does not approve those items.
+literal final permalink/POM is still pending. The later scope/wording acceptance record must
+identify the full approved commit and SHA-256 of the packet's README.md and review.json at
+that commit, as well as its approved candidate hashes. This preparation does not approve
+those items.
 
 **Follow-up:** apply proposal Decision 3 using the accepted MIT/direct-offer basis; no CC
 adapter's license is identified. Replace the draft notice's unresolved paragraph with that

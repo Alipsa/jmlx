@@ -12,7 +12,7 @@ META-INF/THIRD-PARTY-NOTICES for the retained MLX MIT grant and other upstream t
 META-INF/LICENSE-CC-BY-SA-4.0 contains the complete CC BY-SA 4.0 text for Juffa's covered
 expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material. Its scope and
 redistribution basis are identified in the Norbert Juffa notice section. No CC adapter's
-license is identified for Apple/MLX contributions.
+license is identified.
 META-INF/THIRD-PARTY-NOTICES carries the additional MLX/JACCL compiled-in dependency texts,
 including JSON, fmt, gguflib/FP16, pocketfft, V8, ThreadPool, NumPy/opt_einsum,
 supervised-lda, SIMD math, PyTorch, TensorFlow and GPU/PRNG algorithm references.

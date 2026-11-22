@@ -7,17 +7,32 @@
     {
       "name": "MIT License",
       "url": "https://opensource.org/license/mit",
-      "comments": "Applies to the jmlx native artifact code and Apple/MLX contributions covered by their existing MIT grants. The reviewed Juffa expression has separately identified CC BY-SA 4.0 terms."
+      "comments": "Applies to the jmlx native artifact code, mlx-c, Apple/MLX contributions covered by their existing MIT grants, and the other MIT components listed in META-INF/THIRD-PARTY-NOTICES, including nlohmann/json, fmt, gguf-tools, FP16, opt_einsum, supervised-lda and VkFFT. The reviewed Juffa expression has separately identified CC BY-SA 4.0 terms."
     },
     {
       "name": "Apache License, Version 2.0",
       "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
-      "comments": "Applies to vendored metal-cpp compiled into libmlx.dylib."
+      "comments": "Applies to vendored metal-cpp compiled into libmlx.dylib and the NVIDIA/Filipe RNC Maia cexpf, TensorFlow and JAX material identified in META-INF/THIRD-PARTY-NOTICES."
     },
     {
       "name": "Creative Commons Attribution-ShareAlike 4.0 International",
       "url": "https://creativecommons.org/licenses/by-sa/4.0/",
-      "comments": "Applies to Norbert Juffa's covered expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material, including corresponding compiled forms in libmlx.dylib and mlx.metallib. Apple/MLX contributions rely separately on existing MIT grants; no CC adapter's license is identified. Scope and redistribution basis: {{APPROVED_NOTICE_PERMALINK}}. Also packaged in META-INF/THIRD-PARTY-NOTICES."
+      "comments": "Applies to Norbert Juffa's covered expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material, including corresponding compiled forms in libmlx.dylib and mlx.metallib. Apple/MLX contributions rely separately on existing MIT grants. No CC adapter's license is identified. See <{{APPROVED_NOTICE_PERMALINK}}> (scope and redistribution basis), also packaged in META-INF/THIRD-PARTY-NOTICES. The complete CC license is packaged in META-INF/LICENSE-CC-BY-SA-4.0."
+    },
+    {
+      "name": "BSD 2-Clause License",
+      "url": "https://opensource.org/license/bsd-2-clause",
+      "comments": "Applies to the Norbert Juffa expm1f material identified in META-INF/THIRD-PARTY-NOTICES."
+    },
+    {
+      "name": "BSD 3-Clause License",
+      "url": "https://opensource.org/license/bsd-3-clause",
+      "comments": "Applies to the pocketfft, V8, NumPy, fastermath, PyTorch (including Metal hypot), Random123 and CUB material identified in META-INF/THIRD-PARTY-NOTICES."
+    },
+    {
+      "name": "zlib License",
+      "url": "https://opensource.org/license/zlib",
+      "comments": "Applies to the ThreadPool and Julien Pommier NEON math material identified in META-INF/THIRD-PARTY-NOTICES."
     }
   ]
 }

@@ -1,3 +1,4 @@
+
 ======== JMLX NATIVE NOTICE SECTION ========
 
 Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)
@@ -8,7 +9,8 @@ Reviewed source material:
 - Error-function implementation, answer 35148199, revision 4, 2022-06-18:
   https://stackoverflow.com/a/35148199
   https://stackoverflow.com/revisions/35148199/4
-- Inverse-error-function implementation, answer 49743348, revision 3, 2021-06-10:
+- Inverse-error-function implementation, answer 49743348,
+  revision 3, 2021-06-10:
   https://stackoverflow.com/a/49743348
   https://stackoverflow.com/revisions/49743348/3
 
@@ -27,6 +29,10 @@ The reviewed headers hash-match those installed by the pinned mlx-metal 0.32.4
 wheel. This is a source/wheel association, not a reproducible rebuild or a
 complete binary compilation record. The reviewed distribution includes the
 corresponding material in libmlx.dylib and mlx.metallib.
+
+The reviewed answer revision notes report improved core approximation accuracy
+and matching description updates (erf r4), and improved polynomial approximation
+accuracy (erfinv r3).
 
 Modifications visible in the reviewed material include Metal translation,
 Metal math intrinsics, and CPU SIMD/vectorized evaluation. Metal erf uses the
@@ -48,7 +54,7 @@ the existing MIT grant for Apple/MLX contributions. Its owner interprets the
 section 2(a)(5)(A) offer as continuing for Juffa's expression retained in these
 adaptations, with (B) providing an additional offer. The adapter-license
 condition in (B) remains the unresolved counterargument to this interpretation.
-No CC adapter's license is identified, and MIT is not presented as one.
+No CC adapter's license is identified. MIT is not presented as one.
 
 The scoped CC identification concerns Juffa's covered expression in the three
 reviewed functions and their corresponding compiled forms. It does not assert

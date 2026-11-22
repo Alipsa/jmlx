@@ -64,20 +64,20 @@
   "artifacts": [
     {
       "path": "juffa-notice-candidate.txt",
-      "kind": "literal candidate section including separator",
+      "kind": "literal candidate section including leading LF and separator",
       "proposedTarget": "jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
-      "sha256": "a67dc184dfef6648d34f150ee5f1b27354f3a73fdc5e799c142a6df3f36ceb37",
-      "bytes": 3334,
-      "sectionSha256": "c54e657e6059307762ed1f3a3f36b6b8a8e1edeb8ea1c3a74ddb73333054b1f6",
-      "sectionBytes": 3289,
-      "sectionRule": "Exclude the separator line and its LF; preserve every following byte through EOF, including the leading blank line and final LF."
+      "sha256": "fb8df12e47314f1134786e0420efd5ecff4357b9bb351b9fc4a176fb70f47548",
+      "bytes": 3516,
+      "sectionSha256": "28e49c8caa7d1cdf5861b65a96d1d6f75e2654498945f5766829391300bf3660",
+      "sectionBytes": 3470,
+      "sectionRule": "Exclude the initial LF and separator line with its LF; preserve every following byte through EOF, including the blank line before the title and final LF."
     },
     {
       "path": "native-NOTICE-candidate.txt",
       "kind": "literal candidate file",
       "proposedTarget": "jmlx-native-macos-arm64/NOTICE",
-      "sha256": "f005db181e3b8105fca6aa807e8124814d770334ce09acb025fac2b9dd90b1e2",
-      "bytes": 1967
+      "sha256": "25b8aeed4d3120639107a2b197eb8269cf89eed828de7e1f1245f4249422d466",
+      "bytes": 1939
     },
     {
       "path": "LICENSE-CC-BY-SA-4.0",
@@ -90,14 +90,14 @@
       "path": "pom-licenses-candidate.json",
       "kind": "license/comment template; final permalink and literal POM pending",
       "proposedTarget": "jmlx-native-macos-arm64/build.gradle",
-      "sha256": "13f5d825fc994431f09d08578d8d5d9eb9f3bb14190a534a3d41cdff5c2f0405",
-      "bytes": 1778
+      "sha256": "1bfcf6909aa345584b7702206ab894ed1569085199d6037cf32acdec6e11a70c",
+      "bytes": 2850
     },
     {
       "path": "publication-paragraph.txt",
       "kind": "literal candidate paragraph; final surrounding files pending",
       "proposedTarget": "native README and Phase 8.4 release notes",
-      "sha256": "861acfddd5f3569aee231f6a18485eecd48b58d8e86dcf0e0f955cc2bf8712d8",
+      "sha256": "80a83fd1d785f2c5f56e02fe48e33071a50340d07f4b875d26d43e5c4283d33f",
       "bytes": 630
     }
   ],
@@ -115,5 +115,57 @@
     "The POM comment template hash is not the hash of a final generated POM.",
     "Owner downstream-terms conclusion, implementation checks and new candidate validation remain pending.",
     "No rights grant, finding closure or publication approval is created by this packet."
-  ]
+  ],
+  "answerSnapshotReview": {
+    "reviewed": "2026-11-22",
+    "method": "Manually inspected both complete answer bodies (prose and code) and revision metadata from the cached Stack Exchange withbody responses. Reproduced the historical canonical revision-projection and UTF-8 body hashes before inspection. Null notice fields mean none supplied in those bodies, not a claim about other revisions, linked works or the complete website. Raw-response hashes additionally bind user display metadata and revision comments excluded by the historical projection. Bodies remain retrievable from the technicalSources URLs in the scoped review; no full answer bodies are committed here.",
+    "observations": [
+      {
+        "answerId": 35148199,
+        "revision": 4,
+        "revisionGuid": "61E756BD-925D-4F54-9BD3-C0357F51528E",
+        "revisionProjectionSha256": "293120d0c83093330bdc42187a2f126a60c5e8ac18ef24d22f2fff854d03d124",
+        "bodySha256": "fc4bebdfe83046e2054633802d2d1a3e24e370a53570722fc99cf7a1594057ef",
+        "rawResponseSha256": "d0d9db57c1aba1596472c1666662124461b60d61e2d7e26a8223e64d2648b850",
+        "creator": {
+          "name": "Norbert Juffa",
+          "displayName": "njuffa",
+          "userId": 780717
+        },
+        "additionalAttributionDesignationInBody": null,
+        "copyrightNoticeInBody": null,
+        "licenseNoticeInBody": null,
+        "warrantyDisclaimerNoticeInBody": null,
+        "revisionComment": "Refresh code with version employing more accurate core approximations (max ulp error reduced slightly, average error reduced more significantly). Adjustments in the textual description to match the new code plus minor wordsmithing."
+      },
+      {
+        "answerId": 49743348,
+        "revision": 3,
+        "revisionGuid": "8439BF7B-10DC-491E-8C10-9B36BC877757",
+        "revisionProjectionSha256": "190ec4fbb6cc9cc7eaa6aeb65eb4ad15a59f2a2d80311d892baa63a3683e93ec",
+        "bodySha256": "f8b3c1d76aee800eb542d5feec83c0f3fa516fc74009c296c9b947051bf3bbc9",
+        "rawResponseSha256": "0d1cbbb6f04562408e6f770a8665818bd16cbb8d56d0a4cd9626876bb0439ff0",
+        "creator": {
+          "name": "Norbert Juffa",
+          "displayName": "njuffa",
+          "userId": 780717
+        },
+        "additionalAttributionDesignationInBody": null,
+        "copyrightNoticeInBody": null,
+        "licenseNoticeInBody": null,
+        "warrantyDisclaimerNoticeInBody": null,
+        "revisionComment": "Improve accuracy of polynomial approximation"
+      }
+    ],
+    "modificationIndications": "The candidate notice retains summaries of both reviewed revision comments and separately describes the visible MLX modifications. No additional attribution designation, copyright notice or warranty-disclaimer notice was supplied in either reviewed answer body. This observation does not determine legal sufficiency or close the owner review."
+  },
+  "acceptanceRecordRequirements": {
+    "location": "separate owner acceptance record",
+    "approvedCommit": "Record the full approved commit SHA.",
+    "sha256": [
+      "README.md",
+      "review.json"
+    ],
+    "candidateHashes": "Cite every approved artifact hash, including sectionSha256, from review.json at that commit."
+  }
 }

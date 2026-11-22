@@ -20,6 +20,11 @@ Accept the three mappings as the provenance basis, with the limits of the
 
 The exact MLX source commit is `36969c094354086e15d2a327a9c50feb20b9cf11`. The two complete
 header hashes and answer revision identities are pinned in [review.json](review.json).
+The manifest also records inspection of the complete hash-matched answer bodies: neither
+supplied an additional attribution designation, copyright notice or warranty-disclaimer
+notice. It records creator display metadata and both revision comments, summarized in the
+candidate notice as prior modification indications. This bounded observation covers those
+two revisions, not all linked material or the complete website, and leaves the owner review open.
 These mappings are bounded comparison/provenance observations, not a reconstructed copying
 history or a legal test of expression. The record does not convert coefficient matches into
 proof of copyright infringement, ownership of mathematical algorithms, or complete equivalence.
@@ -44,12 +49,15 @@ reassessed for changed pins, functions, compiled material or future jmlx adaptat
 ## Exact notice and license text for approval
 
 [juffa-notice-candidate.txt](juffa-notice-candidate.txt) is the exact proposed new section for
-`jmlx-native-macos-arm64/THIRD-PARTY-NOTICES`. It includes the literal separator and leading
-blank line, exact required title, creator ID, answer revisions, modification indications,
-Apple notices, licensing basis and scoped downstream statement. Its final LF is part of the
+`jmlx-native-macos-arm64/THIRD-PARTY-NOTICES`. It begins with one LF before the literal
+separator, then a blank line before the exact required title. It includes the creator ID,
+answer revisions, modification indications, Apple notices, licensing basis and scoped
+downstream statement. Its final LF is part of the
 candidate bytes. Append these bytes directly after the existing notice's final LF without
 changing the existing bytes. This section is intended to be last; it runs to EOF without a closing
-separator. Existing sections remain unchanged when it is appended.
+separator. The initial LF preserves the blank line before separators used by all existing
+sections. Existing file bytes stay unchanged; that LF becomes the final byte of the preceding
+PyTorch hypot section under the raw-section extraction rule.
 
 This replaces the earlier unresolved paragraph with MIT for Apple/MLX contributions plus
 the section 2(a)(5)(A) offer for Juffa's expression. It retains (B)'s unresolved counterargument
@@ -61,14 +69,20 @@ grant for Juffa's expression. The proposed scope still needs the owner's explici
 [LICENSE-CC-BY-SA-4.0](LICENSE-CC-BY-SA-4.0) is the unmodified complete official plain text,
 retrieved from the legal-code page's plain-text link. Its URL, retrieval date and raw-byte
 hash are in review.json. Retain the existing native `LICENSE`, Apache text and every other
-upstream section. The notice's no-additional-restrictions statement is a proposed undertaking;
+upstream section. `.gitattributes` preserves this packet's raw bytes and pins the future
+native license to LF while allowing its genuine upstream blank line at EOF.
+The notice's no-additional-restrictions statement is a proposed undertaking;
 it is not evidence that the eventual implementation or every distribution surface complies.
 
 ## POM wording and the deliberately unresolved permalink
 
 [pom-licenses-candidate.json](pom-licenses-candidate.json) specifies the exact names, URLs
-and comment wording for MIT, Apache-2.0 and CC BY-SA 4.0. Apache wording is unchanged; MIT
-and CC comments distinguish the contributors and applicable grants.
+and comment wording for MIT, Apache-2.0, CC BY-SA 4.0, BSD-2-Clause, BSD-3-Clause and zlib.
+MIT names mlx-c and the other recorded MIT components; Apache includes cexpf, TensorFlow
+and JAX as well as metal-cpp. The BSD and zlib entries cover the corresponding retained
+notice sections. This also addresses existing metadata gaps as part of the same proposed
+metadata review. Cephes retains its separately recorded original-permission interpretation;
+these entries do not relabel it with a standard license.
 
 The CC comment contains exactly one `{{APPROVED_NOTICE_PERMALINK}}` token. This file is a
 comment template, not a generated POM or the final literal comment. Approval here would cover
@@ -87,17 +101,12 @@ consistent scoped descriptions on every publication surface.
 
 Use the following paragraph in the native README and Phase 8.4 release notes after approval:
 
-> The native distribution retains MLX's MIT grant for Apple/MLX contributions and separately
-> identifies Norbert Juffa's covered expression in the reviewed Metal erf and Metal/CPU SIMD
-> erfinv material under CC BY-SA 4.0. META-INF/THIRD-PARTY-NOTICES records the reviewed scope,
-> revisions, modifications and redistribution basis; META-INF/LICENSE-CC-BY-SA-4.0 contains
-> the complete CC license. No CC adapter's license is identified. Other bundled material
-> retains its applicable licenses and notices. The owner-approved interpretation and its
-> recorded counterargument are documented in the repository's owner license decision record.
+> The native distribution retains MLX's MIT grant for Apple/MLX contributions and separately identifies Norbert Juffa's covered expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material under CC BY-SA 4.0. META-INF/THIRD-PARTY-NOTICES records the reviewed scope, revisions, modifications and redistribution basis; META-INF/LICENSE-CC-BY-SA-4.0 contains the complete CC license. No CC adapter's license is identified. Other bundled material retains its applicable licenses and notices. The owner-approved interpretation and its recorded counterargument are documented in the repository's owner license decision record.
 
 Its exact UTF-8 paragraph, without Markdown blockquote prefixes and with one final LF,
 is retained as [publication-paragraph.txt](publication-paragraph.txt), with its hash in the
-manifest. The native README and release notes will link the reviewed decision record and
+manifest. It is one unwrapped line to avoid hard-wrapped release-note rendering.
+The native README and release notes will link the reviewed decision record and
 notice; their final file hashes will be recorded after implementation. This does not approve
 a new classifier or provenance attachment; that proposal remains a separate review item.
 
@@ -105,9 +114,11 @@ a new classifier or provenance attachment; that proposal remains a separate revi
 
 Approval is requested for the proposed boundary, exact notice/license bytes and publication
 paragraph, and the POM template plus substitution rule. The acceptance record should cite
-review.json and the candidate hashes. Approving the existing licensing interpretation alone
-has not approved this scope or wording. Review or merge of this preparation PR does not
-silently supply those substantive decisions.
+review.json and the candidate hashes, and record the SHA-256 of both README.md and
+review.json as read from the approved commit. Record those two digests in the separate
+acceptance record so the boundary prose and manifest are bound without self-hashing.
+Approving the existing licensing interpretation alone has not approved this scope or wording.
+Review or merge of this preparation PR does not silently supply those substantive decisions.
 
 The proposed distribution retains the original grants and makes no additional restriction
 or effective-technological-measure claim against their exercise. The implementation must

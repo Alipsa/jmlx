@@ -1,0 +1,65 @@
+{
+  "tag": "jmlx-phase8.4-rc.2",
+  "sourceCommit": "33676837f66993b5a809644dbbdc6e6550417334",
+  "overrides": {
+    "jmlx-jinja": [
+      "0.6.2",
+      "0.6.1"
+    ],
+    "jmlx-tokenizer": [
+      "0.1.2",
+      "0.1.1"
+    ],
+    "jmlx-vision": [
+      "0.1.2",
+      "0.1.1"
+    ]
+  },
+  "argv": [
+    "/Users/per/.gradle/wrapper/dists/gradle-9.9.0-bin/k7t1gqg1ujh3kgq8oiu7hqi4/gradle-9.9.0/bin/gradle",
+    "-p",
+    "/private/tmp/jmlx-phase8.4-rc.2-audit",
+    "--gradle-user-home",
+    "/Users/per/project/jmlx/build/releaseAll/candidates/rc.2/audit-evidence/gradle-home",
+    "--no-daemon",
+    "--no-configuration-cache",
+    "--no-build-cache",
+    "--console=plain",
+    ":jmlx-jinja:jar",
+    ":jmlx-jinja:sourcesJar",
+    ":jmlx-jinja:javadocJar",
+    ":jmlx-jinja:generatePomFileForMavenPublication",
+    ":jmlx-jinja:generateMetadataFileForMavenPublication",
+    ":jmlx-tokenizer:jar",
+    ":jmlx-tokenizer:sourcesJar",
+    ":jmlx-tokenizer:javadocJar",
+    ":jmlx-tokenizer:generatePomFileForMavenPublication",
+    ":jmlx-tokenizer:generateMetadataFileForMavenPublication",
+    ":jmlx-vision:jar",
+    ":jmlx-vision:sourcesJar",
+    ":jmlx-vision:javadocJar",
+    ":jmlx-vision:generatePomFileForMavenPublication",
+    ":jmlx-vision:generateMetadataFileForMavenPublication",
+    "-I",
+    "/Users/per/project/jmlx/req/plans/evidence/pure-java-audit-2026-11-16/toolchains.init.gradle",
+    "auditToolchains",
+    "--rerun-tasks",
+    "-Dorg.gradle.java.installations.auto-detect=false",
+    "-Dorg.gradle.java.installations.auto-download=false",
+    "-Dorg.gradle.java.installations.fromEnv=",
+    "-Dorg.gradle.java.installations.paths=/Users/per/project/jmlx/build/releaseAll/pure-java-audit-2026-11-16/toolchain/jdk-21.0.12.1.jdk",
+    "-I",
+    "/Users/per/project/jmlx/req/plans/evidence/pure-java-audit-2026-11-16/record-daemon.init.gradle"
+  ],
+  "environment": {
+    "HOME": "/Users/per",
+    "PATH": "/Users/per/project/jmlx/build/releaseAll/pure-java-audit-2026-11-16/toolchain/jdk-21.0.12.1.jdk/bin:/Users/per/.codex/packages/app-server-daemon/releases/0.171.0-aarch64-apple-darwin/codex-path:/Users/per/.nvm/versions/node/v26.13.0/bin:/Users/per/programs/google-cloud-sdk/bin:/Users/per/.kimi-code/bin:/Users/per/bin:/Users/per/.local/bin:/usr/local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/opt/X11/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:/Users/per/.codex/tmp/arg0-macos/codex-arg01eV3Gx:/Users/per/.codex/packages/app-server-daemon/releases/0.171.0-aarch64-apple-darwin/codex-path:/Users/per/.codex/tmp/arg0-macos/codex-arg02e6jFf:/opt/homebrew/Caskroom/codex/0.171.0/codex-path:/Users/per/.sdkman/candidates/maven/current/bin:/Users/per/.sdkman/candidates/java/current/bin:/Users/per/.sdkman/candidates/groovy/current/bin:/Users/per/.nvm/versions/node/v26.13.0/bin:/Users/per/programs/google-cloud-sdk/bin:/Users/per/.kimi-code/bin:/Users/per/bin:/Users/per/.local/bin:/opt/homebrew/sbin",
+    "TMPDIR": "/var/folders/7s/v3mqz4zs6zn80v1xw1b8hl780000gn/T/",
+    "USER": "per",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "LANGUAGE": "C",
+    "TZ": "UTC",
+    "JAVA_HOME": "/Users/per/project/jmlx/build/releaseAll/pure-java-audit-2026-11-16/toolchain/jdk-21.0.12.1.jdk"
+  }
+}

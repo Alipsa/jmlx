@@ -1,0 +1,46 @@
+{
+  "schema": "jmlx-bundle-smoke-1",
+  "kind": "macos-full",
+  "passed": true,
+  "bundleSha256": "0dbb1451f8015843dfd77aeff5ae5e7f1afdbb80bb01f489ee06dfd92f1ba35e",
+  "preliminarySha256": "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af",
+  "candidateSha": "33676837f66993b5a809644dbbdc6e6550417334",
+  "environment": {
+    "system": "Darwin",
+    "architecture": "arm64",
+    "kernel": "27.2.0",
+    "launcherJava": "openjdk version \"25.0.5\" 2026-10-20 LTS\nOpenJDK Runtime Environment (build 25.0.5+11-LTS)\nOpenJDK 64-Bit Server VM (build 25.0.5+11-LTS, mixed mode, sharing)",
+    "osVersion": "27.2.1",
+    "swVers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.2.1\nBuildVersion:\t\t26B131",
+    "chip": "Apple M5 Max",
+    "virtualized": false
+  },
+  "command": [
+    "bash",
+    "/private/tmp/jmlx-phase8.4-rc.2/tools/release-smoke/run.sh",
+    "candidate",
+    "--profile",
+    "all",
+    "--bundle",
+    "/private/tmp/jmlx-phase8.4-rc.2/build/releaseAll/jmlx-mega-bundle.zip",
+    "--bundle-record",
+    "/private/tmp/jmlx-phase8.4-rc.2/build/releaseAll/preliminary-c24fccff-bf4f-4594-b2bc-f6011c19c87f.json",
+    "--bundle-record-sha256",
+    "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af"
+  ],
+  "consumerRuntime": {
+    "java.vendor": "BellSoft",
+    "java.version": "25.0.5",
+    "java.runtime.version": "25.0.5+11-LTS",
+    "java.vm.name": "OpenJDK 64-Bit Server VM",
+    "java.feature": "25",
+    "java.home": "/Users/per/.sdkman/candidates/java/25.0.5.0+11-librca"
+  },
+  "consumerRuntimeFile": "macos-full.runtime.xml",
+  "runId": null,
+  "identityAssurance": "Local measurements; workflow run ID and container image are operator attestations, not authenticated provenance",
+  "outputs": {
+    "macos-full.log": "7b1e3f049d762af773a84f1f5c8e45a2f272932a1d571a1b302c494414755a1b",
+    "macos-full.runtime.xml": "e8b147f2b912c98a03c6e33564c007e2b47549dd9c7d8c300093217a3d519d2b"
+  }
+}

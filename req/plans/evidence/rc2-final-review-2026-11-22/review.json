@@ -1,0 +1,232 @@
+{
+  "schema": 1,
+  "preparedOn": "2026-11-22",
+  "status": "prepared for owner review; no approval or publication authorization recorded",
+  "candidate": {
+    "tag": "jmlx-phase8.4-rc.2",
+    "tagObject": "400b90e1a0b062a57b70a1007e68a4f6313f3976",
+    "peeledSha": "33676837f66993b5a809644dbbdc6e6550417334",
+    "originBranch": "main",
+    "reviewedPr": 116,
+    "headCi": "https://github.com/Alipsa/jmlx/actions/runs/45072595248",
+    "publicationAuthorized": false
+  },
+  "bundle": {
+    "path": "/Users/per/project/jmlx/build/releaseAll/candidates/rc.2/transport/jmlx-mega-bundle.zip",
+    "bytes": 106730874,
+    "sha256": "0dbb1451f8015843dfd77aeff5ae5e7f1afdbb80bb01f489ee06dfd92f1ba35e"
+  },
+  "preliminarySha256": "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af",
+  "verifiedReceiptSha256": "5253382f3921c79f06b19746d479edf619e565a83d39b7678159549c0be84f55",
+  "previousOwnerAcceptance": {
+    "path": "req/plans/evidence/native-distribution-review-2026-11-22/owner-acceptance.json",
+    "sha256": "ba210deade57f036aa52880ef066b1b21a32bd82bfc41ce7605d47ba544dc257"
+  },
+  "technicalChecks": {
+    "root": "passed",
+    "buildSrc": "passed",
+    "releaseRegressions": "109 passed",
+    "smokeSelftest": "passed",
+    "jinjaReleaseVerification": "two consecutive passes",
+    "pureJavaArtifactAudit": "all 15 reviewed comparison records reproduced",
+    "dryRun": "approved nine selected",
+    "bundleOnly": "passed with fresh required-task evidence"
+  },
+  "minimumHost": {
+    "runId": 45076371223,
+    "runUrl": "https://github.com/Alipsa/jmlx/actions/runs/45076371223",
+    "jobId": 137374458588,
+    "runnerId": 23,
+    "runnerVersion": "2.338.2",
+    "workflowSha": "33676837f66993b5a809644dbbdc6e6550417334",
+    "sourceCommitForAllAccountProbes": "33676837f66993b5a809644dbbdc6e6550417334",
+    "postWindowMeasurementsUnchanged": true,
+    "serviceUnloaded": true,
+    "githubRunnerStatus": "offline",
+    "githubRunnerBusy": false,
+    "smbShareDisabled": true
+  },
+  "capacity": {
+    "bundleBytes": 106730874,
+    "zipFileCount": 270,
+    "zipEntryBytes": 107448768,
+    "currentAccountSnapshot": "pending owner-provided Usage Center values",
+    "officialSourcesRecheckedOn": "2026-11-22",
+    "sources": [
+      "https://central.sonatype.org/publish/publish-portal-upload/",
+      "https://central.sonatype.org/publish/maven-central-publishing-limits/",
+      "https://central.sonatype.org/publish/publish-portal-usage-center/"
+    ]
+  },
+  "draftTransport": {
+    "authorized": true,
+    "releaseId": 454784626,
+    "draft": true,
+    "url": "https://github.com/Alipsa/jmlx/releases/tag/untagged-167950a3a55ef0f9291d",
+    "assets": [
+      {
+        "id": 780616272,
+        "name": "jmlx-mega-bundle.zip",
+        "digest": "sha256:0dbb1451f8015843dfd77aeff5ae5e7f1afdbb80bb01f489ee06dfd92f1ba35e",
+        "size": 106730874
+      },
+      {
+        "id": 780616276,
+        "name": "preliminary-c24fccff-bf4f-4594-b2bc-f6011c19c87f.json",
+        "digest": "sha256:3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af",
+        "size": 22903
+      }
+    ]
+  },
+  "deliveryPlan": {
+    "central": "One combined deployment of this exact signed ZIP after separate digest-specific authorization; fresh-cache Central verification follows publication",
+    "githubDraft": "Temporary private transport only; do not publish it; archive evidence and remove draft/assets within 30 days of publication or abandonment, retaining immutable tag",
+    "recipientTerms": "Retain original grants and approved scope paragraph, full legal texts and notices; no new recipient restriction is proposed"
+  },
+  "ownerDecision": {
+    "signedCandidateAndDocumentedDifferences": "pending",
+    "plannedDeliveryTerms": "pending",
+    "licenseFindingDisposition": "pending; neither finding is closed by technical verification",
+    "centralPublicationAuthorization": "not granted"
+  },
+  "retainedFiles": {
+    "connected-account-probe.json": {
+      "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+      "bytes": 1849
+    },
+    "javadoc-content.diff": {
+      "sha256": "1ae2b857d7e0600d71a8a56dcabb02212db39535383ae2df6cb386cc6e19a35b",
+      "bytes": 5064
+    },
+    "jinja-release-verification.json": {
+      "sha256": "5484a8f477ac533fbb3c29acd1a9bdcfc58a4939970a11e2fcb357223bc81427",
+      "bytes": 265
+    },
+    "jinja-release-verification.md": {
+      "sha256": "9a9ead5ac3a3ead3619f9201b50dcf0cc87dc80429a290c5f9566b3113e1e413",
+      "bytes": 1932
+    },
+    "job-setup-identity.txt": {
+      "sha256": "fb14eff4aa37ee1f695245dbb9ebfa7803af52864ac29a9d15656e2b2ac501ca",
+      "bytes": 248
+    },
+    "linux-pure.json": {
+      "sha256": "f6658c4ace1314d76fc1ea4186f2422eba1473a2b6471daf849284a28c56ee32",
+      "bytes": 2350
+    },
+    "linux-pure.log": {
+      "sha256": "b4384e537bb6d41b186411ed61dfc5e7ed1d288b395176373e36c432409d4fd7",
+      "bytes": 2093
+    },
+    "linux-pure.runtime.xml": {
+      "sha256": "aa2f8b922ca7df6e31ecbd43ad6aeeccf20b6029de1d1bce70a9b7531ea28365",
+      "bytes": 503
+    },
+    "macos-full.json": {
+      "sha256": "a4de1e90b9d088d1ba989742eeff32f9bf44530e64e7d4c20b8a7f2f37bf9300",
+      "bytes": 1940
+    },
+    "macos-full.log": {
+      "sha256": "7b1e3f049d762af773a84f1f5c8e45a2f272932a1d571a1b302c494414755a1b",
+      "bytes": 2966
+    },
+    "macos-full.runtime.xml": {
+      "sha256": "e8b147f2b912c98a03c6e33564c007e2b47549dd9c7d8c300093217a3d519d2b",
+      "bytes": 503
+    },
+    "macos-pure.json": {
+      "sha256": "3ec0e04f0f49b77b806cf4a9423d4f5ff81f6271d1ca201e314803ce38929261",
+      "bytes": 2001
+    },
+    "macos-pure.log": {
+      "sha256": "130a25a5ec10a191c66407f4b18953ce4d501818784e551ed4f18ada19d19b5d",
+      "bytes": 2101
+    },
+    "macos-pure.runtime.xml": {
+      "sha256": "0714fdf283a643745a41a64af9ad6388b2370b45b4133256d485a72efe7397ba",
+      "bytes": 521
+    },
+    "minimum-host-identity-review.json": {
+      "sha256": "74492383988f6e37fd5543bb06b359ef759afd176df71ae58c70560b816fa6c1",
+      "bytes": 1105
+    },
+    "minimum-host.json": {
+      "sha256": "41a1936184f7b9f1aeb078402d1f0001603ce6d684ce6d49c7e2b30094f9acb1",
+      "bytes": 2336
+    },
+    "minimum-host.log": {
+      "sha256": "83453f07bdd5a9b49a0a8a58f339baf265c1e6fae7a283acaf51cce72854f24e",
+      "bytes": 2983
+    },
+    "minimum-host.runtime.xml": {
+      "sha256": "66afa117a854de662cb5f7673b2f38e7e5c8ea7a74e1bff15222f61136f6fa23",
+      "bytes": 575
+    },
+    "native-module.json": {
+      "sha256": "28064ff4acb37e68373fec4f68653a03f07d67e7729bace2bbab5351f969d7ab",
+      "bytes": 3584
+    },
+    "native-pom.xml": {
+      "sha256": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
+      "bytes": 4149
+    },
+    "portal-bundle-measurement.json": {
+      "sha256": "e3a86b38ac6c20658597a7b339cfedcf6e97654a3e7a6c1b1e0703934051c72f",
+      "bytes": 30465
+    },
+    "post-window-account-probe.json": {
+      "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+      "bytes": 1849
+    },
+    "pre-window-account-probe.json": {
+      "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+      "bytes": 1849
+    },
+    "preliminary.json": {
+      "sha256": "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af",
+      "bytes": 22903
+    },
+    "pure-java-audit-invocation.json": {
+      "sha256": "f2d7427e45b5f7213841a8635afc06183321377d1c3c66af4949edca150ddc34",
+      "bytes": 3525
+    },
+    "pure-java-comparison.json": {
+      "sha256": "99ed1f70cfa2e5251559b7aa6b15b2f85b0818eaf3055df06e9334e8ed41e811",
+      "bytes": 7494
+    },
+    "sharing-after.json": {
+      "sha256": "51a0e095634ea347d972421a96ee5441b0dbcf7c31fee5650382b6dc01d23d46",
+      "bytes": 384
+    },
+    "sharing-before.json": {
+      "sha256": "c152f7904227b06eb348c3b273fb79a5cf94123957659a81c63b21a062442ae1",
+      "bytes": 440
+    },
+    "signed-native-comparison.json": {
+      "sha256": "716e125a7eb537049e96965e9b5bc117f0cf3838ce919da09108b429561ac6c4",
+      "bytes": 3956
+    },
+    "verified.json": {
+      "sha256": "5253382f3921c79f06b19746d479edf619e565a83d39b7678159549c0be84f55",
+      "bytes": 1335
+    }
+  },
+  "evidenceLimits": [
+    "Receipt and preliminary records are retained byte-for-byte with original local paths. Revalidation requires the preserved candidate checkout, task/JUnit evidence and signed ZIP; copying records does not make them portable.",
+    "Consumer JSON/log/runtime sidecars and actual job setup identity excerpt are retained here; full job log remains downloadable from the GitHub job, with its hash in the identity review.",
+    "Local prerequisite logs and complete audit scratch build remain under ignored build/releaseAll/candidates/rc.2; their retained conclusions are not substitutes for candidate execution.",
+    "No ZIP, signing key, Portal credential or runner authentication file is committed.",
+    "This follow-up records the immutable RC2 result; its documentation commit is outside the tagged candidate."
+  ],
+  "reviewDocument": {
+    "path": "req/phase8-4-rc2-final-review.md",
+    "sha256": "20ce6412b4545eb5227144893e6690bc7ad2884ecc1a972f1428fde9bb88a28d",
+    "bytes": 7487
+  },
+  "followupSurfaceSha256": {
+    "req/phase8-4-release-notes.md": "50dc7471d0250c54ce9f1eb31f8c120b2c92ebb848cb8d31523bc2573cf9e6c7",
+    "req/phase8-4-release-checklist.md": "46d79c6adff04cf7f95ce08c8cece52b32c3546cca0241971589cb6425932a77",
+    "req/phase8-4-portal-capacity.md": "86178b9a68c67426d5ee4528b937353fdc66771aca61e7bee6c2349360e1997a"
+  },
+  "followupSurfaceSha256Meaning": "Hashes describe the prepared follow-up files at the reviewed packet commit, outside the immutable candidate; acceptance must cite that full commit."
+}

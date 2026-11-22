@@ -1,7 +1,8 @@
 # Phase 8.4 release readiness
 
-Candidate preparation in progress; release-version merge recorded 2026-11-20.
-Artifact audit remains dated 2026-11-16 pending the final-candidate rerun.
+RC2 technical verification passed on 2026-11-22; owner signed-candidate/delivery review
+and current Portal capacity confirmation remain open. The immutable candidate is
+`jmlx-phase8.4-rc.2` at `33676837f66993b5a809644dbbdc6e6550417334`.
 No publication authorized or performed.
 Plan: [phase8-4-plan.md](plans/phase8-4-plan.md).
 Local verification: [implementation report](phase8-4-implementation-report.md).
@@ -39,19 +40,22 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [x] Hosted PR #94 [CI run 43628489480](https://github.com/Alipsa/jmlx/actions/runs/43628489480)
   passed both Java and native jobs, including required-native-suite execution and artifact smoke.
 - [x] Owner approved raising the supported native minimum to macOS 27.2.x (2026-11-16).
-  The local physical Apple Silicon Mac runs 27.2.1; exact-candidate execution remains
-  required before release acceptance. The dedicated
+  The local physical Apple Silicon Mac runs 27.2.1; RC2 exact-candidate execution passed
+  in the dedicated account. The
   `jmlxrunner` account and runner registration were provisioned and connectivity checked
-  on 2026-11-16; the worker is stopped until the reviewed verification window.
-- [ ] Revalidate minimum-host registration, saved environment, tool/runner versions and
+  on 2026-11-16; the worker is stopped after the RC2 verification window.
+- [x] Revalidate minimum-host registration, saved environment, tool/runner versions and
   queued jobs immediately before the window. ID 23 is historical: GitHub removes persistent
   registrations after more than 14 offline days; re-register and record a new ID if necessary.
   The [2026-11-22 account probe](phase8-4-minimum-host-setup.md#account-revalidation-2026-11-22)
-  rechecked isolation, saved environment and local runner/tool versions. GitHub still reports
-  ID 23 offline and idle. Queue review and sharing checks remain for the actual window;
-  this partial revalidation does not close the gate or prove candidate execution.
+  rechecked isolation, saved environment and local runner/tool versions. That preparation
+  probe was partial; it did not complete queue/sharing review or prove candidate execution.
   A later November 22 inspection found guest read-write SMB access to the owner's Public
-  folder. Resolve or explicitly assess that exposure before the window; sharing remains open.
+  folder, leaving sharing review open until the RC2 follow-up below.
+  RC2 follow-up: the owner disabled this share before the verification window. Registration,
+  queue, saved environment and account/tool measurements were rechecked; the post-window
+  probe matches. The share remains disabled and runner ID 23 is offline and unloaded.
+  See the [RC2 review](phase8-4-rc2-final-review.md) for the completed window evidence.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
   The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
   inventory to 26 entries. Two provenance findings (Juffa `erf`/`erfinv` and Cephes)
@@ -80,7 +84,8 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   [final metadata/downstream review](phase8-4-native-distribution-review.md)
   supplies exact local artifact/metadata hashes and the owner conclusion accepted on
   2026-11-22 in PR #115. The separate acceptance record pins the approved review commit and
-  document/metadata hashes. Signed-candidate and actual-distribution validation remain open.
+  document/metadata hashes. RC2 artifact and consumer validation passed; owner acceptance of
+  the signed candidate and planned delivery remains open.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
   organization Usage Center values and the exact signed bundle remain outstanding.
@@ -97,10 +102,14 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e`;
   [merge-commit CI run 44815990385](https://github.com/Alipsa/jmlx/actions/runs/44815990385)
   passed Java and native checks, both release-smoke profiles and required-native-suite verification.
-- [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
+- [x] Before tagging, review and align the jinja, tokenizer, vision, core and models
   changelog version-cut dates with the final candidate cut date.
   Prepared as 2026-11-22; recheck the date immediately before creating the immutable tag.
-- [ ] Freeze candidate tag/SHA, verify signed bundle, both consumer profiles and minimum host.
+  RC2 was cut and verified on that date; no changelog input was changed afterward.
+- [x] Freeze RC2 tag/SHA, verify signed bundle, both consumer profiles and minimum host.
+  [RC2 final review](phase8-4-rc2-final-review.md) retains the receipt, exact reports, artifact
+  comparison and ZIP inventory. All four consumer reports pass. Owner acceptance of this
+  signed candidate and the changed Javadoc/module checksums remains pending.
 - [ ] Review concrete verified-bundle receipt, then explicitly authorize Central publication.
 - [ ] Verify all nine exact Central coordinates and selected Java 21 subset on both platforms.
 - [ ] Merge development-bump PR only after Central verification.

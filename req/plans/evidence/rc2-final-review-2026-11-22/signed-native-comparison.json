@@ -1,0 +1,86 @@
+{
+  "reviewedAt": "2026-11-22T22:21:16.371692+00:00",
+  "candidateSha": "33676837f66993b5a809644dbbdc6e6550417334",
+  "bundleSha256": "0dbb1451f8015843dfd77aeff5ae5e7f1afdbb80bb01f489ee06dfd92f1ba35e",
+  "ownerAcceptanceSha256": "ba210deade57f036aa52880ef066b1b21a32bd82bfc41ce7605d47ba544dc257",
+  "nativeArtifacts": [
+    {
+      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.jar",
+      "sha256": "cfbb7d71615727d5e5a2e84e6816c4680f1ae61f21d1a3bb5f51c91dc3eaea80",
+      "bytes": 77829121,
+      "matchesApprovedWholeJar": true,
+      "legalTextsMatchApproved": true,
+      "encryptedEntries": []
+    },
+    {
+      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-sources.jar",
+      "sha256": "5d3ed16e5dcb2127be30ff1cd94779c5e10404ccad5c465dd7276d8f1d9f73ea",
+      "bytes": 23572,
+      "matchesApprovedWholeJar": true,
+      "legalTextsMatchApproved": true,
+      "encryptedEntries": []
+    },
+    {
+      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-javadoc.jar",
+      "sha256": "d832a704c6e97b89d12676e0ff7694fdf0da43f9c8788de637dfec96d784fcdf",
+      "bytes": 4175527,
+      "matchesApprovedWholeJar": false,
+      "legalTextsMatchApproved": true,
+      "encryptedEntries": [],
+      "changedEntryContent": [
+        {
+          "path": "script-files/script.js",
+          "approvedSha256": "795ddba417f4a106bbfae3c84cb2c61363e0ce9b29163eaefdc9c334db1f9b2d",
+          "candidateSha256": "f388bb395178358a4d21ff85af36b1d0f8e6b14b65d2e618836820fea6a86ab1"
+        },
+        {
+          "path": "script-files/search-page.js",
+          "approvedSha256": "3bd59d168258fa81f6ffe473feec32bae0e0a5d571ecc89a1eb4fc04defed1b7",
+          "candidateSha256": "606948d99b5565e3bd8794a2631c2d4d6c56c7ce0d4291c8749b904db500493b"
+        },
+        {
+          "path": "script-files/search.js",
+          "approvedSha256": "fb8492aa12ea5e8c74045f0f909c7f9afc12cb44ce165e1b18a4d0cd1c49908c",
+          "candidateSha256": "3df9111ae3ece2e3eccf8651367df11a35b21e6956e3b6d0a76a3c1bcff3779d"
+        }
+      ]
+    }
+  ],
+  "nativeMetadata": [
+    {
+      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.pom",
+      "sha256": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
+      "matchesApprovedLiteral": true
+    },
+    {
+      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.module",
+      "sha256": "28064ff4acb37e68373fec4f68653a03f07d67e7729bace2bbab5351f969d7ab",
+      "matchesApprovedLiteral": false,
+      "onlyChanges": {
+        "javadocElements.files[0]": {
+          "size": {
+            "approved": 4175517,
+            "candidate": 4175527
+          },
+          "sha512": {
+            "approved": "39c62509a1f4294fbb410fdf36d681eff6ddd021ae7e3ba5dd4d4df16f45d21b5bea5049a6ade597ddc3e71d54935d4bfeb68ddce4cf3496103af8d51fc09d46",
+            "candidate": "e1957f3a62dab6482a724feea0b1310d6be52092a542dfd95769cc1dd4c16bdc8d1a4c555d8825140c06c6851e1c581d7e8a8c6e51e622bfa2dbc69de05949f8"
+          },
+          "sha256": {
+            "approved": "78c9ceb3bbae86b43ac96abd34f3cd05d80f3971574d02f69dd10573e7bf0728",
+            "candidate": "d832a704c6e97b89d12676e0ff7694fdf0da43f9c8788de637dfec96d784fcdf"
+          },
+          "sha1": {
+            "approved": "49dd4c4f99025167e6284d4ef9393bfe4e2583cc",
+            "candidate": "d1c455e383a6fd1d34b15820f020d49066e438ae"
+          },
+          "md5": {
+            "approved": "5b7055c5ea937a59b3e90a6ec9aacc44",
+            "candidate": "78347259504c6fc327a950c65d8ced62"
+          }
+        }
+      }
+    }
+  ],
+  "scope": "Byte comparison with owner-approved local artifacts. Legal texts and POM match. Module differs only in Javadoc archive size/checksums; Javadoc entry content differs only in three generated JavaScript resources. No new owner decision or actual public-delivery acceptance implied."
+}

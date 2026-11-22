@@ -1,0 +1,1092 @@
+{
+  "measuredAt": "2026-11-22T22:20:16.512426+00:00",
+  "candidateSha": "33676837f66993b5a809644dbbdc6e6550417334",
+  "bundleSha256": "0dbb1451f8015843dfd77aeff5ae5e7f1afdbb80bb01f489ee06dfd92f1ba35e",
+  "bundleBytes": 106730874,
+  "withinConservativeUploadLimit": true,
+  "zipFileCount": 270,
+  "zipEntryBytes": 107448768,
+  "files": [
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-javadoc.jar",
+      "bytes": 4612770
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-javadoc.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-javadoc.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-javadoc.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-javadoc.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-javadoc.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-sources.jar",
+      "bytes": 191503
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-sources.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-sources.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-sources.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-sources.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0-sources.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.jar",
+      "bytes": 245371
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.module",
+      "bytes": 3639
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.module.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.module.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.module.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.module.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.module.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.pom",
+      "bytes": 1914
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.pom.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.pom.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.pom.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.pom.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-core/0.5.0/jmlx-core-0.5.0.pom.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-javadoc.jar",
+      "bytes": 4146744
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-javadoc.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-javadoc.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-javadoc.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-javadoc.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-javadoc.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-sources.jar",
+      "bytes": 160450
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-sources.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-sources.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-sources.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-sources.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0-sources.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.jar",
+      "bytes": 943771
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.module",
+      "bytes": 3446
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.module.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.module.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.module.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.module.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.module.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.pom",
+      "bytes": 1433
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.pom.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.pom.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.pom.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.pom.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-ffi/0.5.0/jmlx-ffi-0.5.0.pom.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-javadoc.jar",
+      "bytes": 403650
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-javadoc.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-javadoc.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-javadoc.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-javadoc.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-javadoc.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-sources.jar",
+      "bytes": 72069
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-sources.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-sources.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-sources.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-sources.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2-sources.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.jar",
+      "bytes": 190570
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.module",
+      "bytes": 3462
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.module.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.module.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.module.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.module.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.module.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.pom",
+      "bytes": 1415
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.pom.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.pom.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.pom.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.pom.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-jinja/0.6.2/jmlx-jinja-0.6.2.pom.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-javadoc.jar",
+      "bytes": 4153226
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-javadoc.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-javadoc.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-javadoc.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-javadoc.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-javadoc.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-sources.jar",
+      "bytes": 4148
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-sources.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-sources.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-sources.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-sources.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0-sources.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.jar",
+      "bytes": 9907
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.module",
+      "bytes": 4220
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.module.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.module.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.module.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.module.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.module.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.pom",
+      "bytes": 1814
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.pom.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.pom.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.pom.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.pom.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-langchain4j/0.1.0/jmlx-langchain4j-0.1.0.pom.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-javadoc.jar",
+      "bytes": 4455353
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-javadoc.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-javadoc.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-javadoc.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-javadoc.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-javadoc.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-sources.jar",
+      "bytes": 247504
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-sources.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-sources.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-sources.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-sources.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0-sources.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.jar",
+      "bytes": 455649
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.module",
+      "bytes": 4638
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.module.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.module.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.module.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.module.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.module.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.pom",
+      "bytes": 2216
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.pom.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.pom.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.pom.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.pom.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-models/0.1.0/jmlx-models-0.1.0.pom.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-javadoc.jar",
+      "bytes": 4175527
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-javadoc.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-javadoc.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-javadoc.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-javadoc.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-javadoc.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-sources.jar",
+      "bytes": 23572
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-sources.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-sources.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-sources.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-sources.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0-sources.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.jar",
+      "bytes": 77829121
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.module",
+      "bytes": 3584
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.module.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.module.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.module.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.module.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.module.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.pom",
+      "bytes": 4149
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.pom.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.pom.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.pom.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.pom.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.pom.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-javadoc.jar",
+      "bytes": 4150616
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-javadoc.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-javadoc.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-javadoc.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-javadoc.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-javadoc.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-sources.jar",
+      "bytes": 4276
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-sources.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-sources.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-sources.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-sources.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0-sources.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.jar",
+      "bytes": 10098
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.module",
+      "bytes": 4214
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.module.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.module.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.module.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.module.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.module.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.pom",
+      "bytes": 1813
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.pom.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.pom.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.pom.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.pom.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-spring-ai/0.1.0/jmlx-spring-ai-0.1.0.pom.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-javadoc.jar",
+      "bytes": 242943
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-javadoc.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-javadoc.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-javadoc.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-javadoc.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-javadoc.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-sources.jar",
+      "bytes": 87530
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-sources.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-sources.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-sources.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-sources.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2-sources.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.jar",
+      "bytes": 161330
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.module",
+      "bytes": 4039
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.module.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.module.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.module.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.module.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.module.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.pom",
+      "bytes": 1852
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.pom.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.pom.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.pom.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.pom.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-tokenizer/0.1.2/jmlx-tokenizer-0.1.2.pom.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-javadoc.jar",
+      "bytes": 212900
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-javadoc.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-javadoc.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-javadoc.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-javadoc.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-javadoc.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-sources.jar",
+      "bytes": 87453
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-sources.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-sources.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-sources.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-sources.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2-sources.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.jar",
+      "bytes": 90563
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.jar.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.jar.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.jar.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.jar.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.jar.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.module",
+      "bytes": 3670
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.module.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.module.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.module.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.module.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.module.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.pom",
+      "bytes": 1681
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.pom.asc",
+      "bytes": 455
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.pom.asc.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.pom.asc.sha1",
+      "bytes": 40
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.pom.md5",
+      "bytes": 32
+    },
+    {
+      "name": "se/alipsa/jmlx-vision/0.1.2/jmlx-vision-0.1.2.pom.sha1",
+      "bytes": 40
+    }
+  ],
+  "accountCapacityVerdict": "pending current organization Usage Center evidence"
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "jmlx-verified-bundle-1",
+  "bundle": "/private/tmp/jmlx-phase8.4-rc.2/build/releaseAll/jmlx-mega-bundle.zip",
+  "preliminary": {
+    "path": "/private/tmp/jmlx-phase8.4-rc.2/build/releaseAll/preliminary-c24fccff-bf4f-4594-b2bc-f6011c19c87f.json",
+    "sha256": "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af"
+  },
+  "identityAssurance": "Local runtime measurements with operator-attested workflow/container identity; not authenticated remote provenance",
+  "reports": {
+    "macos-full": {
+      "path": "/Users/per/project/jmlx/build/releaseAll/candidates/rc.2/macos-full.json",
+      "sha256": "a4de1e90b9d088d1ba989742eeff32f9bf44530e64e7d4c20b8a7f2f37bf9300"
+    },
+    "macos-pure": {
+      "path": "/Users/per/project/jmlx/build/releaseAll/candidates/rc.2/macos-pure.json",
+      "sha256": "3ec0e04f0f49b77b806cf4a9423d4f5ff81f6271d1ca201e314803ce38929261"
+    },
+    "linux-pure": {
+      "path": "/Users/per/project/jmlx/build/releaseAll/candidates/rc.2/linux-pure.json",
+      "sha256": "f6658c4ace1314d76fc1ea4186f2422eba1473a2b6471daf849284a28c56ee32"
+    },
+    "minimum-host": {
+      "path": "/Users/per/project/jmlx/build/releaseAll/candidates/rc.2/minimum-host-evidence/minimum-host.json",
+      "sha256": "41a1936184f7b9f1aeb078402d1f0001603ce6d684ce6d49c7e2b30094f9acb1"
+    }
+  }
+}

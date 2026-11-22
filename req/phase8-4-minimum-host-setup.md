@@ -144,6 +144,10 @@ From the repository root, in an administrator's Terminal:
 ```sh
 (
   set -euo pipefail
+  probe_evidence=req/plans/evidence/minimum-host-runner-2026-11-22
+  probe_changes=$(git status --porcelain --untracked-files=all -- "$probe_evidence")
+  [ -z "$probe_changes" ] || { echo "probe evidence differs from HEAD" >&2; exit 1; }
+  source_commit=$(git rev-parse HEAD)
   probe_dir=''
   cleanup() {
     if [ -n "$probe_dir" ]; then
@@ -163,6 +167,7 @@ From the repository root, in an administrator's Terminal:
   actual="${actual%% *}"
   [ "$actual" = "$expected" ] || { echo "probe script digest mismatch" >&2; exit 1; }
   window_dir=$(/usr/bin/mktemp -d "build/releaseAll/window-$(/bin/date -u +%F).XXXXXXXX")
+  printf '%s\n' "$source_commit" > "$window_dir/source-commit.txt"
   (
     cd /
     sudo -H -u jmlxrunner /usr/bin/env -i \
@@ -173,7 +178,11 @@ From the repository root, in an administrator's Terminal:
 )
 ```
 
-The staged hash must match `windowTimeProbe.scriptSha256` before execution. The exit trap
+The checkout guard rejects staged, unstaged and untracked changes in the probe evidence
+directory before staging. Confirm that HEAD is the reviewed source commit; its SHA is
+retained in `source-commit.txt` beside the result. The guard establishes consistency with
+that commit, not its approval status. The staged hash must match
+`windowTimeProbe.scriptSha256` before execution. The exit trap
 removes the staging directory on success or failure. Output is retained in a fresh directory
 named for the window's UTC date only after staging and digest verification pass. A probe
 failure may leave an empty or partial `account-probe.partial.json`. The probe does not

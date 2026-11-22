@@ -690,7 +690,9 @@ tasks.register('releaseVerification', JavaExec) {
     if (providers.gradleProperty('releaseVerificationAllowDirty').present) args '--allow-dirty'
     inputs.files(releaseVerificationManifest, file('upstream/upstream-lock.json'), file('NOTICE'), file('req/model-fixture-policy.md'),
         file('CHANGELOG.md'), file('req/release-checklist.md'))
-    outputs.files(layout.buildDirectory.file('reports/release-verification.md'), layout.buildDirectory.file('reports/release-verification-evidence'))
+    outputs.file(layout.buildDirectory.file('reports/release-verification.md'))
+    outputs.file(layout.buildDirectory.file('reports/release-verification.json'))
+    outputs.dir(layout.buildDirectory.dir('reports/release-verification-evidence'))
     outputs.upToDateWhen { false }
     outputs.cacheIf { false }
 }

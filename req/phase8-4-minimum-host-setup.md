@@ -1,6 +1,7 @@
 # Phase 8.4 minimum-host runner setup
 
-Provisioned and connectivity checked: 2026-11-16. No candidate has been executed.
+Provisioned and connectivity checked: 2026-11-16. Account revalidated: 2026-11-22.
+No candidate has been executed.
 This implements the runner prerequisites in
 [the plan](plans/phase8-4-plan.md) and
 [release workflow](../.github/workflows/release-candidate.yml).
@@ -59,7 +60,8 @@ supplied clean PATH and `.env` empty. Their digests are retained in
 [the review evidence](plans/evidence/minimum-host-runner-2026-11-16/review.json).
 Neither contains the owner's home or an inherited `JAVA_HOME`. Configuration used `env -i`,
 not the owner's shell environment. Both `RunAtLoad` and `KeepAlive` are disabled.
-The definition remains installed but unloaded; it will not start the worker on reboot.
+At the 2026-11-16 check, the definition remained installed but unloaded.
+The 2026-11-22 state is recorded below; automatic startup remains disabled.
 GitHub's own runner authentication files are private to the account. Reinspect these saved
 files before each release window; the plist alone does not control the effective environment.
 
@@ -78,6 +80,127 @@ No new share was created for `jmlxrunner`. This is not proof that File Sharing i
 disabled or that all network sharing access has been audited; keep the private account home
 and recheck sharing at window time.
 
+## Account revalidation (2026-11-22)
+
+The owner ran the read-only probe as `jmlxrunner`. The retained
+[original script](plans/evidence/minimum-host-runner-2026-11-22/original-account-probe.py)
+and evidence method fields identify its historical `/tmp` invocation, script hash and source
+commit. That invocation did not use Python isolated mode; no tampering was observed, but
+it needs the hardened window-time rerun below. `recordedAt` dates evidence assembly;
+the original probe has no exact timestamp. Supplemental owner-side measurements are under
+`ownerInspection`, separate from the script-produced `host` block.
+
+The [account evidence](plans/evidence/minimum-host-runner-2026-11-22/account-probe.json)
+records UID 503, a `0700` home and no admin membership on ARM64 macOS 27.2.1.
+Owner-side inspection identifies Apple M5 Max and names the `kern.hv_vmm_present` source
+for the virtualization measurement. The account cannot read or write the owner's Gradle
+properties or traverse the owner's SSH and signing directories. The owner's `0700` home
+blocks traversal before the leaf paths can be reached; these checks do not independently
+establish each leaf's permissions. For Gradle properties, `X_OK` means executable, not
+traversable. Historical JSON retains the original `traversable` key with an annotation;
+the formatted window-time probe uses `executable` for that file.
+These scoped permission checks do not establish machine-wide secret isolation.
+
+Local runner ID 23 remains `jmlx-release-minimum-m5-max`, listener 2.338.2. Its listener
+SHA-256 is `732456cbedb8c09870b82a63c05ba5505ad5cc3fb536ee570879a0af1fdb5087`.
+The saved `.env` is empty; `.path` is 63 bytes. Neither contains the owner's home;
+versions, resolved tool paths, modes and environment hashes are retained in the probe.
+Python 3.15.2 and Git 2.56.1 still resolve through owner-managed Homebrew.
+
+A read-only GitHub registration check confirmed ID 23 offline and idle, with labels
+`self-hosted`, `macOS`, `ARM64` and `jmlx-release-minimum`. A local launchd inspection
+found the service loaded, with state `not running`, active count zero and no starts.
+The host booted on 2026-11-22 at 10:14:17 local time, after the unloaded November 16 check.
+Loading the plist from `/Library/LaunchDaemons` at boot is consistent with this state;
+no historical launchd event log was examined to establish the cause. `RunAtLoad` and
+`KeepAlive` remain false, and the service reports no starts. Supplemental evidence records
+these observations, the chip model and the GitHub registration snapshot separately from
+measurements made as `jmlxrunner`.
+No listener was started or job dispatched during this revalidation. If still loaded at
+window time, skip `bootstrap` and use `kickstart` only after the window checks pass.
+
+The account's `com.apple.sharepoint.group.1` membership comes through nested `everyone`;
+it is the Public-folder share group, not an account-specific grant. A later read-only
+`sharing -l` check found the owner's Public-folder SMB share enabled with guest access
+and read-write permissions. Its state at the earlier account probe time was not established.
+This exposure remains an open sharing-review item: resolve it or explicitly assess it before
+the window, then recheck sharing and private-home isolation. No sharing settings were changed.
+
+The queued-job review, sharing review and immediate pre-window revalidation remain required.
+This probe does not close the readiness gate or establish signed-candidate Metal execution.
+
+## Window-time account probe
+
+Use the formatted
+[window-time probe](plans/evidence/minimum-host-runner-2026-11-22/account-probe.py)
+for the next measurement. These commands stage it outside the owner's private home in a
+fresh, runner-owned `0700` directory. Python isolated mode excludes the script directory,
+user site packages and Python environment overrides from import resolution. Run from `/`
+with the absolute staged path; retain the new output separately from the historical evidence.
+This procedure has not yet been run and does not change the historical invocation.
+
+From the repository root, in an administrator's Terminal:
+
+```sh
+(
+  set -euo pipefail
+  probe_evidence=req/plans/evidence/minimum-host-runner-2026-11-22
+  probe_changes=$(git status --porcelain --untracked-files=all -- "$probe_evidence")
+  [ -z "$probe_changes" ] || { echo "probe evidence differs from HEAD" >&2; exit 1; }
+  source_commit=$(git rev-parse HEAD)
+  for probe_file in account-probe.py account-probe.json; do
+    working_blob=$(git hash-object --no-filters "$probe_evidence/$probe_file")
+    reviewed_blob=$(git rev-parse "$source_commit:$probe_evidence/$probe_file")
+    [ "$working_blob" = "$reviewed_blob" ] || {
+      echo "probe evidence differs from HEAD: $probe_file" >&2
+      exit 1
+    }
+  done
+  probe_dir=''
+  cleanup() {
+    if [ -n "$probe_dir" ]; then
+      sudo /bin/rm -rf "$probe_dir"
+    fi
+  }
+  trap cleanup EXIT
+  mkdir -p build/releaseAll
+  probe_dir=$(/usr/bin/mktemp -d /private/tmp/jmlx-account-probe.XXXXXXXX)
+  sudo /usr/bin/install -d -o jmlxrunner -g staff -m 0700 "$probe_dir"
+  git show "$source_commit:$probe_evidence/account-probe.py" | \
+    sudo -u jmlxrunner /usr/bin/tee "$probe_dir/account-probe.py" > /dev/null
+  sudo -u jmlxrunner /bin/chmod 0400 "$probe_dir/account-probe.py"
+  expected=$(git show "$source_commit:$probe_evidence/account-probe.json" | \
+    /usr/bin/plutil -extract windowTimeProbe.scriptSha256 raw -o - -)
+  actual=$(sudo -u jmlxrunner /usr/bin/shasum -a 256 "$probe_dir/account-probe.py")
+  actual="${actual%% *}"
+  [ "$actual" = "$expected" ] || { echo "probe script digest mismatch" >&2; exit 1; }
+  window_dir=$(/usr/bin/mktemp -d "build/releaseAll/window-$(/bin/date -u +%F).XXXXXXXX")
+  printf '%s\n' "$source_commit" > "$window_dir/source-commit.txt"
+  (
+    cd /
+    sudo -H -u jmlxrunner /usr/bin/env -i \
+      PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+      /opt/homebrew/bin/python3 -I "$probe_dir/account-probe.py"
+  ) > "$window_dir/account-probe.partial.json"
+  mv "$window_dir/account-probe.partial.json" "$window_dir/account-probe.json"
+)
+```
+
+The status check rejects visible staged, unstaged and untracked changes in the probe evidence
+directory. Direct comparisons of the script and manifest with committed blobs also reject
+content changes hidden by `assume-unchanged` or `skip-worktree`; hashing bypasses Git filters.
+Confirm that HEAD is the reviewed source commit; its SHA is retained in `source-commit.txt`.
+The blob checks detect local input edits without establishing the commit's approval status.
+Staging reads the script directly from that recorded commit, and the expected digest comes
+from the same commit's manifest. Later working-tree edits therefore cannot change either input.
+The staged hash must match `windowTimeProbe.scriptSha256` before execution. The exit trap
+removes the staging directory on success or failure. Output is retained in a fresh directory
+named for the window's UTC date only after staging and digest verification pass. A probe
+failure may leave an empty or partial `account-probe.partial.json`. The probe does not
+start the runner service.
+
+## Starting and stopping the reviewed window
+
 For a reviewed release verification window, a host administrator can start it with:
 
 ```sh
@@ -91,6 +214,9 @@ After the job finishes, stop and unload it with:
 sudo launchctl bootout system/com.alipsa.jmlx-release-runner
 ```
 
+`bootout` unloads the service for the current boot. With the plist still installed in
+`/Library/LaunchDaemons`, launchd can load it again after reboot. Disabled `RunAtLoad` and
+`KeepAlive` prevent automatic startup; they do not keep the definition unloaded.
 These administrative commands manage launchd; the runner process itself runs as UID 503.
 Recheck account isolation and the candidate workflow before each window. Exact-bundle Metal
 execution, measured Java 21/25 consumer runtimes and acceptance reports remain outstanding.

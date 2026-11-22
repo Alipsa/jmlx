@@ -10,7 +10,7 @@ Prepared 2026-11-21. Status: both owner interpretations accepted; remaining cond
 | Confirmation date | 2026-11-21; owner statements in the preparation conversation |
 | Applicable law | Not determined; pending assessment of relevant rights and grants |
 | Assessment | Owner judgment based on the evidence; reviewer is not a lawyer |
-| Juffa disposition | Interpretation accepted; scope, terms and artifact conditions pending |
+| Juffa disposition | Interpretation accepted; scope/wording approved; terms and artifact review pending |
 | Cephes disposition | Interpretation and Netlib-material basis accepted; validation pending |
 | Release gate | Open; neither finding has been resolved |
 
@@ -91,43 +91,44 @@ header hashes. The identified compiled forms are in `libmlx.dylib` and `mlx.meta
 [binary observation][juffa-binaries] records unchanged vendor bytes, the `libmlxc.dylib`
 import observations and sources-JAR contents, with the stated technical limits.
 
-Those mappings identify the evidence considered; this approval does not separately finalize
-the technical mapping acceptance or source/compiled legal boundary. The surrounding MLX code
-and combined-binary treatment still require an explicit scope decision. CPU `erf` has separate
-PyTorch provenance. The differing BSD forum samples do not supply a new grant for these exact
-versions. Applicable law remains undetermined as recorded above.
+On 2026-11-22, Per Nyfelt explicitly approved the proposed scope and wording and authorized
+implementation: "I approve the proposed scope and wording; proceed with implementation."
+This decision is separate from merging PR #113. The approved packet is the version at
+`0cc1ca63311d6c5ca8f8168dffac99d8a7529563`.
+
+The [acceptance record][juffa-acceptance] pins the packet README.md and review.json SHA-256
+values and every approved candidate hash, including the raw section digest. The historical
+packet remains unchanged. The owner accepts its three source/revision mappings and logical
+boundary: Juffa's covered expression in Metal erf and Metal/CPU SIMD erfinv, plus corresponding
+compiled forms in the identified vendor libmlx.dylib and mlx.metallib. Other MLX functions,
+unrelated combined-binary material and jmlx Java code retain their applicable terms. This is
+an owner scope judgment under the conditional interpretation above, not proof of a separable
+compiled/legal boundary. CPU erf, BSD expm1f and Cephes remain separately attributed.
+
+The exact notice, native NOTICE, full CC text and publication paragraph are approved, along
+with the six-entry POM template and its substitution rule. The final literal POM and module
+metadata remain subject to review after the notice commit exists. No CC adapter's license is
+identified. The existing (B) counterargument remains recorded.
 
 | Owner decision field | Current value |
 | --- | --- |
-| Decision date and reviewed proposal commit | 2026-11-21; full research/proposal commit above |
-| Technical source/revision mapping accepted, with rationale/references? | Scope review pending |
-| Source and compiled adaptation boundary | Pending, including surrounding-code treatment |
+| Decision date and reviewed packet | 2026-11-22; commit and hashes in acceptance record |
+| Technical source/revision mapping | Accepted; bounded provenance observations in the packet |
+| Source and compiled adaptation boundary | Approved logical boundary described above |
 | Rights holders and existing licensing basis | Juffa: CC BY-SA 4.0; Apple/MLX: MIT contributions |
 | Reasoned adapter-license interpretation | Approved above; counterargument remains explicit |
-| Downstream terms examined and conclusion | Pending; no compatibility conclusion yet |
-| Final notice/license/POM paths, exact wording and SHA-256 hashes | Pending artifact review |
-| Accept/reject/need evidence; conditions and responsible owner | Conditional accept; Per Nyfelt |
-| Named implementation/review owner and unresolved questions | Follow-up below |
+| Downstream terms examined and conclusion | Pending actual-distribution review |
+| Exact notice/license/publication wording | Approved hashes in acceptance record |
+| POM wording | Template/substitution approved; final literal metadata review pending |
+| Disposition and responsible owner | Conditional accept; Per Nyfelt; finding remains open |
+| Implementation owner | Codex implements; Per Nyfelt reviews the implementation PR |
 
-The [scope and wording packet][juffa-wording] supplies concrete candidates for the next owner
-review. Its manifest pins proposed section/file bytes and the POM template separately; the
-literal final permalink/POM is still pending. The later scope/wording acceptance record must
-identify the full approved commit and SHA-256 of the packet's README.md and review.json at
-that commit, as well as its approved candidate hashes. This preparation does not approve
-those items.
-
-**Follow-up:** apply proposal Decision 3 using the accepted MIT/direct-offer basis; no CC
-adapter's license is identified. Replace the draft notice's unresolved paragraph with that
-basis and the approved scope, retaining (B)'s counterargument rather than naming MIT as a
-CC adapter's license. Final wording remains subject to owner approval.
-
-Per Nyfelt owns review and acceptance. Implementation ownership has not yet been assigned.
-Finalize the technical mapping acceptance and source/compiled scope, including
-surrounding-code treatment. Approve attribution, retained modification notices, license/POM
-wording and the downstream-terms assessment, with exact paths and reviewed hashes. Then
-implement and validate the approved treatment in a new candidate. Future changes by jmlx need
-their own assessment. `NATIVE-LICENSE-1` remains open until these conditions are met; this
-decision authorizes neither a replacement candidate nor Central publication.
+**Follow-up:** implement the approved bytes and verifier extensions on a separate branch.
+Commit the approved notice before adding its POM permalink in a later commit; preserve both
+through a merge commit. Review the final literal metadata and actual downstream terms,
+validate the changed artifacts and prepare a new immutable candidate under the release
+runbook. Applicable law remains undetermined. Both findings and the release gate remain
+open. This approval does not authorize Central publication.
 
 ## Cephes: approved owner interpretation
 
@@ -258,3 +259,5 @@ Central publication still needs the owner's separate approval of the exact verif
 [juffa-binaries]: plans/evidence/juffa-license-interpretation-2026-11-21/binary-observation.json
 
 [juffa-wording]: plans/evidence/juffa-scope-wording-2026-11-21/README.md
+
+[juffa-acceptance]: plans/evidence/juffa-implementation-2026-11-22/acceptance.json

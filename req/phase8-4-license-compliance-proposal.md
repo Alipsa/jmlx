@@ -19,6 +19,10 @@ The concrete [draft notice](plans/evidence/license-compliance-proposal-2026-11-2
 is review material outside the native module. Its unresolved adapter-license paragraph must
 be replaced with approved wording before packaging. No production task includes that file.
 
+The [current scope and wording packet][scope-wording] supplies candidate notice, native NOTICE,
+full CC text and POM template under the accepted interpretation. It supersedes the earlier
+draft's unresolved-paragraph prompt for review; its scope and wording remain unapproved.
+
 ## Material and distribution to decide
 
 The reference is the unchanged RC1 ZIP with SHA-256
@@ -108,7 +112,8 @@ Use a separate implementation PR tied to the completed decision record and draft
 | Native module `LICENSE-CC-BY-SA-4.0` | Add the unmodified official license text |
 | Native module `build.gradle` | Include that text in all three JARs; update scoped POM |
 | `req/native-license-inventory.json` | Record upstream evidence and approved packaged hashes |
-| `req/phase8-4-native-license-audit.json` | Record each resolution only after validation |
+| `req/phase8-4-native-license-audit.md` | Describe the approved scoped POM entries |
+| `req/phase8-4-native-license-audit.json` | Check consistency; resolve findings after validation |
 | Native README and 8.4 release notes | Explain approved scope and where terms are packaged |
 | Release checks and independent smoke | Add the separate enforcement described below |
 
@@ -359,3 +364,5 @@ the separately digest-pinned snapshots in the scoped review. No new raw-page has
 [netlib]: https://netlib.org/cephes/readme
 [cephes-email]: https://lists.debian.org/debian-legal/2004/12/msg00295.html
 [cephes-reply]: https://lists.debian.org/debian-legal/2004/12/msg00297.html
+
+[scope-wording]: plans/evidence/juffa-scope-wording-2026-11-21/README.md

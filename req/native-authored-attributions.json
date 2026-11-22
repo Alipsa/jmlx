@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "decision": "req/phase8-4-owner-license-decision.md",
+  "evidence": [
+    {
+      "path": "req/plans/evidence/juffa-implementation-2026-11-22/acceptance.json",
+      "sha256": "563eec69c808b1559d12afaa25d6e95e81ed426c810b8541447cea6ea0880208"
+    },
+    {
+      "path": "req/plans/evidence/juffa-scope-wording-2026-11-21/README.md",
+      "sha256": "202d3e9a4a506b5ebbc5aafcdc3f11251925049aab64575c4b98a13bb909c385"
+    },
+    {
+      "path": "req/plans/evidence/juffa-scope-wording-2026-11-21/review.json",
+      "sha256": "99f98e2cc8b733df0c00d98faebc48e9e7b511fa223fd4f033580d4c0745790d"
+    },
+    {
+      "path": "req/plans/evidence/scoped-license-review-2026-11-21/technical-findings.json",
+      "sha256": "d37cba5d97188a2936abfb784603c5e19bbc94cc9c5e876b32ce09a20d3b1124"
+    }
+  ],
+  "sections": [
+    {
+      "title": "Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)",
+      "sectionSha256": "1762ce0bc5af8518c5c155f3352cd16e5af62bef0f264f529ebcf4e10c8686af",
+      "approvedManifest": "req/plans/evidence/juffa-scope-wording-2026-11-21/review.json",
+      "requirements": {
+        "creator": "Creator: Norbert Juffa (Stack Overflow display name: njuffa; user ID 780717)",
+        "profile": "Profile: https://stackoverflow.com/users/780717/njuffa",
+        "revisions": [
+          "https://stackoverflow.com/revisions/35148199/4",
+          "https://stackoverflow.com/revisions/49743348/3"
+        ],
+        "license": "under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0):",
+        "modifications": "Modifications visible in the reviewed material include Metal translation,",
+        "scope": "jmlx relies on the direct CC BY-SA 4.0 grant for Juffa's covered expression and\nthe existing MIT grant for Apple/MLX contributions. Its owner interprets the\nsection 2(a)(5)(A) offer as continuing for Juffa's expression retained in these\nadaptations, with (B) providing an additional offer. The adapter-license\ncondition in (B) remains the unresolved counterargument to this interpretation.\nNo CC adapter's license is identified. MIT is not presented as one.\n\nThe scoped CC identification concerns Juffa's covered expression in the three\nreviewed functions and their corresponding compiled forms. It does not assert\nan MIT-only license for Juffa's expression, or place other MLX functions,\nthe entire combined binaries, or jmlx Java code under CC merely because they\nare distributed together. Those contributions retain their applicable terms.\nDownstream recipients must retain the applicable notices and license terms;\njmlx imposes no additional terms or technological measures restricting the\nexercise of the rights granted for the covered material.\n"
+      },
+      "upstreamSources": [
+        {
+          "id": "metal-header",
+          "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/metal/kernels/erf.h",
+          "sha256": "31d88004390bbe08636c5f64a3cb3180ebc8d79a89267347de9f6c33aba0e9f9"
+        },
+        {
+          "id": "simd-header",
+          "source": "https://github.com/ml-explore/mlx/blob/36969c094354086e15d2a327a9c50feb20b9cf11/mlx/backend/cpu/simd/math.h",
+          "sha256": "5dbe79caa33a228d1354b2621876dc0fb3629dd6733c8ee4ebd0471790b0a94a"
+        },
+        {
+          "id": "answer-35148199",
+          "source": "https://api.stackexchange.com/2.3/revisions/61E756BD-925D-4F54-9BD3-C0357F51528E?site=stackoverflow&filter=withbody",
+          "sha256": "fc4bebdfe83046e2054633802d2d1a3e24e370a53570722fc99cf7a1594057ef",
+          "jsonBody": true,
+          "revisionGuid": "61E756BD-925D-4F54-9BD3-C0357F51528E",
+          "ownerUserId": 780717,
+          "contentLicense": "CC BY-SA 4.0"
+        },
+        {
+          "id": "answer-49743348",
+          "source": "https://api.stackexchange.com/2.3/revisions/8439BF7B-10DC-491E-8C10-9B36BC877757?site=stackoverflow&filter=withbody",
+          "sha256": "f8b3c1d76aee800eb542d5feec83c0f3fa516fc74009c296c9b947051bf3bbc9",
+          "jsonBody": true,
+          "revisionGuid": "8439BF7B-10DC-491E-8C10-9B36BC877757",
+          "ownerUserId": 780717,
+          "contentLicense": "CC BY-SA 4.0"
+        }
+      ]
+    }
+  ]
+}

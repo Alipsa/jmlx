@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import final_receipt as F
 from release_inputs import sha256
 from release_inputs import MODULE_KEYS
+from native_license_fixtures import install_policy
 from verify_native_tests import required_tasks, verify_events
 
 
@@ -184,20 +185,21 @@ class FinalReceiptTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "plan changed"):
             F.verify(self.root, self.path)
 
-    def test_native_payload_verification_must_execute(self):
+    def test_native_release_verification_must_execute(self):
         events = json.loads((self.root / "events.json").read_text())
-        payload = ":jmlx-native-macos-arm64:verifyNativeReleasePayload"
-        self.assertIn(payload, {task["path"] for task in events["tasks"]})
-        verify_events(events, "run")
-        for outcome in ("SKIPPED", "UP-TO-DATE", "FROM-CACHE", "FAILED", "MISSING"):
-            with self.subTest(outcome=outcome):
-                changed = copy.deepcopy(events)
-                if outcome == "MISSING":
-                    changed["tasks"] = [task for task in changed["tasks"] if task["path"] != payload]
-                else:
-                    next(task for task in changed["tasks"] if task["path"] == payload)["outcome"] = outcome
-                with self.assertRaisesRegex(ValueError, "task outcomes"):
-                    verify_events(changed, "run")
+        for task in ("verifyNativeReleasePayload", "verifyNativeReleaseLicenses"):
+            payload = ":jmlx-native-macos-arm64:" + task
+            self.assertIn(payload, {task["path"] for task in events["tasks"]})
+            verify_events(events, "run")
+            for outcome in ("SKIPPED", "UP-TO-DATE", "FROM-CACHE", "FAILED", "MISSING"):
+                with self.subTest(outcome=outcome):
+                    changed = copy.deepcopy(events)
+                    if outcome == "MISSING":
+                        changed["tasks"] = [task for task in changed["tasks"] if task["path"] != payload]
+                    else:
+                        next(task for task in changed["tasks"] if task["path"] == payload)["outcome"] = outcome
+                    with self.assertRaisesRegex(ValueError, "task outcomes"):
+                        verify_events(changed, "run")
 
     def test_cached_task_cannot_claim_passed(self):
         path = self.root / "events.json"
@@ -236,11 +238,27 @@ class FinalReceiptTest(unittest.TestCase):
         manifest = {"schema": 1, "baselineSha": "a"*40, "audit": "req/audit.md", "modules": [
             {"module": name, "version": "0.1.0", "source": "local"} for name in MODULE_KEYS]}
         manifest_path = self.write("tools/release-smoke/released-8.4.json", manifest)
+        install_policy(self.root)
+        original = Path(__file__).resolve().parents[3]
+        inventory = json.loads((original / 'req/native-license-inventory.json').read_text())
+        self.write('req/native-license-inventory.json', inventory)
+        native_buffer = io.BytesIO()
+        with zipfile.ZipFile(native_buffer, 'w') as native:
+            for name in inventory['packagedTexts']:
+                native.writestr('META-INF/' + name,
+                                (original / 'jmlx-native-macos-arm64' / name).read_bytes())
+        native_pom = (Path(__file__).parent / 'fixtures/native-pom/valid.pom').read_bytes()
         with zipfile.ZipFile(self.bundle, "w") as archive:
             for name in MODULE_KEYS:
                 base = f"se/alipsa/{name}/0.1.0/{name}-0.1.0"
                 for suffix in (".pom", ".module", ".jar", "-sources.jar", "-javadoc.jar"):
-                    archive.writestr(base + suffix, "fixture")
+                    data = b'fixture'
+                    if name == 'jmlx-native-macos-arm64':
+                        if suffix == '.pom':
+                            data = native_pom
+                        elif suffix in ('.jar', '-sources.jar', '-javadoc.jar'):
+                            data = native_buffer.getvalue()
+                    archive.writestr(base + suffix, data)
                     archive.writestr(base + suffix + ".asc", "signature")
         self.record.update(schema="jmlx-preliminary-bundle-1", bundleSha256=sha256(self.bundle),
                            releaseManifestSha256=sha256(manifest_path))
@@ -254,6 +272,14 @@ class FinalReceiptTest(unittest.TestCase):
             info["sha256"] = sha256(info["path"])
         self.write("final.json", self.receipt)
         def git(command, **kwargs):
+            if command[3:] == ['rev-parse', '--is-shallow-repository']:
+                return b'false\n'
+            if command[3:] == ['remote', 'get-url', 'origin']:
+                return b'https://github.com/Alipsa/jmlx.git\n'
+            if command[3] == 'show':
+                return (original / 'jmlx-native-macos-arm64/THIRD-PARTY-NOTICES').read_bytes()
+            if not kwargs.get('text'):
+                return b''
             if command[-1] == "--porcelain":
                 return ""
             if command[3] == "cat-file":

@@ -1,0 +1,61 @@
+{
+  "schema": 1,
+  "date": "2026-11-22",
+  "reviewer": "Per Nyfelt",
+  "approvalStatement": "I approve the proposed scope and wording; proceed with implementation.",
+  "approvedCommit": "0cc1ca63311d6c5ca8f8168dffac99d8a7529563",
+  "packet": "req/plans/evidence/juffa-scope-wording-2026-11-21",
+  "packetSha256": {
+    "README.md": "202d3e9a4a506b5ebbc5aafcdc3f11251925049aab64575c4b98a13bb909c385",
+    "review.json": "99f98e2cc8b733df0c00d98faebc48e9e7b511fa223fd4f033580d4c0745790d"
+  },
+  "approvedArtifacts": [
+    {
+      "path": "juffa-notice-candidate.txt",
+      "kind": "literal candidate section including leading LF and separator",
+      "proposedTarget": "jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
+      "sha256": "1d8c17a5d94d9297247345904030ed4776f41c804e3957c27241f64d98b1dfdf",
+      "bytes": 3593,
+      "sectionSha256": "1762ce0bc5af8518c5c155f3352cd16e5af62bef0f264f529ebcf4e10c8686af",
+      "sectionBytes": 3547,
+      "sectionRule": "Exclude the initial LF and separator line with its LF; preserve every following byte through EOF, including the blank line before the title and final LF."
+    },
+    {
+      "path": "native-NOTICE-candidate.txt",
+      "kind": "literal candidate file",
+      "proposedTarget": "jmlx-native-macos-arm64/NOTICE",
+      "sha256": "25b8aeed4d3120639107a2b197eb8269cf89eed828de7e1f1245f4249422d466",
+      "bytes": 1939
+    },
+    {
+      "path": "LICENSE-CC-BY-SA-4.0",
+      "kind": "unmodified official license bytes",
+      "proposedTarget": "jmlx-native-macos-arm64/LICENSE-CC-BY-SA-4.0",
+      "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+      "bytes": 20138
+    },
+    {
+      "path": "pom-licenses-candidate.json",
+      "kind": "license/comment template; final permalink and literal POM pending",
+      "proposedTarget": "jmlx-native-macos-arm64/build.gradle",
+      "sha256": "a299f186b34913bbbf2217534294635abbfcceb65a5ee402f4c9a67f76c748ec",
+      "bytes": 3235
+    },
+    {
+      "path": "publication-paragraph.txt",
+      "kind": "literal candidate paragraph; final surrounding files pending",
+      "proposedTarget": "native README and Phase 8.4 release notes",
+      "sha256": "80a83fd1d785f2c5f56e02fe48e33071a50340d07f4b875d26d43e5c4283d33f",
+      "bytes": 630
+    }
+  ],
+  "mappingAndScope": "Accept the three mappings and logical source/compiled boundary in the approved README under the existing conditional MIT/direct-CC interpretation; this is owner judgment, not a separable-binary or legal-boundary proof.",
+  "approvedPom": "Six-entry template and substitution rule approved; final literal permalink/POM and generated metadata remain subject to review.",
+  "remainingConditions": [
+    "Reasoned owner downstream-terms conclusion after examination of actual distribution surfaces.",
+    "Final literal POM, module metadata and signed artifact review.",
+    "New immutable candidate and required native/consumer/minimum-host verification.",
+    "Separate publication approval; both license findings remain open."
+  ],
+  "releaseReady": false
+}

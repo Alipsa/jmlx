@@ -36,3 +36,10 @@ artifact evidence. The
 bounds performance statements to its measured host/settings and retains unstable, IO-affected,
 unmatched-generation and cross-pin limitations. Packaging changes do not establish new
 performance measurements. No golden, binding or upstream native pin changes are part of 8.4.
+
+## Native license scope
+
+The native distribution retains MLX's MIT grant for Apple/MLX contributions and separately identifies Norbert Juffa's covered expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material under CC BY-SA 4.0. META-INF/THIRD-PARTY-NOTICES records the reviewed scope, revisions, modifications and redistribution basis; META-INF/LICENSE-CC-BY-SA-4.0 contains the complete CC license. No CC adapter's license is identified. Other bundled material retains its applicable licenses and notices. The owner-approved interpretation and its recorded counterargument are documented in the repository's owner license decision record.
+
+See the [owner decision](phase8-4-owner-license-decision.md) and
+[approved notice](https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES). Final literal metadata and artifact review remain pending.

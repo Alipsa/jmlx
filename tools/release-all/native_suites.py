@@ -1,6 +1,7 @@
 """Required native suite and task inventory shared by CI and release verification."""
 
-required_non_test_tasks = frozenset({":jmlx-native-macos-arm64:verifyNativeReleasePayload"})
+required_non_test_tasks = frozenset({":jmlx-native-macos-arm64:verifyNativeReleasePayload",
+                                      ":jmlx-native-macos-arm64:verifyNativeReleaseLicenses"})
 
 suites = {
     'jmlx-ffi': ['NativeLoaderMissingMetallibTest', 'NativeLoaderExtractionFallbackTest'],

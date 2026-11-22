@@ -31,3 +31,7 @@ req/plans/phase8-2-wp4-raw-digests.json -text
 req/plans/evidence/juffa-scope-wording-2026-11-21/** -text
 req/plans/evidence/juffa-scope-wording-2026-11-21/LICENSE-CC-BY-SA-4.0 -whitespace
 jmlx-native-macos-arm64/LICENSE-CC-BY-SA-4.0 text eol=lf whitespace=-blank-at-eof
+
+# Implementation approval and validation evidence is byte-pinned.
+req/plans/evidence/juffa-implementation-2026-11-22/** -text
+req/native-authored-attributions.json text eol=lf

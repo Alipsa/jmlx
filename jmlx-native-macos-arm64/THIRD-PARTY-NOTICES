@@ -856,3 +856,70 @@ INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
 CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
+
+======== JMLX NATIVE NOTICE SECTION ========
+
+Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)
+
+Creator: Norbert Juffa (Stack Overflow display name: njuffa; user ID 780717)
+Profile: https://stackoverflow.com/users/780717/njuffa
+
+Reviewed source material:
+- Error-function implementation, answer 35148199, revision 4, 2022-06-18:
+  https://stackoverflow.com/a/35148199
+  https://stackoverflow.com/revisions/35148199/4
+- Inverse-error-function implementation, answer 49743348,
+  revision 3, 2021-06-10:
+  https://stackoverflow.com/a/49743348
+  https://stackoverflow.com/revisions/49743348/3
+
+Juffa's covered expression in the reviewed revisions is identified as licensed
+under Creative Commons Attribution-ShareAlike 4.0 International (CC BY-SA 4.0):
+https://creativecommons.org/licenses/by-sa/4.0/
+Legal code: https://creativecommons.org/licenses/by-sa/4.0/legalcode.en
+The complete license, including its disclaimer of warranties and limitation of
+liability (section 5), is included at META-INF/LICENSE-CC-BY-SA-4.0.
+
+Material identified in reviewed MLX v0.32.4 source
+(36969c094354086e15d2a327a9c50feb20b9cf11):
+- mlx/backend/metal/kernels/erf.h: erf and erfinv
+- mlx/backend/cpu/simd/math.h: erfinv
+The reviewed headers hash-match those installed by the pinned mlx-metal 0.32.4
+wheel. This is a source/wheel association, not a reproducible rebuild or a
+complete binary compilation record. The reviewed distribution includes the
+corresponding material in libmlx.dylib and mlx.metallib.
+
+The reviewed answer revision notes report improved core approximation accuracy
+and matching description updates (erf r4), and improved polynomial approximation
+accuracy (erfinv r3).
+
+Modifications visible in the reviewed material include Metal translation,
+Metal math intrinsics, and CPU SIMD/vectorized evaluation. Metal erf uses the
+separately attributed expm1f implementation; that substitution is recorded in
+MLX commit 634b148dd4203f80b8cc8db3e33452a91785fad8. This is not a complete
+reconstruction of the implementation history. jmlx redistributes the identified
+vendor libmlx.dylib and mlx.metallib bytes without changing those files.
+
+Retained Apple file-header notices:
+- Copyright © 2023 Apple Inc. -- Metal erf.h
+- Copyright © 2024 Apple Inc. -- CPU simd/math.h
+The existing MLX MIT grant for Apple/MLX contributions is retained in the
+MLX and JACCL notice section. Other supplied upstream notices remain applicable.
+No endorsement by Norbert Juffa, Apple or Stack Overflow is implied.
+
+Redistribution basis and scope:
+jmlx relies on the direct CC BY-SA 4.0 grant for Juffa's covered expression and
+the existing MIT grant for Apple/MLX contributions. Its owner interprets the
+section 2(a)(5)(A) offer as continuing for Juffa's expression retained in these
+adaptations, with (B) providing an additional offer. The adapter-license
+condition in (B) remains the unresolved counterargument to this interpretation.
+No CC adapter's license is identified. MIT is not presented as one.
+
+The scoped CC identification concerns Juffa's covered expression in the three
+reviewed functions and their corresponding compiled forms. It does not assert
+an MIT-only license for Juffa's expression, or place other MLX functions,
+the entire combined binaries, or jmlx Java code under CC merely because they
+are distributed together. Those contributions retain their applicable terms.
+Downstream recipients must retain the applicable notices and license terms;
+jmlx imposes no additional terms or technological measures restricting the
+exercise of the rights granted for the covered material.

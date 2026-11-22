@@ -400,5 +400,12 @@
       "sha256": "84d86eecdea022cdd63b5dcac25ae0586a627ee3f722bf9c972b4170ff11ae35",
       "size": 1793
     }
+  },
+  "scopeWordingImplementation": {
+    "date": "2026-11-22",
+    "acceptanceRecord": "req/plans/evidence/juffa-implementation-2026-11-22/acceptance.json",
+    "report": "req/plans/phase8-4-license-compliance-implementation.md",
+    "metadata": "Six scoped POM entries implemented; component examples are illustrative and reference-only notices are separately identified.",
+    "status": "Final literal metadata, owner downstream-terms conclusion and new-candidate artifact validation pending; both findings remain open."
   }
 }

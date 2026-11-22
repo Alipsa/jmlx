@@ -1,0 +1,229 @@
+{
+  "schema": 1,
+  "date": "2026-11-22",
+  "status": "implementation verified locally; final literal metadata/downstream review and new candidate validation pending",
+  "baseCommit": "0cc1ca63311d6c5ca8f8168dffac99d8a7529563",
+  "noticeCommit": "551eebeeb66a80ef3af467a6c1b4995c2a7f7034",
+  "noticePermalink": "https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
+  "acceptanceRecord": "req/plans/evidence/juffa-implementation-2026-11-22/acceptance.json",
+  "verificationInputSha256": {
+    "jmlx-native-macos-arm64/build.gradle": "ce3aab26648c300d145d1ca021d91375e3cea4b7d7e00c197259027ada79c674",
+    "req/native-license-inventory.json": "07f50ebdf90df419a6a0642b361979ff95e02ed4d36ed3a91ca25f471da09259",
+    "req/native-authored-attributions.json": "458fda282f777e1ff135380e962fb0ab4749a4baab60fac3af25711e2ffa4e3c",
+    "tools/release-all/release_inputs.py": "818ef3e9224c9d205885807ad8d33639cd65340662aeea3a290a88639c33b305",
+    "tools/release-all/audit_native_licenses.py": "c24180152db55bdbda9fe691cc48f1f7a1e972fb81bac669769f35dfd8341fbc",
+    "tools/release-all/native_suites.py": "812c5cc8475b17a395278d2247eca1e63fe0d97eadb1ba5ef4411f9e59218913",
+    "tools/release-smoke/native-pom-licenses.gradle": "dace3bccb219e232b28684c02697c86d776333393a012badc7fe85405ba155d8",
+    "tools/release-smoke/native-legal-texts.gradle": "40ff188a8bd5a4f0b7d50863151190267cbb0f8874b5cbb9adf0f55c50cd795d",
+    "tools/release-smoke/smoke-conventions.gradle": "75a669bf40b199c54d6c29dd66541005049aa40cbcfcf1e53b21b4dd5d3ffa6e",
+    "tools/release-all/tests/test_native_licenses.py": "470fe52bf0316336d7c97eb8c15224c255eb62747f60cca942d978d24e10872e",
+    "tools/release-all/tests/test_native_publish.py": "5264a242320afcbf823236c9d3075841677085fff1b3634727a8c6a18ba51df1",
+    "tools/release-all/tests/test_final_receipt.py": "4cf9cf254cd12fb1a635fadc865ac4cccda0de2f29cb8e742d89c542a41901c9",
+    "tools/release-all/tests/test_release_inputs.py": "fbdcec489e9b5f59e82e3365e1418331603263e86ecadd6153ba359d4568b8a6",
+    "tools/release-all/tests/native_license_fixtures.py": "c6bb72a22e891f7a9bc09c0957e852ca94edc378d16d692f22302f835a6bffe6",
+    "tools/release-all/tests/fixtures/native-pom/stale-permalink.pom": "98cc2972c57d1fa5f31e3c2049f7713831bc5248b783d6639da1c1a0d4bd3369",
+    "tools/release-all/tests/fixtures/native-pom/changed-comment.pom": "9de8f1a04b0a55a144e86a28ba889a9480b9132d87889cd25cd990e69d11ebdc",
+    "tools/release-all/tests/fixtures/native-pom/missing-entry.pom": "946202233cac9a465e57e2671d8210a43712be7d581d37718e5ddddff52f9572",
+    "tools/release-all/tests/fixtures/native-pom/foreign-namespace.pom": "5cae5195cb5e451b9bf3e43e48e68fa23abe814a60387c2b477703b363e6223d",
+    "tools/release-all/tests/fixtures/native-pom/changed-name.pom": "7c9fd675b50cde1c899a364fb83d687096b075ae33d5d717d0c86f65a8632785",
+    "tools/release-all/tests/fixtures/native-pom/missing-comment.pom": "8aac17d5fecf97e5ed132c6ed465c6ae59ccc4377c12eef71260f74cbc7ef6b5",
+    "tools/release-all/tests/fixtures/native-pom/changed-url.pom": "3c9be16ae97337aae2d4d9cb65e310a21da07b236925260c8c3874832409dc45",
+    "tools/release-all/tests/fixtures/native-pom/duplicate-entry.pom": "dd2ec5cdcd99ed49bcb8fa01f5d8f10af857d43b5959c62349b447339de171b5",
+    "tools/release-all/tests/fixtures/native-pom/doctype.pom": "c9e90de2353d5f9deadff859114fd680793b45c319cfa6731f4513e9cfd6e0c6",
+    "tools/release-all/tests/fixtures/native-pom/build.gradle": "70c18b37f50ccc4c4efdf68728b47663bef06c90b1f76e4ff8befc0d88b619c7",
+    "tools/release-all/tests/fixtures/native-pom/valid.pom": "ebb2cbffd88771be9929cd4d44210715a5b788a5a3c43234698d5cbae545c4ec",
+    "tools/release-all/tests/fixtures/native-pom/settings.gradle": "c5919715f83d01aee4fc8429c7c20a83c05dfd6f407b299f040724fcf42cf017"
+  },
+  "artifacts": {
+    "req/plans/evidence/juffa-implementation-2026-11-22/native-pom.xml": {
+      "sha256": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
+      "bytes": 4149
+    },
+    "req/plans/evidence/juffa-implementation-2026-11-22/native-module.json": {
+      "sha256": "e8c0cd6775c976fb3013a99df55154f11197c6c13e466dc2efbfd333c800a594",
+      "bytes": 3584
+    },
+    "req/plans/evidence/juffa-implementation-2026-11-22/literal-cc-pom-comment.txt": {
+      "sha256": "a3a73b5f35de3f1b73004de6957d6abc6abf43ae2790acdb4623396122428a9a",
+      "bytes": 562
+    },
+    "req/plans/evidence/juffa-implementation-2026-11-22/source-notice-report.json": {
+      "sha256": "84639963a0b7788784850ba781eccf399608370a29f4602d554e4fd8915d6697",
+      "bytes": 5257
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0.jar": {
+      "sha256": "cfbb7d71615727d5e5a2e84e6816c4680f1ae61f21d1a3bb5f51c91dc3eaea80",
+      "bytes": 77829121
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-sources.jar": {
+      "sha256": "5d3ed16e5dcb2127be30ff1cd94779c5e10404ccad5c465dd7276d8f1d9f73ea",
+      "bytes": 23572
+    },
+    "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-javadoc.jar": {
+      "sha256": "78c9ceb3bbae86b43ac96abd34f3cd05d80f3971574d02f69dd10573e7bf0728",
+      "bytes": 4175517
+    }
+  },
+  "checks": [
+    {
+      "name": "root-check",
+      "command": "./gradlew check",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/root-check.log",
+      "sha256": "4258905ece35fb62ccc85722c3a8aa1a0751079c29100e9e4d9ab3da0d590245"
+    },
+    {
+      "name": "buildsrc-check",
+      "command": "./gradlew -p buildSrc check",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/buildsrc-check.log",
+      "sha256": "cd3136fc77472f9b38be26959c9d791b6b348ffc0af52d4a5da34d56ae271470"
+    },
+    {
+      "name": "native-payload",
+      "command": "./gradlew :jmlx-native-macos-arm64:verifyNativeReleasePayload",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/native-payload.log",
+      "sha256": "ad237dd604efab9d773e87e056f605faf2e5fe467483f37b32c0b8618cfbeacd"
+    },
+    {
+      "name": "macos-release-regressions",
+      "command": "bash tools/release-all/selftest.sh",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/macos-release-regressions.log",
+      "sha256": "5375a08c5ba54b4eaeb9f049a4aafe4d41011e93ae645977f4952cd79503e878"
+    },
+    {
+      "name": "linux-release-regressions",
+      "command": "linux-exec bash -lc \"cd /projects/jmlx && bash tools/release-all/selftest.sh\"",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/linux-release-regressions.log",
+      "sha256": "6603bf7e9881134802218f74d1b69930b8564be35d0445c7c2fd8a25c9514071"
+    },
+    {
+      "name": "macos-full-smoke",
+      "command": "bash tools/release-smoke/run.sh ci --profile all",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/macos-full-smoke.log",
+      "sha256": "72dbd82a06a9e6b073558ee30642d73665f0cd30c5d928dcfcc328258fab8369"
+    },
+    {
+      "name": "linux-pure-smoke",
+      "command": "linux-exec bash -lc \"cd /projects/jmlx && bash tools/release-smoke/run.sh ci --profile pure-java\"",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/linux-pure-smoke.log",
+      "sha256": "d75f6479f84f849ab00a5a26c8080ff4167b0d887efc4f5727f90bab00ea6300"
+    },
+    {
+      "name": "final-native-focused",
+      "command": "JMLX_RELEASE_TEST_GRADLE=<pinned Gradle> python3 -m unittest discover -s tools/release-all/tests -p test_native_licenses.py -v",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/final-native-focused.log",
+      "sha256": "799adc26114692d28975441ba41ada67359376b569316c72569022900db2b935"
+    },
+    {
+      "name": "final-receipt-focused",
+      "command": "python3 -m unittest discover -s tools/release-all/tests -p test_final_receipt.py",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/final-receipt-focused.log",
+      "sha256": "9b0476c2658047331efa78ea0cee3374f1846136ba47c7a3be76d92caa293629"
+    },
+    {
+      "name": "linux-final-native-focused",
+      "command": "linux-exec bash -lc \"cd /projects/jmlx && python3 -m unittest discover -s tools/release-all/tests -p test_native_licenses.py\"",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/linux-final-native-focused.log",
+      "sha256": "a0ff1e825b9d611d836a06237306dd813842426d19979d9fde0bedb4819c2fdb"
+    },
+    {
+      "name": "premerge-ancestry-refusal",
+      "command": "./gradlew :jmlx-native-macos-arm64:verifyNativeReleaseLicenses",
+      "exitCode": 1,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/premerge-ancestry-refusal.log",
+      "sha256": "74d516c4e6c51997fd32308b8849cba3dd886e40791288a7ff3da482086df81b"
+    },
+    {
+      "name": "smoke-parser-preflight",
+      "command": "bash tools/release-smoke/selftest.sh",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/smoke-parser.log",
+      "sha256": "116364182c3f7188f536f63ceed8df1c6a0ce8ed64ac46b4a8771f462f356173"
+    },
+    {
+      "name": "missing-origin-macos-focused",
+      "command": "python3 -m unittest discover -s tools/release-all/tests -p test_native_licenses.py -v",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/missing-origin-macos-focused.log",
+      "sha256": "e4c1f84203519cc6a9c033c38aed5a452f8cee12f30b6e7afda772ce355bd007"
+    },
+    {
+      "name": "missing-origin-linux-focused",
+      "command": "linux-exec bash -lc \"cd /projects/jmlx && python3 -m unittest discover -s tools/release-all/tests -p test_native_licenses.py\"",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/missing-origin-linux-focused.log",
+      "sha256": "e5d0d4b88af016077abc587a6bb01fbb15549af3c382213c9ecdc2a44831b323"
+    },
+    {
+      "name": "missing-origin-receipt-focused",
+      "command": "python3 -m unittest discover -s tools/release-all/tests -p test_final_receipt.py",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/missing-origin-receipt-focused.log",
+      "sha256": "7257ee4ee92ade9e4fd2a2271944250ba83c1155410ca30b94c9c9663661c8a2"
+    }
+  ],
+  "regressions": {
+    "macosFullSuite": {
+      "tests": 107,
+      "skipped": 0,
+      "seconds": 86.559
+    },
+    "linuxArm64FullSuite": {
+      "tests": 107,
+      "skipped": 0,
+      "seconds": 81.421
+    },
+    "finalFocused": {
+      "macosNative": 25,
+      "macosReceipt": 13,
+      "linuxNative": 25,
+      "linuxNativeSkipped": 1
+    },
+    "note": "Full suites include real independent Groovy POM/legal-text mutation fixtures and unstaged-publish refusal. Final focused suites were rerun after replacing checkout-history fixtures with synthetic history and adding revision-identity/task-outcome cases. The final Linux focused run omits only the Groovy fixture already exercised by the full Linux suite."
+  },
+  "expectedPremergeFailure": "The actual explicit release task rejects the known notice commit as not an ancestor of refs/remotes/origin/main, without a fetch suggestion. Missing history has a separate fetch diagnostic. Synthetic-history CLI fixtures prove local main cannot authorize a commit absent from origin/main and stale local main does not cause rejection. Fetch origin and rerun the actual task after merge, before tagging.",
+  "limits": [
+    "Local packaging and consumer smoke artifacts are not a signed immutable release candidate.",
+    "Root/buildSrc checks include ordinary up-to-date tasks; no claim of a fresh release test invocation is made.",
+    "Raw logs under build/ are local gitignored provenance, not committed replay inputs.",
+    "Final literal POM/module/comment hashes are supplied for owner review, not marked approved here.",
+    "Both license findings and the release gate remain open; RC1 and its receipts are unchanged.",
+    "No candidate tag, classifier, external release asset or publication was created."
+  ],
+  "releaseReady": false,
+  "reviewFixes": {
+    "date": "2026-11-22",
+    "pr": 114,
+    "changes": [
+      "Use fetched origin/main, not local main, for the reviewed ancestry gate.",
+      "Distinguish merge-base exit 1 non-ancestry from missing history and name the failing ref.",
+      "Restore the BSD-forum-samples and future-jmlx-changes conditions in the owner record.",
+      "Give all six producer license lookups an explicit missing-entry diagnostic.",
+      "Construct the Python CC comment from the single approved permalink constant; retain independent Groovy literals.",
+      "Remove duplicate per-JAR authored validation in check_bundle."
+    ],
+    "generatedPomBytesUnchanged": true,
+    "validation": "Full 105-test suites pass on macOS and Linux ARM64, including synthetic local/remote-main divergence, missing-history/non-ancestor CLI diagnostics and real Gradle POM name drift.",
+    "shallowHistoryAndOriginFollowup": {
+      "changes": [
+        "Reject shallow repositories with the full-history diagnostic before testing ancestry, even when the linked commit object exists.",
+        "Require origin to identify Alipsa/jmlx on GitHub using canonical HTTPS or Git SSH URLs.",
+        "Rewrap both README prose passages; check all newly added prose lines there against 100 columns."
+      ],
+      "validation": "All 107 release tests pass on macOS and Linux ARM64. The shallow clone has the linked object and Git returns ancestry exit 1; explicit verification reports truncated history, then passes after unshallowing. Wrong repository/fork origins are rejected; canonical URL forms pass. The real checkout retains the expected pre-merge non-ancestor error."
+    },
+    "missingOriginFollowup": {
+      "change": "Catch git remote get-url origin failures separately and use the same repository-configuration error as a wrong URL, without fetch advice.",
+      "validation": "Helper and CLI missing-origin regressions pass. Focused native suites run 27 tests on macOS and Linux ARM64, each skipping only the unchanged Groovy fixture already covered by the prior full suites; all 13 receipt tests pass. No packaging or Groovy behavior changed."
+    }
+  }
+}

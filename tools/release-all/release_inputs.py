@@ -3,6 +3,7 @@
 
 import argparse
 import hashlib
+import io
 import json
 import os
 import re
@@ -33,10 +34,53 @@ MODULE_KEYS = {
 PURE = set(list(MODULE_KEYS)[:3])
 NATIVE_FILES = ("libmlxc.dylib", "libmlx.dylib", "libjaccl.dylib", "mlx.metallib",
                 "native-pin.properties")
-REQUIRED_NATIVE_LEGAL_TEXTS = {"LICENSE", "NOTICE", "LICENSE-APACHE-2.0", "THIRD-PARTY-NOTICES"}
+REQUIRED_NATIVE_LEGAL_TEXTS = {"LICENSE", "NOTICE", "LICENSE-APACHE-2.0", "THIRD-PARTY-NOTICES",
+                               "LICENSE-CC-BY-SA-4.0"}
 UPSTREAM_PATH = (b"/Users/runner/work/mlx/mlx/build/temp.macosx-11.0-arm64-cpython-310/"
                  b"mlx.core/mlx/backend/metal/kernels//mlx.metallib")
 UPSTREAM_MLX_HASH = "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6"
+
+ROOT = Path(__file__).resolve().parents[2]
+NOTICE_SEPARATOR = b"======== JMLX NATIVE NOTICE SECTION ========"
+REQUIRED_NATIVE_AUTHORED_SECTIONS = frozenset({'Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)'})
+REQUIRED_AUTHORED_FIELDS = {"creator", "profile", "revisions", "license", "modifications", "scope"}
+APPROVED_NOTICE_PERMALINK = 'https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES'
+REQUIRED_NATIVE_POM_LICENSES = (('MIT License',
+  'https://opensource.org/license/mit',
+  'Applies to the jmlx native artifact code, mlx-c, Apple/MLX contributions covered by their '
+  'existing MIT grants, and the other MIT components listed in META-INF/THIRD-PARTY-NOTICES, '
+  'including nlohmann/json, fmt, gguf-tools, FP16 and supervised-lda. MIT notices are also '
+  'retained there for the opt_einsum algorithm attribution and VkFFT algorithm reference. The '
+  'reviewed Juffa expression has separately identified CC BY-SA 4.0 terms.'),
+ ('Apache License, Version 2.0',
+  'https://www.apache.org/licenses/LICENSE-2.0.txt',
+  'Applies to Apache-2.0 components identified in META-INF/THIRD-PARTY-NOTICES, including vendored '
+  'metal-cpp compiled into libmlx.dylib and the NVIDIA/Filipe RNC Maia cexpf and TensorFlow '
+  'adaptations. An Apache-2.0 notice is also retained there for the JAX Threefry algorithm '
+  'reference.'),
+ ('Creative Commons Attribution-ShareAlike 4.0 International',
+  'https://creativecommons.org/licenses/by-sa/4.0/',
+  "Applies to Norbert Juffa's covered expression in the reviewed Metal erf and Metal/CPU SIMD "
+  'erfinv material, including corresponding compiled forms in libmlx.dylib and mlx.metallib. '
+  "Apple/MLX contributions rely separately on existing MIT grants. No CC adapter's license is "
+  'identified. See '
+  f'<{APPROVED_NOTICE_PERMALINK}> '
+  '(scope and redistribution basis), also packaged in META-INF/THIRD-PARTY-NOTICES. The complete '
+  'CC license is packaged in META-INF/LICENSE-CC-BY-SA-4.0.'),
+ ('BSD 2-Clause License',
+  'https://opensource.org/license/bsd-2-clause',
+  'Applies to BSD-2-Clause material identified in META-INF/THIRD-PARTY-NOTICES, including Norbert '
+  'Juffa expm1f.'),
+ ('BSD 3-Clause License',
+  'https://opensource.org/license/bsd-3-clause',
+  'Applies to BSD-3-Clause components identified in META-INF/THIRD-PARTY-NOTICES, including '
+  'pocketfft, V8, NumPy, fastermath and PyTorch (including Metal hypot). BSD-3-Clause notices are '
+  'also retained there for the Random123 Threefry attribution and CUB merge-sort algorithm '
+  'reference.'),
+ ('zlib License',
+  'https://opensource.org/license/zlib',
+  'Applies to zlib components identified in META-INF/THIRD-PARTY-NOTICES, including ThreadPool and '
+  'the Julien Pommier NEON math adaptation.'))
 
 
 def sha256(path):
@@ -219,13 +263,206 @@ def verify_smoke_environment(kind, env, supported_minimum, run_id=None):
         raise ValueError(error)
 
 
+def raw_notice_sections(data):
+    """Extract untouched sections using only complete LF/CRLF separator lines."""
+    boundaries = []
+    offset = 0
+    physical = data.split(b"\n")
+    for number, part in enumerate(physical, 1):
+        terminated = number < len(physical)
+        line = part[:-1] if part.endswith(b"\r") else part
+        if line.rstrip(b" \t") == NOTICE_SEPARATOR:
+            if line != NOTICE_SEPARATOR:
+                raise ValueError(f"malformed-separator at line {number}")
+            if terminated:
+                boundaries.append((offset, offset + len(part) + 1))
+        offset += len(part) + (1 if terminated else 0)
+    result = {}
+    for index, (_, start) in enumerate(boundaries):
+        end = boundaries[index + 1][0] if index + 1 < len(boundaries) else len(data)
+        section = data[start:end]
+        title = None
+        for part in section.split(b"\n"):
+            line = part[:-1] if part.endswith(b"\r") else part
+            text = line.decode("utf-8", errors="strict")
+            if not text.strip(" \t"):
+                continue
+            first = text.lstrip(" \t")
+            if first[0].isspace():
+                raise ValueError("unsupported-leading-whitespace before native notice title")
+            title = text
+            break
+        if title is None:
+            raise ValueError("empty native notice section")
+        if title in result:
+            raise ValueError(f"duplicate native notice section: {title}")
+        result[title] = section
+    return result
+
+
+def authored_policy(root=ROOT):
+    """Validate authored policy coverage and its independently pinned approval evidence."""
+    root = Path(root)
+    try:
+        policy = read_json(root / "req/native-authored-attributions.json")
+    except OSError as error:
+        raise ValueError("required native authored-attribution policy missing") from error
+    sections = policy.get("sections", [])
+    titles = [entry.get("title") for entry in sections]
+    if (policy.get("schema") != 1 or len(titles) != len(set(titles))
+            or set(titles) != REQUIRED_NATIVE_AUTHORED_SECTIONS):
+        raise ValueError("required native authored-attribution policy coverage differs")
+    evidence = policy.get("evidence")
+    if not isinstance(evidence, list) or not evidence:
+        raise ValueError("authored policy lacks approval evidence")
+    checked = set()
+    for entry in evidence:
+        path = root / entry["path"]
+        if (not path.resolve().is_relative_to(root.resolve()) or not path.is_file()
+                or sha256(path) != entry["sha256"]):
+            raise ValueError(f"authored policy evidence differs: {entry['path']}")
+        checked.add(entry["path"])
+    decision = root / policy["decision"]
+    if not decision.resolve().is_relative_to(root.resolve()) or not decision.is_file():
+        raise ValueError("authored policy decision record missing")
+    for entry in sections:
+        fields = entry.get("requirements", {})
+        if set(fields) != REQUIRED_AUTHORED_FIELDS:
+            raise ValueError("authored policy required fields differ")
+        for value in fields.values():
+            fragments = value if isinstance(value, list) else [value]
+            if not fragments or any(not isinstance(x, str) or not x.strip() for x in fragments):
+                raise ValueError("invalid authored policy requirement")
+        if entry.get("approvedManifest") not in checked:
+            raise ValueError("authored policy manifest is not pinned evidence")
+        approved = read_json(root / entry["approvedManifest"])
+        artifact = next((a for a in approved.get("artifacts", [])
+                         if a.get("path") == "juffa-notice-candidate.txt"), {})
+        if entry.get("sectionSha256") != artifact.get("sectionSha256"):
+            raise ValueError("authored section digest differs from approved manifest")
+        if not entry.get("upstreamSources"):
+            raise ValueError("authored policy upstream evidence missing")
+    return policy
+
+
+def check_authored_attribution(data, root=ROOT):
+    """Check authored text without pretending it is an upstream excerpt."""
+    sections = raw_notice_sections(data)
+    if not REQUIRED_NATIVE_AUTHORED_SECTIONS <= sections.keys():
+        raise ValueError("required native authored notice section missing")
+    policy = authored_policy(root)
+    result = {}
+    for entry in policy["sections"]:
+        section = sections[entry["title"]]
+        text = section.decode("utf-8", errors="strict")
+        for key, value in entry["requirements"].items():
+            for fragment in value if isinstance(value, list) else [value]:
+                if fragment not in text:
+                    raise ValueError(f"authored attribution missing {key}: {entry['title']}")
+        digest = hashlib.sha256(section).hexdigest()
+        if digest != entry["sectionSha256"]:
+            raise ValueError("authored attribution raw section differs from approved bytes")
+        result[entry["title"]] = digest
+    return result
+
+
+def native_pom_report(data):
+    """Compare complete literal license tuples independently of producer Gradle logic."""
+    if b"<!DOCTYPE" in data.upper() or b"<!ENTITY" in data.upper():
+        raise ValueError("native POM document declarations are forbidden")
+    try:
+        project = ElementTree.fromstring(data)
+    except ElementTree.ParseError as error:
+        raise ValueError("invalid native POM XML") from error
+    namespace = "{http://maven.apache.org/POM/4.0.0}" if project.tag.startswith("{") else ""
+    if project.tag != namespace + "project":
+        raise ValueError("invalid native POM root")
+    groups = project.findall(namespace + "licenses")
+    if len(groups) != 1:
+        raise ValueError("native POM license entries differ")
+    actual = []
+    for entry in groups[0]:
+        fields = [child.tag for child in entry]
+        if (entry.tag != namespace + "license" or len(fields) != 3
+                or set(fields) != {namespace + key for key in ("name", "url", "comments")}
+                or any(len(child) for child in entry)):
+            raise ValueError("native POM license fields differ")
+        actual.append(tuple(entry.findtext(namespace + key, "") for key in ("name", "url", "comments")))
+    if len(set(actual)) != len(actual) or sorted(actual) != sorted(REQUIRED_NATIVE_POM_LICENSES):
+        raise ValueError("native POM license entries differ from approved literal tuples")
+    return {"licenses": len(actual), "noticePermalink": APPROVED_NOTICE_PERMALINK}
+
+
+def verify_notice_permalink(root, data, *, reviewed_ref="refs/remotes/origin/main",
+                            candidate_ref="HEAD"):
+    """Require the linked commit in fetched origin/main and candidate history, then compare bytes."""
+    root = Path(root)
+    match = re.fullmatch(r"https://github.com/Alipsa/jmlx/blob/([0-9a-f]{40})/"
+                         r"jmlx-native-macos-arm64/THIRD-PARTY-NOTICES", APPROVED_NOTICE_PERMALINK)
+    if not match:
+        raise ValueError("invalid approved notice permalink")
+    commit = match[1]
+    local = raw_notice_sections(data)
+    def git(*args):
+        return subprocess.check_output(["git", "-C", str(root), *args], stderr=subprocess.PIPE)
+    try:
+        if git("rev-parse", "--is-shallow-repository").strip() == b"true":
+            raise ValueError("approved notice history unavailable; shallow checkout requires "
+                             "full history: run git fetch --unshallow origin before explicit "
+                             "release verification")
+        origin_error = ("origin must point to Alipsa/jmlx on github.com for approved "
+                        "notice verification")
+        try:
+            origin = git("remote", "get-url", "origin").decode("utf-8").strip()
+        except subprocess.CalledProcessError as error:
+            raise ValueError(origin_error) from error
+        if not re.fullmatch(r"(?:https://github\.com/|ssh://git@github\.com/|git@github\.com:)"
+                            r"Alipsa/jmlx(?:\.git)?/?", origin, flags=re.IGNORECASE):
+            raise ValueError(origin_error)
+        git("cat-file", "-e", commit + "^{commit}")
+        for ref in (reviewed_ref, candidate_ref):
+            git("rev-parse", "--verify", ref + "^{commit}")
+            try:
+                git("merge-base", "--is-ancestor", commit, ref)
+            except subprocess.CalledProcessError as error:
+                if error.returncode == 1:
+                    raise ValueError(f"linked notice commit is not an ancestor of {ref}") from error
+                raise
+        linked = raw_notice_sections(git("show", commit + ":jmlx-native-macos-arm64/THIRD-PARTY-NOTICES"))
+    except subprocess.CalledProcessError as error:
+        raise ValueError("approved notice history unavailable; fetch origin/main and "
+                         "the linked commit before explicit release verification") from error
+    for title in REQUIRED_NATIVE_AUTHORED_SECTIONS:
+        if title not in local or title not in linked or local[title] != linked[title]:
+            raise ValueError("stale approved notice permalink: raw section bytes differ or missing")
+    return commit
+
+
+def native_release_licenses(root, pom, jars):
+    """Explicit pre-tag verification, separate from candidate-only bundle guards."""
+    root = Path(root)
+    if len(jars) != 3 or len({Path(jar).resolve() for jar in jars}) != 3:
+        raise ValueError("exactly three distinct native jars are required")
+    report = native_pom_report(Path(pom).read_bytes())
+    local = (root / "jmlx-native-macos-arm64/THIRD-PARTY-NOTICES").read_bytes()
+    check_authored_attribution(local, root)
+    report["noticeCommit"] = verify_notice_permalink(root, local)
+    inventory = read_json(root / "req/native-license-inventory.json")
+    for jar in jars:
+        native_notice_report(jar, inventory, root=root)
+        with zipfile.ZipFile(jar) as archive:
+            verify_notice_permalink(root, archive.read("META-INF/THIRD-PARTY-NOTICES"))
+    report["checkedJars"] = [Path(jar).name for jar in jars]
+    return report
+
+
 def validate_native_legal_inventory(inventory):
     texts = inventory.get("packagedTexts")
     if not isinstance(texts, dict) or not REQUIRED_NATIVE_LEGAL_TEXTS <= texts.keys():
         raise ValueError("native license inventory lacks required packaged texts")
 
 
-def native_notice_report(jar, inventory, forbidden=(), *, skip_native_payload=False):
+def native_notice_report(jar, inventory, forbidden=(), *, skip_native_payload=False, root=ROOT):
     """Check reviewed legal texts in either the runtime or documentation artifact."""
     validate_native_legal_inventory(inventory)
     with zipfile.ZipFile(jar) as archive:
@@ -241,6 +478,7 @@ def native_notice_report(jar, inventory, forbidden=(), *, skip_native_payload=Fa
             if not data.strip() or hashlib.sha256(data).hexdigest() != digest:
                 raise ValueError(f"{jar}: native legal text differs from reviewed inventory: {name}")
             result[name] = digest
+        check_authored_attribution(archive.read("META-INF/THIRD-PARTY-NOTICES"), root)
         for entry in archive.infolist():
             if skip_native_payload and entry.filename in {
                     "se/alipsa/jmlx/native/macos-aarch64/" + name for name in NATIVE_FILES}:
@@ -255,7 +493,8 @@ def native_notice_report(jar, inventory, forbidden=(), *, skip_native_payload=Fa
 
 def native_jar_report(jar, bootstrap, forbidden):
     inventory = read_json(Path(bootstrap).resolve().parents[1] / "req/native-license-inventory.json")
-    native_notice_report(jar, inventory, forbidden, skip_native_payload=True)
+    native_notice_report(jar, inventory, forbidden, skip_native_payload=True,
+                         root=Path(bootstrap).resolve().parents[1])
     with tempfile.TemporaryDirectory(prefix="jmlx-native-verify-") as temp:
         with zipfile.ZipFile(jar) as archive:
             names = archive.namelist()
@@ -369,6 +608,15 @@ def check_bundle(bundle, record_path, record_hash, manifest_path, root):
             for suffix in (".pom", ".module", ".jar", "-sources.jar", "-javadoc.jar"):
                 if prefix + suffix not in names or prefix + suffix + ".asc" not in names:
                     raise ValueError(f"bundle missing artifact/signature: {prefix + suffix}")
+            if name == "jmlx-native-macos-arm64":
+                native_pom_report(archive.read(prefix + ".pom"))
+                inventory = read_json(Path(root) / "req/native-license-inventory.json")
+                for suffix in (".jar", "-sources.jar", "-javadoc.jar"):
+                    jar_bytes = archive.read(prefix + suffix)
+                    native_notice_report(io.BytesIO(jar_bytes), inventory, root=root)
+                    with zipfile.ZipFile(io.BytesIO(jar_bytes)) as jar:
+                        data = jar.read("META-INF/THIRD-PARTY-NOTICES")
+                        verify_notice_permalink(root, data, candidate_ref=tag["sha"])
     return record
 
 
@@ -394,12 +642,18 @@ def main():
     bundle.add_argument("--manifest", type=Path, required=True)
     bundle.add_argument("--root", type=Path, required=True)
     bundle.add_argument("--extract", type=Path)
+    licenses = sub.add_parser("licenses")
+    licenses.add_argument("--root", type=Path, required=True)
+    licenses.add_argument("--pom", type=Path, required=True)
+    licenses.add_argument("--jar", type=Path, action="append", required=True)
     args = parser.parse_args()
     if args.command == "select":
         for name, entry in manifest(args.manifest, args.profile).items():
             print("\t".join((name, entry["version"], entry["source"], MODULE_KEYS[name])))
     elif args.command == "preflight":
         preflight(manifest(args.manifest, args.profile), args.root)
+    elif args.command == "licenses":
+        print(json.dumps(native_release_licenses(args.root, args.pom, args.jar), indent=2))
     elif args.command == "bundle":
         check_bundle(args.bundle, args.record, args.record_sha256, args.manifest, args.root)
         if args.extract:
@@ -413,7 +667,7 @@ def main():
         if args.documentation_jar:
             inventory = read_json(args.bootstrap.resolve().parents[1] / "req/native-license-inventory.json")
             for jar in args.documentation_jar:
-                native_notice_report(jar, inventory, args.forbid)
+                native_notice_report(jar, inventory, args.forbid, root=args.bootstrap.resolve().parents[1])
         print(json.dumps(report, indent=2))
 
 

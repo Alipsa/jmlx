@@ -51,8 +51,20 @@ checkout still builds, but the local native jar intentionally has no bundled run
 published. The publish task refuses to run until the validated staged files and completion marker
 are present.
 
-The main, sources and Javadoc JARs carry `LICENSE`, `NOTICE`, `LICENSE-APACHE-2.0` and
-`THIRD-PARTY-NOTICES` under `META-INF`. Run
+The main, sources and Javadoc JARs carry `LICENSE`, `NOTICE`, `LICENSE-APACHE-2.0`,
+`LICENSE-CC-BY-SA-4.0` and `THIRD-PARTY-NOTICES` under `META-INF`. Run
 `./gradlew :jmlx-native-macos-arm64:verifyNativeReleasePayload` to verify their reviewed digests.
+Before tagging a release, also run
+`./gradlew :jmlx-native-macos-arm64:verifyNativeReleaseLicenses` after `git fetch origin`, with
+`origin/main` and the linked notice commit available locally. This explicit check verifies
+scoped POM terms, approval evidence and notice ancestry/freshness; see the
+[release runbook](../tools/release-all/README.md) for the required history.
 The [Phase 8.4 native license audit](../req/phase8-4-native-license-audit.md) records compiled-in
 dependencies and unresolved provenance findings that must be resolved before release.
+
+## License scope
+
+The native distribution retains MLX's MIT grant for Apple/MLX contributions and separately identifies Norbert Juffa's covered expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material under CC BY-SA 4.0. META-INF/THIRD-PARTY-NOTICES records the reviewed scope, revisions, modifications and redistribution basis; META-INF/LICENSE-CC-BY-SA-4.0 contains the complete CC license. No CC adapter's license is identified. Other bundled material retains its applicable licenses and notices. The owner-approved interpretation and its recorded counterargument are documented in the repository's owner license decision record.
+
+See the [owner decision](../req/phase8-4-owner-license-decision.md) and
+[approved notice](https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES) for the reviewed basis and scope.

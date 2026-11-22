@@ -1,0 +1,61 @@
+plugins { id 'base' }
+apply from: providers.gradleProperty('licenseScript').get()
+tasks.register('verifyFixturePoms') {
+    doLast {
+        fileTree(projectDir) { include '*.pom' }.files.sort().each { pom ->
+            def passed = false
+            try {
+                verifyNativePomLicenseBytes(pom.bytes)
+                passed = true
+            } catch (Exception rejected) {
+                if (pom.name == 'valid.pom') throw rejected
+            }
+            if (passed != (pom.name == 'valid.pom')) {
+                throw new GradleException("Unexpected POM fixture result: ${pom.name}")
+            }
+        }
+    }
+}
+
+tasks.register('verifyLegalMutations') {
+    doLast {
+        def root = file(providers.gradleProperty('repositoryRoot').get())
+        apply from: new File(root, 'tools/release-smoke/native-legal-texts.gradle')
+        def inventory = new groovy.json.JsonSlurper().parse(new File(root, 'req/native-license-inventory.json'))
+        def policy = new groovy.json.JsonSlurper().parse(new File(root, 'req/native-authored-attributions.json'))
+        def texts = inventory.packagedTexts.collectEntries { name, digest ->
+            [(name): new File(root, "jmlx-native-macos-arm64/${name}").bytes]
+        }
+        verifyNativeLegalTexts(texts, inventory, policy)
+        def expectRejected = { changedTexts, changedInventory, changedPolicy ->
+            def rejected = false
+            try { verifyNativeLegalTexts(changedTexts, changedInventory, changedPolicy) }
+            catch (GradleException expected) { rejected = true }
+            if (!rejected) throw new GradleException('Native legal mutation unexpectedly accepted')
+        }
+        def copy = { value -> new groovy.json.JsonSlurper().parseText(groovy.json.JsonOutput.toJson(value)) }
+        def changedTexts = new LinkedHashMap(texts)
+        def changedInventory = copy(inventory)
+        changedTexts.remove('LICENSE-CC-BY-SA-4.0')
+        changedInventory.packagedTexts.remove('LICENSE-CC-BY-SA-4.0')
+        expectRejected(changedTexts, changedInventory, policy)
+        def changedPolicy = copy(policy)
+        changedTexts = new LinkedHashMap(texts)
+        changedInventory = copy(inventory)
+        changedPolicy.sections = []
+        def notice = new String(texts['THIRD-PARTY-NOTICES'], java.nio.charset.StandardCharsets.UTF_8)
+        def offset = notice.lastIndexOf('======== JMLX NATIVE NOTICE SECTION ========')
+        changedTexts['THIRD-PARTY-NOTICES'] = notice.substring(0, offset).getBytes('UTF-8')
+        changedInventory.packagedTexts['THIRD-PARTY-NOTICES'] = java.security.MessageDigest
+                .getInstance('SHA-256').digest(changedTexts['THIRD-PARTY-NOTICES']).encodeHex().toString()
+        expectRejected(changedTexts, changedInventory, changedPolicy)
+        ['Creator:', 'No CC adapter', 'Norbert Juffa erf / erfinv adaptations'].each { required ->
+            changedTexts = new LinkedHashMap(texts)
+            changedInventory = copy(inventory)
+            changedTexts['THIRD-PARTY-NOTICES'] = notice.replace(required, 'changed').getBytes('UTF-8')
+            changedInventory.packagedTexts['THIRD-PARTY-NOTICES'] = java.security.MessageDigest
+                    .getInstance('SHA-256').digest(changedTexts['THIRD-PARTY-NOTICES']).encodeHex().toString()
+            expectRejected(changedTexts, changedInventory, policy)
+        }
+    }
+}

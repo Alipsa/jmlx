@@ -19,7 +19,8 @@ class NativePublishTest(unittest.TestCase):
             root = Path(temp)
             module = root / "jmlx-native-macos-arm64"
             module.mkdir()
-            for name in ("build.gradle", "LICENSE", "NOTICE", "LICENSE-APACHE-2.0", "THIRD-PARTY-NOTICES"):
+            for name in ("build.gradle", "LICENSE", "NOTICE", "LICENSE-APACHE-2.0",
+                         "LICENSE-CC-BY-SA-4.0", "THIRD-PARTY-NOTICES"):
                 shutil.copy(ROOT / "jmlx-native-macos-arm64" / name, module)
             (root / "settings.gradle").write_text("rootProject.name='native-publish-fixture'\ninclude 'jmlx-native-macos-arm64'\n")
             with (module / "build.gradle").open("a") as stream:
@@ -42,6 +43,14 @@ publishing.repositories.maven {
             self.assertNotEqual(publish.returncode, 0)
             self.assertIn("Refusing to publish jmlx-native-macos-arm64 without staged native binaries", publish.stdout)
             self.assertFalse(list((root / "build/combined-staging").rglob("*.jar")))
+            build_file = module / "build.gradle"
+            build_file.write_text(build_file.read_text().replace(
+                "name = 'MIT License'", "name = 'Drifted MIT entry'", 1))
+            drifted = subprocess.run(command + [":jmlx-native-macos-arm64:generatePomFileForMavenPublication"],
+                                     env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+            self.assertNotEqual(drifted.returncode, 0)
+            self.assertIn("Expected native POM license entry: MIT License", drifted.stdout)
+            self.assertNotIn("NullPointerException", drifted.stdout)
 
 
 if __name__ == "__main__":

@@ -1,0 +1,69 @@
+// Independent consumer coverage and raw authored-text checks, usable without native execution.
+ext.verifyNativeLegalTexts = { Map texts, Map inventory, Map policy ->
+    // These sets are independent of inventory and policy coverage.
+    def requiredLegal = ['LICENSE', 'NOTICE', 'LICENSE-APACHE-2.0',
+            'LICENSE-CC-BY-SA-4.0', 'THIRD-PARTY-NOTICES'].toSet()
+    def requiredAuthored = [
+            'Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)'].toSet()
+    if (!inventory.packagedTexts.keySet().containsAll(requiredLegal)) {
+        throw new GradleException('Native inventory lacks required legal texts')
+    }
+    if (policy.schema != 1 || policy.sections*.title.toSet() != requiredAuthored ||
+            policy.sections.size() != requiredAuthored.size()) {
+        throw new GradleException('Native authored-attribution policy coverage differs')
+    }
+    if (!texts.keySet().containsAll(requiredLegal)) {
+        throw new GradleException('Required native legal text missing')
+    }
+    def notices = new String(texts['THIRD-PARTY-NOTICES'],
+            java.nio.charset.StandardCharsets.UTF_8)
+    def separator = '======== JMLX NATIVE NOTICE SECTION ========'
+    if ((notices =~ /(?m)^${java.util.regex.Pattern.quote(separator)}[ \t]+\r?$/).find()) {
+        throw new GradleException('Malformed native notice separator')
+    }
+    def sections = [:]
+    def matcher = java.util.regex.Pattern.compile(
+            '(?m)^' + java.util.regex.Pattern.quote(separator) + '\\r?\\n').matcher(notices)
+    def starts = []
+    while (matcher.find()) starts << [matcher.start(), matcher.end()]
+    starts.eachWithIndex { bounds, index ->
+        def end = index + 1 < starts.size() ? starts[index + 1][0] : notices.length()
+        def section = notices.substring(bounds[1], end)
+        def title = section.split('\\r?\\n', -1).find { !it.matches('[ \\t]*') }
+        if (title == null || sections.containsKey(title)) {
+            throw new GradleException('Empty or duplicate native notice section')
+        }
+        sections[title] = section
+    }
+    if (!sections.keySet().containsAll(requiredAuthored)) {
+        throw new GradleException('Required native authored notice missing')
+    }
+    policy.sections.each { requirement ->
+        def section = sections[requirement.title]
+        def requiredFields = ['creator', 'profile', 'revisions', 'license',
+                'modifications', 'scope'].toSet()
+        if (requirement.requirements.keySet() != requiredFields) {
+            throw new GradleException('Native authored policy fields differ')
+        }
+        requirement.requirements.values().each { value ->
+            def fragments = value instanceof List ? value : [value]
+            if (!fragments || fragments.any { !it || !section.contains(it) }) {
+                throw new GradleException('Required authored attribution missing')
+            }
+        }
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+                .digest(section.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                .encodeHex().toString()
+        if (digest != requirement.sectionSha256) {
+            throw new GradleException('Authored attribution bytes differ')
+        }
+    }
+    inventory.packagedTexts.each { name, expected ->
+        def bytes = texts[name]
+        def digest = bytes == null ? null : java.security.MessageDigest.getInstance('SHA-256')
+                .digest(bytes).encodeHex().toString()
+        if (digest != expected) {
+            throw new GradleException("Native notice text differs: ${name}")
+        }
+    }
+}

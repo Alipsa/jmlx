@@ -11,7 +11,8 @@ import urllib.request
 import zipfile
 from pathlib import Path
 
-from release_inputs import native_notice_report, read_json, sha256, validate_native_legal_inventory
+from release_inputs import (authored_policy, check_authored_attribution, native_notice_report,
+                            read_json, sha256, validate_native_legal_inventory)
 
 NOTICE_SEPARATOR = "======== JMLX NATIVE NOTICE SECTION ========"
 
@@ -50,7 +51,13 @@ def source_bytes(entry, cache, wheel):
                         or not isinstance(items[0], dict) or not isinstance(items[0].get("body"), str)
                         or "error_id" in document):
                     raise ValueError(f"unexpected Stack Exchange response: {entry['source']}")
-                data = items[0]["body"].encode("utf-8")
+                item = items[0]
+                if entry.get("revisionGuid") and (
+                        item.get("revision_guid") != entry["revisionGuid"]
+                        or item.get("user", {}).get("user_id") != entry["ownerUserId"]
+                        or item.get("content_license") != entry["contentLicense"]):
+                    raise ValueError("authored upstream revision identity differs")
+                data = item["body"].encode("utf-8")
             fetched = True
     if hashlib.sha256(data).hexdigest() != entry["sha256"]:
         raise ValueError(f"source digest differs: {entry['source']}")
@@ -128,10 +135,18 @@ def verify(root, wheel, cache, jars=()):
         checked.append({"component": entry["component"], "sha256": entry["sha256"]})
     for entry in audit["sourceEvidence"]:
         source_bytes(entry, cache, wheel)
+    authored = check_authored_attribution((legal / "THIRD-PARTY-NOTICES").read_bytes(), root)
+    policy = authored_policy(root)
+    for section in policy["sections"]:
+        for source in section["upstreamSources"]:
+            source_bytes(source, cache, wheel)
     for jar in jars:
-        native_notice_report(jar, inventory)
+        native_notice_report(jar, inventory, root=root)
     return {"schema": 1, "inventorySha256": sha256(root / "req/native-license-inventory.json"),
-            "components": checked, "sourceEvidenceCount": len(audit["sourceEvidence"]),
+            "components": checked, "authoredAttributions": authored,
+            "authoredSourceEvidenceCount": sum(len(entry["upstreamSources"])
+                                              for entry in policy["sections"]),
+            "sourceEvidenceCount": len(audit["sourceEvidence"]),
             "sourceUrlDigestPairs": len({(entry["source"], entry["sha256"])
                                          for entry in inventory["components"] + audit["sourceEvidence"]
                                          if "archiveMember" not in entry}),

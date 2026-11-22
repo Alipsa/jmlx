@@ -1,0 +1,98 @@
+{
+  "schema": 1,
+  "date": "2026-11-22",
+  "reviewer": "Per Nyfelt",
+  "approvalStatement": "I approve the proposed owner conclusion and final metadata in PR #115",
+  "approvedPr": 115,
+  "approvedReviewCommit": "cf31c3390ad0d7657bf5bccc0121948a6cd6ea8d",
+  "approvedReviewFiles": [
+    {
+      "path": "req/phase8-4-native-distribution-review.md",
+      "sha256": "5e49117c7291c4f0964ffe3375ca24453ab7ed9cbc3b221faeb15dba976db7f3"
+    },
+    {
+      "path": "req/plans/evidence/native-distribution-review-2026-11-22/review.json",
+      "sha256": "7310ef9dc422cef631ed8c4d925c8e4a3484a934d7098f704f7ec7ccbe98f8e1"
+    }
+  ],
+  "approvedOwnerConclusion": "I approve the final literal native POM, module metadata and CC comment identified by the\nreview manifest's hashes, together with the retained Cephes implementation notices. Under\nmy recorded conditional MIT/direct-CC interpretation and approved scope, I accept the\nreviewed downstream terms: the original grants, attribution and modification indications\nare retained, and the inspected local distribution surfaces add no jmlx restriction or\ntechnological measure against exercising the covered rights. I retain the recorded\nadapter-license counterargument. This conclusion is conditional on the signed candidate\nand its actual distribution preserving these terms and passing the required artifact,\nconsumer and physical minimum-host validation. Both findings remain open until those\nconditions are met. This does not authorize Maven Central publication.\n",
+  "approvedOwnerConclusionSha256": "95b196262d650292f1f29f9b2d5ab5ef12b7df37ccd566b691d6e2a2717f80c1",
+  "approvedMetadata": [
+    {
+      "path": "req/plans/evidence/juffa-implementation-2026-11-22/native-pom.xml",
+      "sha256": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
+      "bytes": 4149
+    },
+    {
+      "path": "req/plans/evidence/juffa-implementation-2026-11-22/native-module.json",
+      "sha256": "e8c0cd6775c976fb3013a99df55154f11197c6c13e466dc2efbfd333c800a594",
+      "bytes": 3584
+    },
+    {
+      "path": "req/plans/evidence/juffa-implementation-2026-11-22/literal-cc-pom-comment.txt",
+      "sha256": "a3a73b5f35de3f1b73004de6957d6abc6abf43ae2790acdb4623396122428a9a",
+      "bytes": 562
+    }
+  ],
+  "approvedLocalLegalTexts": {
+    "LICENSE-APACHE-2.0": {
+      "sha256": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+      "bytes": 11344
+    },
+    "THIRD-PARTY-NOTICES": {
+      "sha256": "9fd8e909bd2546fbce8159b16b2ff81e560a566dfad5e59fa391330968273b1c",
+      "bytes": 44290
+    },
+    "NOTICE": {
+      "sha256": "25b8aeed4d3120639107a2b197eb8269cf89eed828de7e1f1245f4249422d466",
+      "bytes": 1939
+    },
+    "LICENSE": {
+      "sha256": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9",
+      "bytes": 1063
+    },
+    "LICENSE-CC-BY-SA-4.0": {
+      "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+      "bytes": 20138
+    }
+  },
+  "localArtifactsReviewed": [
+    {
+      "path": "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0.jar",
+      "sha256": "cfbb7d71615727d5e5a2e84e6816c4680f1ae61f21d1a3bb5f51c91dc3eaea80",
+      "bytes": 77829121
+    },
+    {
+      "path": "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-sources.jar",
+      "sha256": "5d3ed16e5dcb2127be30ff1cd94779c5e10404ccad5c465dd7276d8f1d9f73ea",
+      "bytes": 23572
+    },
+    {
+      "path": "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-javadoc.jar",
+      "sha256": "78c9ceb3bbae86b43ac96abd34f3cd05d80f3971574d02f69dd10573e7bf0728",
+      "bytes": 4175517
+    }
+  ],
+  "noticeCommit": "551eebeeb66a80ef3af467a6c1b4995c2a7f7034",
+  "noticePermalink": "https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
+  "decisions": {
+    "finalLiteralMetadata": "approved for pinned bytes",
+    "downstreamTermsConclusion": "approved for reviewed local shape under recorded conditional interpretation",
+    "cephesImplementationAcceptance": "approved for retained reviewed notices"
+  },
+  "remainingConditions": [
+    "Signed candidate and actual distribution must preserve the reviewed terms and treatment.",
+    "Required artifact, consumer and physical minimum-host exact-bundle validation must pass.",
+    "Newly changed scope, terms or technological measures require another assessment.",
+    "Neither license finding closes before its remaining validation conditions are met.",
+    "Maven Central publication requires separate explicit approval against the final verified receipt."
+  ],
+  "unresolvedFindingIds": [
+    "NATIVE-LICENSE-1",
+    "NATIVE-LICENSE-2"
+  ],
+  "releaseReady": false,
+  "signedCandidateAccepted": false,
+  "publicationAuthorized": false,
+  "preparationStatus": "The unchanged review.json records pending owner decisions at preparation; this separate record supersedes only those pending decision fields."
+}

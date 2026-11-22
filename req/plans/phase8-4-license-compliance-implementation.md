@@ -16,7 +16,8 @@ The POM carries the approved six scoped entries and literal comments. Its CC com
 notice commit `551eebeeb66a80ef3af467a6c1b4995c2a7f7034`, committed before the POM change.
 The native README and draft release notes contain the exact approved publication paragraph,
 with decision and notice links beside it. The audit describes the expanded scoped metadata.
-Final literal metadata review remains pending; these changes do not resolve either finding.
+Final literal metadata and local downstream terms were accepted on 2026-11-22 in the
+[owner record](../phase8-4-owner-license-decision.md). Candidate conditions remain open.
 
 `req/native-authored-attributions.json` separates jmlx-authored attribution requirements from
 upstream excerpts. The audit verifies its pinned local approval evidence and upstream source
@@ -62,9 +63,10 @@ fetching and syncing main; the [post-merge report][postmerge-report] supersedes 
 real-checkout ancestry refusal. Repeat these checks before candidate tagging. Shallow
 contributor/PR builds must not run the explicit history-dependent task.
 
-Per Nyfelt must review the final literal metadata and the actual downstream distribution
-terms and measures. Any resulting wording change needs another reviewed notice commit before
-updating its permalink and independent expectations. Both `NATIVE-LICENSE-1` and
+Per Nyfelt accepted the pinned final metadata and reviewed local downstream terms in
+PR #115. The signed candidate and actual distribution must preserve that treatment. Any
+resulting wording change needs another reviewed notice commit before updating its permalink
+and independent expectations. Both `NATIVE-LICENSE-1` and
 `NATIVE-LICENSE-2` stay open until their separate validation/decision conditions are met.
 
 After review, follow the release runbook for a new immutable candidate, fresh signatures and

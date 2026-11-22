@@ -1,6 +1,7 @@
 # Phase 8.4 owner license decision record
 
-Prepared 2026-11-21. Status: both owner interpretations accepted; remaining conditions open.
+Prepared 2026-11-21; updated 2026-11-22. Owner interpretations, final metadata and local
+downstream terms accepted; signed-candidate validation remains open.
 
 | Field | Record |
 | --- | --- |
@@ -10,8 +11,8 @@ Prepared 2026-11-21. Status: both owner interpretations accepted; remaining cond
 | Confirmation date | 2026-11-21; owner statements in the preparation conversation |
 | Applicable law | Not determined; pending assessment of relevant rights and grants |
 | Assessment | Owner judgment based on the evidence; reviewer is not a lawyer |
-| Juffa disposition | Scope/wording approved; downstream terms and artifact review pending |
-| Cephes disposition | Interpretation and Netlib-material basis accepted; validation pending |
+| Juffa disposition | Scope, final metadata and local terms accepted; validation pending |
+| Cephes disposition | Interpretation and retained implementation accepted; validation pending |
 | Release gate | Open; neither finding has been resolved |
 
 The owner makes jmlx's acceptance and release decisions. This workflow does not require an
@@ -108,7 +109,7 @@ The differing BSD forum samples do not supply a new grant for these exact versio
 
 The exact notice, native NOTICE, full CC text and publication paragraph are approved, along
 with the six-entry POM template and its substitution rule. The final literal POM and module
-metadata remain subject to review after the notice commit exists. No CC adapter's license is
+metadata were subsequently accepted as recorded below. No CC adapter's license is
 identified. The existing (B) counterargument remains recorded.
 
 | Owner decision field | Current value |
@@ -118,26 +119,54 @@ identified. The existing (B) counterargument remains recorded.
 | Source and compiled adaptation boundary | Approved logical boundary described above |
 | Rights holders and existing licensing basis | Juffa: CC BY-SA 4.0; Apple/MLX: MIT contributions |
 | Reasoned adapter-license interpretation | Approved above; counterargument remains explicit |
-| Downstream terms examined and conclusion | Pending actual-distribution review |
+| Downstream terms examined and conclusion | Accepted locally; signed delivery review pending |
 | Exact notice/license/publication wording | Approved hashes in acceptance record |
-| POM wording | Template/substitution approved; final literal metadata review pending |
+| POM wording | Final literal hashes accepted; signed-candidate recheck required |
 | Disposition and responsible owner | Conditional accept; Per Nyfelt; finding remains open |
 | Implementation owner | Codex implements; Per Nyfelt reviews the implementation PR |
 
 PR #114 merged as `fc9b634a5d0103e266fa550c5737bcd74e0707e6` after both CI jobs passed.
 Post-merge payload and explicit license verification passed on synchronized main. The
 [final metadata and downstream review][native-final-review] records the actual artifact
-hashes, unchanged POM/module literals and a proposed owner conclusion. That conclusion and
-final literal metadata acceptance remain pending; this technical verification closes no finding.
+hashes, unchanged POM/module literals and the owner conclusion subsequently accepted below.
+The technical checks alone close no finding.
 
-**Follow-up:** review the proposed owner conclusion and exact metadata hashes.
-The approved notice precedes its POM permalink commit and is preserved by the merge.
-Keep that ordering and ancestry for later revisions. Review the final literal metadata and
-actual downstream terms,
-validate the changed artifacts and prepare a new immutable candidate under the release
-runbook. Applicable law remains undetermined. Both findings and the release gate remain
-open. Future changes by jmlx need their own assessment.
-This approval does not authorize Central publication.
+### Final metadata and local downstream terms accepted (2026-11-22)
+
+Per Nyfelt explicitly stated: "I approve the proposed owner conclusion and final metadata
+in PR #115". The approved review is commit
+`cf31c3390ad0d7657bf5bccc0121948a6cd6ea8d`, separate from any PR merge decision.
+The [final acceptance record][final-acceptance] pins the SHA-256 of that commit's
+review Markdown and review manifest, all three literal metadata files, retained legal texts
+and reviewed local JARs. The preparation manifest's pending status is historical; this
+separate acceptance record supersedes those pending owner decisions without changing the
+reviewed snapshot.
+
+**Approved owner conclusion:**
+
+> I approve the final literal native POM, module metadata and CC comment identified by the
+> review manifest's hashes, together with the retained Cephes implementation notices. Under
+> my recorded conditional MIT/direct-CC interpretation and approved scope, I accept the
+> reviewed downstream terms: the original grants, attribution and modification indications
+> are retained, and the inspected local distribution surfaces add no jmlx restriction or
+> technological measure against exercising the covered rights. I retain the recorded
+> adapter-license counterargument. This conclusion is conditional on the signed candidate
+> and its actual distribution preserving these terms and passing the required artifact,
+> consumer and physical minimum-host validation. Both findings remain open until those
+> conditions are met. This does not authorize Maven Central publication.
+
+This accepts the reviewed final literal POM/module/CC comment and retained Cephes notices,
+plus the local downstream-terms conclusion under the existing conditional interpretation.
+It preserves the adapter-license counterargument and every existing scope/authority limit.
+It accepts neither unspecified future artifacts nor changed distribution terms or measures.
+
+**Follow-up:** merge the reviewed decision record, then prepare the next candidate under
+the release runbook. The approved notice precedes its POM permalink commit and is preserved
+by the merge; keep that ordering and ancestry for later revisions. Validate the signed
+candidate, its actual distribution and the required consumer/physical minimum-host gates.
+Applicable law remains undetermined. Both findings and the release gate remain open until
+those conditions pass. Future changes by jmlx need their own assessment. This approval does
+not authorize Maven Central publication.
 
 ## Cephes: approved owner interpretation
 
@@ -218,7 +247,7 @@ This decision does not extend an intermediary contributor's grant to Moshier's r
 | Modification, redistribution and downstream rationale | Approved; see Netlib basis above |
 | Exact material/provenance covered | Pinned header, functions, Netlib members and binary above |
 | Required notices and conditions | Retain Netlib, fastermath/NEON and MLX MIT notices |
-| Final notice/license/POM paths, exact wording and SHA-256 hashes | Hashes below; review pending |
+| Final notice/license/POM paths, wording and hashes | Accepted in final review; candidate pending |
 | Accept/reject/need evidence; conditions and responsible owner | Conditional accept; Per Nyfelt |
 | Named implementation/review owner and unresolved questions | Follow-up below |
 
@@ -234,13 +263,15 @@ POM hashes and all three JAR hashes. The [source/notice report][cephes-source-re
 explicit payload verification and 17 native-license tests passed. The native payload remains
 byte-identical to the earlier audit. These are producer checks, not candidate verification.
 
-**Follow-up:** Per Nyfelt owns review and acceptance. Implementation review remains pending.
-Review the changed title, retained notices and recorded hashes, then validate the final new
-candidate before closing the Cephes finding. Any newly identified material outside the
-reviewed scope needs another assessment. Applicable law remains undetermined as recorded
-above. `NATIVE-LICENSE-2` remains open for implementation review and final candidate
-validation; `NATIVE-LICENSE-1` remains open pending its recorded acceptance conditions. Neither a
-replacement candidate nor Central publication is approved by this decision.
+On 2026-11-22, Per Nyfelt's final-review approval above accepted the retained Cephes
+implementation notices and their pinned hashes in the reviewed local artifacts. The
+[final acceptance record][final-acceptance] binds that acceptance to the exact review.
+
+**Follow-up:** validate the final signed candidate before closing the Cephes finding.
+Any newly identified material outside the reviewed scope needs another assessment.
+Applicable law remains undetermined as recorded above. `NATIVE-LICENSE-2` remains open for
+final candidate validation; `NATIVE-LICENSE-1` remains open pending its recorded conditions.
+No unspecified future candidate or Central publication is accepted by this decision.
 
 ## What follows the owner's decisions
 
@@ -272,3 +303,5 @@ Central publication still needs the owner's separate approval of the exact verif
 [juffa-acceptance]: plans/evidence/juffa-implementation-2026-11-22/acceptance.json
 
 [native-final-review]: phase8-4-native-distribution-review.md
+
+[final-acceptance]: plans/evidence/native-distribution-review-2026-11-22/owner-acceptance.json

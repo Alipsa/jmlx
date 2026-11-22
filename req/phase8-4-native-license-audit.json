@@ -406,6 +406,7 @@
     "acceptanceRecord": "req/plans/evidence/juffa-implementation-2026-11-22/acceptance.json",
     "report": "req/plans/phase8-4-license-compliance-implementation.md",
     "metadata": "Six scoped POM entries implemented; component examples are illustrative and reference-only notices are separately identified.",
-    "status": "Final literal metadata, owner downstream-terms conclusion and new-candidate artifact validation pending; both findings remain open."
+    "status": "Final literal metadata, local downstream terms and retained Cephes implementation accepted on 2026-11-22; signed-candidate and actual-distribution validation pending; both findings remain open.",
+    "finalReviewAcceptance": "req/plans/evidence/native-distribution-review-2026-11-22/owner-acceptance.json"
   }
 }

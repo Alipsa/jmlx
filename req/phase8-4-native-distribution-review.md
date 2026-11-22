@@ -1,6 +1,8 @@
 # Native distribution terms and final metadata review
 
-2026-11-22. Prepared for Per Nyfelt after merging PR #114. Owner acceptance remains pending.
+2026-11-22. Prepared after PR #114; Per Nyfelt accepted the proposed conclusion and final
+metadata in PR #115. The [acceptance record][acceptance] pins the exact reviewed commit and
+document/metadata hashes. The review manifest retains its historical preparation status.
 This review advances the remaining final-metadata and downstream-terms decisions from the
 [owner record](phase8-4-owner-license-decision.md); it does not close either license finding.
 
@@ -53,7 +55,7 @@ not a legal determination about every possible technological measure. The signat
 by the later release flow provide integrity evidence; their presence alone would settle
 neither additional-terms compliance nor the actual signed delivery path's treatment.
 
-## Reasoning for the proposed owner conclusion
+## Reasoning for the accepted owner conclusion
 
 The [CC legal code][cc], sections 2(a)(5)(C) and 3, frames the additional-restrictions and
 attribution questions. This review applies the owner's already recorded scope and
@@ -65,7 +67,7 @@ They do not replace Juffa's terms with jmlx's MIT grant or expand the CC label t
 contributions. Retaining other upstream notices for their own material does not introduce a
 new jmlx recipient contract for the scoped Juffa material. The no-additional-restrictions
 statement in the authored notice matches the inspected LICENSE/NOTICE/POM/publication text.
-Together, those observations support the conditional owner conclusion proposed below.
+Together, those observations support the conditional owner conclusion accepted below.
 Unencrypted archives alone would not support it.
 
 Acceptance remains limited to these exact local terms and metadata. Actual signed candidate
@@ -75,9 +77,10 @@ or scope requires another assessment. Existing source/wheel and compiled-boundar
 remain; the review neither proves a vendor-wheel rebuild nor identifies binary offsets for
 a legally separable work.
 
-## Proposed decision for Per Nyfelt
+## Decision accepted by Per Nyfelt
 
-The following is proposed text for the owner record, not an approval already received:
+Per Nyfelt approved the following statement at reviewed commit
+`cf31c3390ad0d7657bf5bccc0121948a6cd6ea8d`:
 
 > I approve the final literal native POM, module metadata and CC comment identified by the
 > review manifest's hashes, together with the retained Cephes implementation notices. Under
@@ -90,15 +93,15 @@ The following is proposed text for the owner record, not an approval already rec
 > consumer and physical minimum-host validation. Both findings remain open until those
 > conditions are met. This does not authorize Maven Central publication.
 
-Approval would finish the proposed final-literal-metadata and local downstream-terms review.
-It would permit moving to the next candidate-preparation steps under the release runbook;
-it would not accept an unspecified future artifact. Reject or amend the statement if it
-exceeds the owner's intended conclusion. Record any approval against the full reviewed
-commit and the SHA-256 of this Markdown file and review manifest in the separate owner
-record, without self-hashing either document.
+This approval completes final-literal-metadata and local downstream-terms acceptance for
+the pinned review. It permits moving to candidate preparation under the release runbook;
+it does not accept an unspecified future artifact. The separate owner record and acceptance
+JSON preserve the approved commit and original review-document/manifest hashes. The source
+review and its manifest at that commit remain unchanged in Git history.
 
-Until that decision is received, the owner record and audit keep both findings open.
-No replacement candidate, classifier, GitHub release asset or publication is created here.
+Both findings remain open until the signed candidate and actual distribution satisfy the
+recorded conditions. No replacement candidate, classifier, GitHub release asset or
+publication is created by this decision record.
 
 [review]: plans/evidence/native-distribution-review-2026-11-22/review.json
 [task-report]: plans/evidence/native-distribution-review-2026-11-22/postmerge-license-report.json
@@ -106,3 +109,4 @@ No replacement candidate, classifier, GitHub release asset or publication is cre
 [module]: plans/evidence/juffa-implementation-2026-11-22/native-module.json
 [comment]: plans/evidence/juffa-implementation-2026-11-22/literal-cc-pom-comment.txt
 [cc]: https://creativecommons.org/licenses/by-sa/4.0/legalcode.en
+[acceptance]: plans/evidence/native-distribution-review-2026-11-22/owner-acceptance.json

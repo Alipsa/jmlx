@@ -152,16 +152,17 @@ From the repository root, in an administrator's Terminal:
   }
   trap cleanup EXIT
   mkdir -p build/releaseAll
-  window_dir=$(/usr/bin/mktemp -d "build/releaseAll/window-$(/bin/date -u +%F).XXXXXXXX")
   probe_dir=$(/usr/bin/mktemp -d /private/tmp/jmlx-account-probe.XXXXXXXX)
   sudo /usr/bin/install -d -o jmlxrunner -g staff -m 0700 "$probe_dir"
   sudo /usr/bin/install -o jmlxrunner -g staff -m 0400 \
     req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py \
     "$probe_dir/account-probe.py"
-  expected=20e907f58b38f86aa3bc56080c9057b1ab67dd5fc520f831e87e6b3b2b597b01
+  expected=$(/usr/bin/plutil -extract windowTimeProbe.scriptSha256 raw -o - \
+    req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.json)
   actual=$(sudo -u jmlxrunner /usr/bin/shasum -a 256 "$probe_dir/account-probe.py")
   actual="${actual%% *}"
   [ "$actual" = "$expected" ] || { echo "probe script digest mismatch" >&2; exit 1; }
+  window_dir=$(/usr/bin/mktemp -d "build/releaseAll/window-$(/bin/date -u +%F).XXXXXXXX")
   (
     cd /
     sudo -H -u jmlxrunner /usr/bin/env -i \
@@ -174,8 +175,9 @@ From the repository root, in an administrator's Terminal:
 
 The staged hash must match `windowTimeProbe.scriptSha256` before execution. The exit trap
 removes the staging directory on success or failure. Output is retained in a fresh directory
-named for the window's UTC date; a failed run leaves only a partial result. The probe does
-not start the runner service.
+named for the window's UTC date only after staging and digest verification pass. A probe
+failure may leave an empty or partial `account-probe.partial.json`. The probe does not
+start the runner service.
 
 ## Starting and stopping the reviewed window
 

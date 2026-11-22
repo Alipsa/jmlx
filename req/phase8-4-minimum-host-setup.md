@@ -82,9 +82,13 @@ and recheck sharing at window time.
 
 ## Account revalidation (2026-11-22)
 
-The owner ran the read-only probe as `jmlxrunner`. The
+The owner ran the read-only probe as `jmlxrunner`. The retained
+[probe script](plans/evidence/minimum-host-runner-2026-11-22/account-probe.py) and the evidence's
+method fields identify the command, script hash and source commit. `recordedAt` dates evidence
+assembly and supplemental inspection; the original probe recorded only its observation date.
+The
 [retained account measurements](plans/evidence/minimum-host-runner-2026-11-22/account-probe.json)
-confirm UID 503, a `0700` home and no admin membership on physical ARM64 macOS 27.2.1
+confirm UID 503, a `0700` home and no admin membership on Apple M5 Max ARM64 macOS 27.2.1
 (build 26B131; `kern.hv_vmm_present=0`). The account cannot read or write the owner's
 Gradle properties or traverse the owner's SSH and signing directories. These scoped
 permission checks do not establish machine-wide secret isolation.
@@ -98,8 +102,21 @@ Python 3.15.2 and Git 2.56.1 still resolve through owner-managed Homebrew.
 A read-only GitHub registration check confirmed ID 23 offline and idle, with labels
 `self-hosted`, `macOS`, `ARM64` and `jmlx-release-minimum`. A local launchd inspection
 found the service loaded, with state `not running`, active count zero and no starts.
+The host booted on 2026-11-22 at 10:14:17 local time, after the unloaded November 16 check.
+Loading the plist from `/Library/LaunchDaemons` at boot is consistent with this state;
+no historical launchd event log was examined to establish the cause. `RunAtLoad` and
+`KeepAlive` remain false, and the service reports no starts. Supplemental evidence records
+these observations, the chip model and the GitHub registration snapshot separately from
+measurements made as `jmlxrunner`.
 No listener was started or job dispatched during this revalidation. If still loaded at
 window time, skip `bootstrap` and use `kickstart` only after the window checks pass.
+
+The account's `com.apple.sharepoint.group.1` membership comes through nested `everyone`;
+it is the Public-folder share group, not an account-specific grant. A later read-only
+`sharing -l` check found the owner's Public-folder SMB share enabled with guest access
+and read-write permissions. Its state at the earlier account probe time was not established.
+This exposure remains an open sharing-review item: resolve it or explicitly assess it before
+the window, then recheck sharing and private-home isolation. No sharing settings were changed.
 
 The queued-job review, sharing review and immediate pre-window revalidation remain required.
 This probe does not close the readiness gate or establish signed-candidate Metal execution.
@@ -119,6 +136,9 @@ After the job finishes, stop and unload it with:
 sudo launchctl bootout system/com.alipsa.jmlx-release-runner
 ```
 
+`bootout` unloads the service for the current boot. With the plist still installed in
+`/Library/LaunchDaemons`, launchd can load it again after reboot. Disabled `RunAtLoad` and
+`KeepAlive` prevent automatic startup; they do not keep the definition unloaded.
 These administrative commands manage launchd; the runner process itself runs as UID 503.
 Recheck account isolation and the candidate workflow before each window. Exact-bundle Metal
 execution, measured Java 21/25 consumer runtimes and acceptance reports remain outstanding.

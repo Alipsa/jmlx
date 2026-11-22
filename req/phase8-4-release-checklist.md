@@ -50,6 +50,8 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   rechecked isolation, saved environment and local runner/tool versions. GitHub still reports
   ID 23 offline and idle. Queue review and sharing checks remain for the actual window;
   this partial revalidation does not close the gate or prove candidate execution.
+  A later November 22 inspection found guest read-write SMB access to the owner's Public
+  folder. Resolve or explicitly assess that exposure before the window; sharing remains open.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
   The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
   inventory to 26 entries. Two provenance findings (Juffa `erf`/`erfinv` and Cephes)

@@ -12,7 +12,12 @@
   "host": {
     "swVers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.2.1\nBuildVersion:\t\t26B131",
     "architecture": "arm64",
-    "virtualized": "0"
+    "virtualized": "0",
+    "virtualizedSource": "sysctl -n kern.hv_vmm_present",
+    "chip": "Apple M5 Max",
+    "chipSource": "system_profiler SPHardwareDataType -json: chip_type",
+    "bootTime": "{ sec = 1795338857, usec = 999821 } Sun Nov 22 10:14:17 2026",
+    "bootTimeSource": "sysctl -n kern.boottime"
   },
   "runner": {
     "agentId": 23,
@@ -69,5 +74,70 @@
       "mode": "0o555",
       "version": "git version 2.56.1"
     }
+  },
+  "recordedAt": "2026-11-22T20:23:34.989373+00:00",
+  "sourceCommit": "c5ca92817b17703519bc9e83842f769b8915f67b",
+  "method": {
+    "recordedAtMeaning": "Evidence assembly and supplemental inspection time; original account probe ran earlier on 2026-11-22 and did not record an exact timestamp.",
+    "accountProbeObservedOn": "2026-11-22",
+    "script": "req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py",
+    "scriptSha256": "305096d8128452c70b54ae3e279a216a57dc0e46c9a01b0af2302b004004ea29",
+    "command": "sudo -H -u jmlxrunner /usr/bin/env -i PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin /opt/homebrew/bin/python3 req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py",
+    "supplementalInspection": "Read-only commands as the owner after the original account probe; not a rerun as jmlxrunner.",
+    "commands": [
+      "system_profiler SPHardwareDataType -json (chip_type only)",
+      "sysctl -n kern.boottime",
+      "sysctl -n kern.hv_vmm_present",
+      "launchctl print system/com.alipsa.jmlx-release-runner",
+      "Read RunAtLoad and KeepAlive from /Library/LaunchDaemons/com.alipsa.jmlx-release-runner.plist",
+      "gh api repos/Alipsa/jmlx/actions/runners (ID 23 only)",
+      "sharing -l (retain Public-folder SMB flags)",
+      "dscl . -read /Groups/com.apple.sharepoint.group.1 NestedGroups",
+      "dscl . -read /Groups/everyone GeneratedUID"
+    ],
+    "sourceCommitMeaning": "Checkout HEAD during supplemental inspection and evidence assembly, not a timestamped anchor captured by the original probe.",
+    "supplementalObservedAt": "2026-11-22T20:22:55Z",
+    "commandMeaning": "Equivalent command using the retained script path; original invocation used /tmp/jmlx-minimum-host-readonly.py."
+  },
+  "repositoryRunnersAfterCheck": [
+    {
+      "id": 23,
+      "name": "jmlx-release-minimum-m5-max",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        "self-hosted",
+        "macOS",
+        "ARM64",
+        "jmlx-release-minimum"
+      ]
+    }
+  ],
+  "launchd": {
+    "loaded": true,
+    "state": "not running",
+    "activeCount": 0,
+    "runs": 0,
+    "lastExitCode": "never exited",
+    "plist": "/Library/LaunchDaemons/com.alipsa.jmlx-release-runner.plist",
+    "runAtLoad": false,
+    "keepAlive": false,
+    "bootLoadingAssessment": "Consistent with loading the installed LaunchDaemon at the November 22 boot; no historical launchd event log was examined."
+  },
+  "sharingReview": {
+    "status": "open",
+    "observedAfterAccountProbe": true,
+    "stateAtAccountProbe": "not established",
+    "smbPublicFolder": {
+      "shared": true,
+      "guestAccess": true,
+      "readOnly": false
+    },
+    "shareGroup": "com.apple.sharepoint.group.1",
+    "nestedGroup": "everyone",
+    "nestedGroupId": "ABCDEFAB-CDEF-ABCD-EFAB-CDEF0000000C",
+    "accountSpecificGrant": false,
+    "hostSettingsChanged": false,
+    "requiredBeforeWindow": "Resolve or explicitly assess guest-writable Public-folder SMB exposure; recheck sharing and private-home isolation."
   }
 }

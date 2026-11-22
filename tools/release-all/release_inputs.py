@@ -43,6 +43,8 @@ UPSTREAM_MLX_HASH = "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875
 ROOT = Path(__file__).resolve().parents[2]
 NOTICE_SEPARATOR = b"======== JMLX NATIVE NOTICE SECTION ========"
 REQUIRED_NATIVE_AUTHORED_SECTIONS = frozenset({'Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)'})
+REQUIRED_FINAL_ACCEPTANCE = (
+    "req/plans/evidence/native-distribution-review-2026-11-22/owner-acceptance.json")
 REQUIRED_AUTHORED_FIELDS = {"creator", "profile", "revisions", "license", "modifications", "scope"}
 APPROVED_NOTICE_PERMALINK = 'https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES'
 REQUIRED_NATIVE_POM_LICENSES = (('MIT License',

@@ -82,6 +82,16 @@ class NativeLicensesTest(unittest.TestCase):
         self.save()
         with self.assertRaisesRegex(ValueError, 'final owner acceptance record pin missing'):
             self.verify()
+        # Removing both fields must not turn the pin check off, even if the file exists.
+        path.write_bytes(b'{"approved": true}\n')
+        self.audit['scopeWordingImplementation'].pop('finalReviewAcceptance')
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record pin missing'):
+            self.verify()
+        self.audit['scopeWordingImplementation']['status'] = 'implemented'
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record pin missing'):
+            self.verify()
 
     def test_corrupt_cache_and_changed_wheel_fail(self):
         self.cached.write_bytes(b"unreviewed")

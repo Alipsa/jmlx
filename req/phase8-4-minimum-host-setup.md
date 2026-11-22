@@ -166,11 +166,11 @@ From the repository root, in an administrator's Terminal:
   mkdir -p build/releaseAll
   probe_dir=$(/usr/bin/mktemp -d /private/tmp/jmlx-account-probe.XXXXXXXX)
   sudo /usr/bin/install -d -o jmlxrunner -g staff -m 0700 "$probe_dir"
-  sudo /usr/bin/install -o jmlxrunner -g staff -m 0400 \
-    req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py \
-    "$probe_dir/account-probe.py"
-  expected=$(/usr/bin/plutil -extract windowTimeProbe.scriptSha256 raw -o - \
-    req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.json)
+  git show "$source_commit:$probe_evidence/account-probe.py" | \
+    sudo -u jmlxrunner /usr/bin/tee "$probe_dir/account-probe.py" > /dev/null
+  sudo -u jmlxrunner /bin/chmod 0400 "$probe_dir/account-probe.py"
+  expected=$(git show "$source_commit:$probe_evidence/account-probe.json" | \
+    /usr/bin/plutil -extract windowTimeProbe.scriptSha256 raw -o - -)
   actual=$(sudo -u jmlxrunner /usr/bin/shasum -a 256 "$probe_dir/account-probe.py")
   actual="${actual%% *}"
   [ "$actual" = "$expected" ] || { echo "probe script digest mismatch" >&2; exit 1; }
@@ -190,9 +190,10 @@ The status check rejects visible staged, unstaged and untracked changes in the p
 directory. Direct comparisons of the script and manifest with committed blobs also reject
 content changes hidden by `assume-unchanged` or `skip-worktree`; hashing bypasses Git filters.
 Confirm that HEAD is the reviewed source commit; its SHA is retained in `source-commit.txt`.
-The blob checks bind those two inputs to that commit, without establishing its approval status.
-The staged hash must match
-`windowTimeProbe.scriptSha256` before execution. The exit trap
+The blob checks detect local input edits without establishing the commit's approval status.
+Staging reads the script directly from that recorded commit, and the expected digest comes
+from the same commit's manifest. Later working-tree edits therefore cannot change either input.
+The staged hash must match `windowTimeProbe.scriptSha256` before execution. The exit trap
 removes the staging directory on success or failure. Output is retained in a fresh directory
 named for the window's UTC date only after staging and digest verification pass. A probe
 failure may leave an empty or partial `account-probe.partial.json`. The probe does not

@@ -12,12 +12,7 @@
   "host": {
     "swVers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.2.1\nBuildVersion:\t\t26B131",
     "architecture": "arm64",
-    "virtualized": "0",
-    "virtualizedSource": "sysctl -n kern.hv_vmm_present",
-    "chip": "Apple M5 Max",
-    "chipSource": "system_profiler SPHardwareDataType -json: chip_type",
-    "bootTime": "{ sec = 1795338857, usec = 999821 } Sun Nov 22 10:14:17 2026",
-    "bootTimeSource": "sysctl -n kern.boottime"
+    "virtualized": "0"
   },
   "runner": {
     "agentId": 23,
@@ -44,7 +39,7 @@
     "ownerGradleProperties": {
       "readable": false,
       "writable": false,
-      "traversable": false
+      "executable": false
     },
     "ownerSshDirectory": {
       "readable": false,
@@ -80,9 +75,9 @@
   "method": {
     "recordedAtMeaning": "Evidence assembly and supplemental inspection time; original account probe ran earlier on 2026-11-22 and did not record an exact timestamp.",
     "accountProbeObservedOn": "2026-11-22",
-    "script": "req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py",
+    "script": "req/plans/evidence/minimum-host-runner-2026-11-22/original-account-probe.py",
     "scriptSha256": "305096d8128452c70b54ae3e279a216a57dc0e46c9a01b0af2302b004004ea29",
-    "command": "sudo -H -u jmlxrunner /usr/bin/env -i PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin /opt/homebrew/bin/python3 req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py",
+    "command": "sudo -H -u jmlxrunner /usr/bin/env -i PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin /opt/homebrew/bin/python3 /tmp/jmlx-minimum-host-readonly.py",
     "supplementalInspection": "Read-only commands as the owner after the original account probe; not a rerun as jmlxrunner.",
     "commands": [
       "system_profiler SPHardwareDataType -json (chip_type only)",
@@ -97,47 +92,71 @@
     ],
     "sourceCommitMeaning": "Checkout HEAD during supplemental inspection and evidence assembly, not a timestamped anchor captured by the original probe.",
     "supplementalObservedAt": "2026-11-22T20:22:55Z",
-    "commandMeaning": "Equivalent command using the retained script path; original invocation used /tmp/jmlx-minimum-host-readonly.py."
+    "commandMeaning": "Original historical invocation, with the script staged in /tmp; no equivalent invocation from the owner checkout is claimed. It did not use Python isolated mode.",
+    "originalInvocationLimitations": "The historical invocation did not use -I and used a shared temporary script directory. No tampering was observed; a hardened rerun remains required before the window.",
+    "measurementNormalization": "Renamed isolation.ownerGradleProperties.traversable to executable: the original script used os.access(path, X_OK), which tests execution for this file. No measurement value changed."
   },
-  "repositoryRunnersAfterCheck": [
-    {
-      "id": 23,
-      "name": "jmlx-release-minimum-m5-max",
-      "status": "offline",
-      "busy": false,
-      "labels": [
-        "self-hosted",
-        "macOS",
-        "ARM64",
-        "jmlx-release-minimum"
-      ]
-    }
-  ],
-  "launchd": {
-    "loaded": true,
-    "state": "not running",
-    "activeCount": 0,
-    "runs": 0,
-    "lastExitCode": "never exited",
-    "plist": "/Library/LaunchDaemons/com.alipsa.jmlx-release-runner.plist",
-    "runAtLoad": false,
-    "keepAlive": false,
-    "bootLoadingAssessment": "Consistent with loading the installed LaunchDaemon at the November 22 boot; no historical launchd event log was examined."
-  },
-  "sharingReview": {
-    "status": "open",
-    "observedAfterAccountProbe": true,
-    "stateAtAccountProbe": "not established",
-    "smbPublicFolder": {
-      "shared": true,
-      "guestAccess": true,
-      "readOnly": false
+  "ownerInspection": {
+    "host": {
+      "virtualizedSource": "sysctl -n kern.hv_vmm_present",
+      "chip": "Apple M5 Max",
+      "chipSource": "system_profiler SPHardwareDataType -json: chip_type",
+      "bootTime": "{ sec = 1795338857, usec = 999821 } Sun Nov 22 10:14:17 2026",
+      "bootTimeSource": "sysctl -n kern.boottime"
     },
-    "shareGroup": "com.apple.sharepoint.group.1",
-    "nestedGroup": "everyone",
-    "nestedGroupId": "ABCDEFAB-CDEF-ABCD-EFAB-CDEF0000000C",
-    "accountSpecificGrant": false,
-    "hostSettingsChanged": false,
-    "requiredBeforeWindow": "Resolve or explicitly assess guest-writable Public-folder SMB exposure; recheck sharing and private-home isolation."
+    "repositoryRunnersAfterCheck": [
+      {
+        "id": 23,
+        "name": "jmlx-release-minimum-m5-max",
+        "status": "offline",
+        "busy": false,
+        "labels": [
+          "self-hosted",
+          "macOS",
+          "ARM64",
+          "jmlx-release-minimum"
+        ]
+      }
+    ],
+    "launchd": {
+      "loaded": true,
+      "state": "not running",
+      "activeCount": 0,
+      "runs": 0,
+      "lastExitCode": "never exited",
+      "plist": "/Library/LaunchDaemons/com.alipsa.jmlx-release-runner.plist",
+      "runAtLoad": false,
+      "keepAlive": false,
+      "bootLoadingAssessment": "Consistent with loading the installed LaunchDaemon at the November 22 boot; no historical launchd event log was examined."
+    },
+    "sharingReview": {
+      "status": "open",
+      "observedAfterAccountProbe": true,
+      "stateAtAccountProbe": "not established",
+      "smbPublicFolder": {
+        "shared": true,
+        "guestAccess": true,
+        "readOnly": false
+      },
+      "shareGroup": "com.apple.sharepoint.group.1",
+      "nestedGroup": "everyone",
+      "nestedGroupId": "ABCDEFAB-CDEF-ABCD-EFAB-CDEF0000000C",
+      "accountSpecificGrant": false,
+      "hostSettingsChanged": false,
+      "requiredBeforeWindow": "Resolve or explicitly assess guest-writable Public-folder SMB exposure; recheck sharing and private-home isolation."
+    }
+  },
+  "windowTimeProbe": {
+    "status": "not run",
+    "script": "req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py",
+    "scriptSha256": "20e907f58b38f86aa3bc56080c9057b1ab67dd5fc520f831e87e6b3b2b597b01",
+    "invocationGuide": "req/phase8-4-minimum-host-setup.md#window-time-account-probe",
+    "requirements": [
+      "Copy script out of owner checkout to a fresh jmlxrunner-owned 0700 staging directory.",
+      "Run from / using an absolute script path and python3 -I.",
+      "Retain new output separately; do not replace the historical measurements."
+    ],
+    "command": "cd / && sudo -H -u jmlxrunner /usr/bin/env -i PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin /opt/homebrew/bin/python3 -I \"$probe_dir/account-probe.py\"",
+    "commandMeaning": "Run only after the documented staging procedure defines probe_dir as the absolute path of a fresh runner-owned 0700 directory and copies the reviewed script there."
   }
 }

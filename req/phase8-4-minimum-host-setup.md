@@ -83,15 +83,22 @@ and recheck sharing at window time.
 ## Account revalidation (2026-11-22)
 
 The owner ran the read-only probe as `jmlxrunner`. The retained
-[probe script](plans/evidence/minimum-host-runner-2026-11-22/account-probe.py) and the evidence's
-method fields identify the command, script hash and source commit. `recordedAt` dates evidence
-assembly and supplemental inspection; the original probe recorded only its observation date.
-The
-[retained account measurements](plans/evidence/minimum-host-runner-2026-11-22/account-probe.json)
-confirm UID 503, a `0700` home and no admin membership on Apple M5 Max ARM64 macOS 27.2.1
-(build 26B131; `kern.hv_vmm_present=0`). The account cannot read or write the owner's
-Gradle properties or traverse the owner's SSH and signing directories. These scoped
-permission checks do not establish machine-wide secret isolation.
+[original script](plans/evidence/minimum-host-runner-2026-11-22/original-account-probe.py)
+and evidence method fields identify its historical `/tmp` invocation, script hash and source
+commit. That invocation did not use Python isolated mode; no tampering was observed, but
+it needs the hardened window-time rerun below. `recordedAt` dates evidence assembly;
+the original probe has no exact timestamp. Supplemental owner-side measurements are under
+`ownerInspection`, separate from the script-produced `host` block.
+
+The [account evidence](plans/evidence/minimum-host-runner-2026-11-22/account-probe.json)
+records UID 503, a `0700` home and no admin membership on ARM64 macOS 27.2.1.
+Owner-side inspection identifies Apple M5 Max and names the `kern.hv_vmm_present` source
+for the virtualization measurement. The account cannot read or write the owner's Gradle
+properties or traverse the owner's SSH and signing directories. The owner's `0700` home
+blocks traversal before the leaf paths can be reached; these checks do not independently
+establish each leaf's permissions. For Gradle properties, `X_OK` means executable, not
+traversable. The evidence explicitly records that key normalization without changing its value.
+These scoped permission checks do not establish machine-wide secret isolation.
 
 Local runner ID 23 remains `jmlx-release-minimum-m5-max`, listener 2.338.2. Its listener
 SHA-256 is `732456cbedb8c09870b82a63c05ba5505ad5cc3fb536ee570879a0af1fdb5087`.
@@ -120,6 +127,37 @@ the window, then recheck sharing and private-home isolation. No sharing settings
 
 The queued-job review, sharing review and immediate pre-window revalidation remain required.
 This probe does not close the readiness gate or establish signed-candidate Metal execution.
+
+## Window-time account probe
+
+Use the formatted
+[window-time probe](plans/evidence/minimum-host-runner-2026-11-22/account-probe.py)
+for the next measurement. These commands stage it outside the owner's private home in a
+fresh, runner-owned `0700` directory. Python isolated mode excludes the script directory,
+user site packages and Python environment overrides from import resolution. Run from `/`
+with the absolute staged path; retain the new output separately from the historical evidence.
+This procedure has not yet been run and does not change the historical invocation.
+
+From the repository root, in an administrator's Terminal:
+
+```sh
+mkdir -p build/releaseAll/pre-candidate-2026-11-22
+probe_dir=$(/usr/bin/mktemp -d /private/tmp/jmlx-account-probe.XXXXXXXX)
+sudo /usr/bin/install -d -o jmlxrunner -g staff -m 0700 "$probe_dir"
+sudo /usr/bin/install -o jmlxrunner -g staff -m 0400 \
+  req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py \
+  "$probe_dir/account-probe.py"
+(
+  cd /
+  sudo -H -u jmlxrunner /usr/bin/env -i \
+    PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+    /opt/homebrew/bin/python3 -I "$probe_dir/account-probe.py"
+) > build/releaseAll/pre-candidate-2026-11-22/window-time-account-probe.json
+```
+
+Review the staged script's SHA-256 against
+`windowTimeProbe.scriptSha256` before running. After retaining the result, remove the
+staged script and directory as `jmlxrunner`. The probe does not start the runner service.
 
 ## Starting and stopping the reviewed window
 

@@ -94,5 +94,36 @@
   "releaseReady": false,
   "signedCandidateAccepted": false,
   "publicationAuthorized": false,
-  "preparationStatus": "The review.json at approvedReviewCommit records pending owner decisions at preparation; this acceptance supersedes those pending fields. Later provenance clarifications identify the original source snapshot and checked inputs without changing approved metadata bytes or the accepted conclusion."
+  "preparationStatus": "The review.json at approvedReviewCommit records pending owner decisions at preparation; this acceptance supersedes those pending fields. Later provenance clarifications identify the original source snapshot and checked inputs without changing approved metadata bytes or the accepted conclusion.",
+  "postApprovalAmendments": [
+    {
+      "path": "req/phase8-4-native-distribution-review.md",
+      "commit": "7fc55dd4ab8219992c41bf97c8d8fbd7c6d389ca",
+      "sha256": "6395c6007f1e124b98d5cc631e243cacb1ad9bd604b4eb8ee31ff1631a383048",
+      "provenanceOnly": true,
+      "description": "Record the approval/status and replace proposal instructions with the accepted state; the quoted conclusion and approved metadata are unchanged."
+    },
+    {
+      "path": "req/phase8-4-native-distribution-review.md",
+      "commit": "6e65332e63fd12d0a996d36e3451820169fffef1",
+      "sha256": "310546c1920ba01ce27f23469bbd66941687013370c3ea2628669644cf77ea21",
+      "provenanceOnly": true,
+      "description": "Explain the source snapshot and verification context; move the existing Juffa caveats into the Juffa paragraph using the owner record wording."
+    },
+    {
+      "path": "req/plans/evidence/native-distribution-review-2026-11-22/review.json",
+      "commit": "6e65332e63fd12d0a996d36e3451820169fffef1",
+      "sha256": "c8393a0fb83ff25bb43758744796b91ad51bf5bb3f4ddc34370da85958d64e91",
+      "provenanceOnly": true,
+      "description": "Add surfaceSha256At, surfacesExaminedAt and retained checkout/origin/main/JAR verification context for the original merged-main run."
+    },
+    {
+      "path": "req/plans/evidence/native-distribution-review-2026-11-22/owner-acceptance.json",
+      "commit": "faa7566ebc2ecdc98b9a79c35f8ead246552faf5",
+      "sha256": "75f38f702d197e20876349607f04579136dbea20ad5ec9f023355aaa1f9351f6",
+      "provenanceOnly": true,
+      "description": "Clarify that approval pins the original reviewed commit and later provenance annotations do not change approved metadata or the accepted conclusion."
+    }
+  ],
+  "postApprovalAmendmentsMeaning": "These entries pin provenance, approval-status and presentation annotations after approvedReviewCommit; they do not expand the approval or change its metadata bytes, conclusion or conditions. Each digest names that file at the listed historical commit, including the acceptance-record explanation at faa7566. The current acceptance record is pinned separately in the audit JSON; it does not hash itself."
 }

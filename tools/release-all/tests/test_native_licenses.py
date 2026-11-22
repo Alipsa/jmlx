@@ -64,6 +64,25 @@ class NativeLicensesTest(unittest.TestCase):
         self.save()
         self.assertTrue(self.verify()["releaseReady"])
 
+    def test_final_owner_acceptance_pin_rejects_edits_missing_files_and_missing_digest(self):
+        path = self.root / 'req/owner-acceptance.json'
+        path.write_bytes(b'{"approved": true}\n')
+        self.audit['scopeWordingImplementation'] = {
+            'finalReviewAcceptance': 'req/owner-acceptance.json',
+            'finalReviewAcceptanceSha256': R.sha256(path)}
+        self.save()
+        self.verify()
+        path.write_bytes(path.read_bytes() + b' ')
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record.*digest differs'):
+            self.verify()
+        path.unlink()
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record missing'):
+            self.verify()
+        self.audit['scopeWordingImplementation'].pop('finalReviewAcceptanceSha256')
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record pin missing'):
+            self.verify()
+
     def test_corrupt_cache_and_changed_wheel_fail(self):
         self.cached.write_bytes(b"unreviewed")
         with self.assertRaisesRegex(ValueError, "source digest differs"):

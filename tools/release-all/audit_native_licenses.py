@@ -120,6 +120,17 @@ def verify(root, wheel, cache, jars=()):
     inventory = read_json(root / "req/native-license-inventory.json")
     validate_native_legal_inventory(inventory)
     audit = read_json(root / "req/phase8-4-native-license-audit.json")
+    final_review = audit.get("scopeWordingImplementation", {})
+    acceptance = final_review.get("finalReviewAcceptance")
+    expected = final_review.get("finalReviewAcceptanceSha256")
+    if acceptance is not None or expected is not None:
+        if (not isinstance(acceptance, str) or not acceptance
+                or not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected)):
+            raise ValueError("final owner acceptance record pin missing or invalid")
+        path = root / acceptance
+        if (not path.resolve().is_relative_to(root.resolve()) or not path.is_file()
+                or sha256(path) != expected):
+            raise ValueError("final owner acceptance record missing or digest differs")
     if sha256(wheel) != inventory["wheelSha256"]:
         raise ValueError("wheel digest differs from reviewed inventory")
     legal = root / "jmlx-native-macos-arm64"

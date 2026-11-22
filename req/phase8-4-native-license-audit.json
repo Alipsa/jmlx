@@ -407,6 +407,7 @@
     "report": "req/plans/phase8-4-license-compliance-implementation.md",
     "metadata": "Six scoped POM entries implemented; component examples are illustrative and reference-only notices are separately identified.",
     "status": "Final literal metadata, local downstream terms and retained Cephes implementation accepted on 2026-11-22; signed-candidate and actual-distribution validation pending; both findings remain open.",
-    "finalReviewAcceptance": "req/plans/evidence/native-distribution-review-2026-11-22/owner-acceptance.json"
+    "finalReviewAcceptance": "req/plans/evidence/native-distribution-review-2026-11-22/owner-acceptance.json",
+    "finalReviewAcceptanceSha256": "ba210deade57f036aa52880ef066b1b21a32bd82bfc41ce7605d47ba544dc257"
   }
 }

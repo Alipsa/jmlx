@@ -67,8 +67,7 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   records the revised title and checks all three native JARs; implementation review was
   accepted on 2026-11-22, while final candidate validation remains outstanding. The owner
   also accepted the Juffa existing-grants interpretation on 2026-11-21, subject to scope,
-  final wording, downstream terms and artifact
-  validation. Both findings stay open.
+  final wording, downstream terms and artifact validation. Both findings stay open.
   On 2026-11-22 the owner approved the scope/wording packet. PR #114 merged as
   `fc9b634a5d0103e266fa550c5737bcd74e0707e6`; payload and explicit license verification
   now pass on merged main. The

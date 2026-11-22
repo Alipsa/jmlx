@@ -93,20 +93,38 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   passed Java and native checks, both release-smoke profiles and required-native-suite verification.
 - [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
   changelog version-cut dates with the final candidate cut date.
-  Prepared as 2026-11-20; recheck the date immediately before creating the immutable tag.
+  Prepared as 2026-11-22; recheck the date immediately before creating the immutable tag.
 - [ ] Freeze candidate tag/SHA, verify signed bundle, both consumer profiles and minimum host.
 - [ ] Review concrete verified-bundle receipt, then explicitly authorize Central publication.
 - [ ] Verify all nine exact Central coordinates and selected Java 21 subset on both platforms.
 - [ ] Merge development-bump PR only after Central verification.
   In that PR, update AGENTS.md's version paragraph and remove the Phase 8.4 release-window note.
 
-## Pre-candidate verification (2026-11-20)
+## Pre-candidate verification (2026-11-22)
+
+PR #116 aligned the five changelog version-cut dates to 2026-11-22. The earlier PR #105
+jinja verification below is historical: its changelog input no longer matches. A fresh
+`./gradlew :jmlx-jinja:releaseVerification` passed at clean commit
+`e081786faae7e93856e905d8378d08603a5f7124`. Its report records `CHANGELOG.md` SHA-256
+`9bc0162e0158403e06dd6b9068edec5ec655e77189b23c95092d8c5bcbf539e0`.
+
+The isolated online/offline matrix, reproducible archives and independent consumer resolution
+passed with BellSoft JDK 25.0.5, Temurin 21.0.13+9 and pinned Node v26.7.0. The published and
+consumer-resolved runtime JAR SHA-256 was
+`8048f73b7480d8bab56d8def5ef73fd9501e5d91329f644f701c00d8d5d083c1`.
+The nine-module `releaseAll.sh --dry-run` also passed at that clean commit. Local logs are
+`/tmp/pr115-next-jinja-verification.log` and `/tmp/pr116-dry-run.log`; generated reports are
+under ignored `jmlx-jinja/build/reports/`. These checks precede the immutable candidate;
+repeat verification after any contract input changes, including the jinja release checklist.
+The final tagged candidate still requires its own verification and signed-bundle evidence.
+
+## Historical pre-candidate verification (2026-11-20)
 
 The earlier jinja verification at PR #104 merge
 `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e` predates this PR's changelog date change and
 is stale for that contract input. A fresh `./gradlew :jmlx-jinja:releaseVerification`
 passed at clean PR #105 commit `a37d1683463081b16cdc6cbbab0238b47af9cf4f`, after the
-changelog change was committed. Its report records the current `CHANGELOG.md` SHA-256
+changelog change was committed. Its report recorded the then-current `CHANGELOG.md` SHA-256
 `918ccbfd3dbf1a3f250c1a6424b49859dbfd3f7bee3a927a12a77208843b1725`.
 
 Gradle ran on Eclipse Adoptium 25.0.4.1; jinja compiled with the resolved Java 21 toolchain,

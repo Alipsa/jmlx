@@ -2,6 +2,9 @@
 
 - [ ] Start from a clean checkout. Set `jmlx-jinja/build.gradle`'s version to the intended release version (not `-SNAPSHOT`), roll `CHANGELOG.md`'s `[Unreleased]` entries into a dated `## [x.y.z]` section, and commit those release-preparation changes. `releaseVerification` refuses a dirty tree.
 - [ ] Confirm JDK 21 or newer and the exact Node version in `upstream/upstream-lock.json`, then run `./gradlew :jmlx-jinja:releaseVerification` from that clean release commit. Use `-PreleaseVerificationAllowDirty` only for development; its report is not a release candidate.
+- [ ] Run the same verification command a second time at the same clean commit, keeping the
+  existing reports and evidence directory. Both runs must pass; this checks task output
+  validation when the evidence directory already exists. Retain both logs.
 - [ ] Read `jmlx-jinja/build/reports/release-verification.md` and its JSON companion. The task prepares an isolated Gradle home, runs the candidate matrix offline, and compares two clean archive builds.
 - [ ] The isolated verification repository is created per candidate; do not use `publishToMavenLocal` for this verification step. The verifier publishes with `:jmlx-jinja:publishMavenPublicationToReleaseVerificationRepository`. (The actual release below does use `publishToMavenLocal`, via the nexus-release-plugin's `bundle` task -- that is expected there, just not while verifying.)
 - [ ] Review `NOTICE`, `req/model-fixture-policy.md`, `CHANGELOG.md`, public Javadoc, and the generated POM.

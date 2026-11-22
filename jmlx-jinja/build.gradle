@@ -691,6 +691,7 @@ tasks.register('releaseVerification', JavaExec) {
     inputs.files(releaseVerificationManifest, file('upstream/upstream-lock.json'), file('NOTICE'), file('req/model-fixture-policy.md'),
         file('CHANGELOG.md'), file('req/release-checklist.md'))
     outputs.file(layout.buildDirectory.file('reports/release-verification.md'))
+    outputs.file(layout.buildDirectory.file('reports/release-verification.json'))
     outputs.dir(layout.buildDirectory.dir('reports/release-verification-evidence'))
     outputs.upToDateWhen { false }
     outputs.cacheIf { false }

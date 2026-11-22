@@ -28,5 +28,6 @@ req/plans/phase8-2-wp3-raw-digests.json -text
 req/plans/phase8-2-wp4-raw-digests.json -text
 
 # Preserve raw-byte scope/wording evidence, including upstream license whitespace.
-req/plans/evidence/juffa-scope-wording-2026-11-21/** -text -whitespace
+req/plans/evidence/juffa-scope-wording-2026-11-21/** -text
+req/plans/evidence/juffa-scope-wording-2026-11-21/LICENSE-CC-BY-SA-4.0 -whitespace
 jmlx-native-macos-arm64/LICENSE-CC-BY-SA-4.0 text eol=lf whitespace=-blank-at-eof

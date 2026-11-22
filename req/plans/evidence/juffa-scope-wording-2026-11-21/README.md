@@ -23,8 +23,9 @@ header hashes and answer revision identities are pinned in [review.json](review.
 The manifest also records inspection of the complete hash-matched answer bodies: neither
 supplied an additional attribution designation, copyright notice or warranty-disclaimer
 notice. It records creator display metadata and both revision comments, summarized in the
-candidate notice as prior modification indications. This bounded observation covers those
-two revisions, not all linked material or the complete website, and leaves the owner review open.
+candidate notice as the author's own revision notes. The visible downstream MLX modifications
+are described separately. This bounded observation covers those two revisions, not all linked
+material or the complete website, and leaves the owner review open.
 These mappings are bounded comparison/provenance observations, not a reconstructed copying
 history or a legal test of expression. The record does not convert coefficient matches into
 proof of copyright infringement, ownership of mathematical algorithms, or complete equivalence.
@@ -45,6 +46,14 @@ The existing binary observation establishes unchanged vendor bytes and records t
 wrapper/import and Java-only sources-JAR checks. It does not exclude every possible inlined
 implementation or establish a reproducible source-to-wheel build. The proposed scope must be
 reassessed for changed pins, functions, compiled material or future jmlx adaptations.
+
+The creator line retains the recorded display name `njuffa` and a direct profile URL.
+Stack Overflow's
+[attribution guidance](https://stackoverflow.blog/2009/06/25/attribution-required/)
+(2009; checked 2026-11-22) asks for author names linked directly to their profiles.
+Its [current licensing help](https://stackoverflow.com/help/licensing) points readers to the
+terms and applicable license. These references support retaining the additional identity
+information; they do not decide the outstanding scope or compliance review.
 
 ## Exact notice and license text for approval
 
@@ -78,11 +87,21 @@ it is not evidence that the eventual implementation or every distribution surfac
 
 [pom-licenses-candidate.json](pom-licenses-candidate.json) specifies the exact names, URLs
 and comment wording for MIT, Apache-2.0, CC BY-SA 4.0, BSD-2-Clause, BSD-3-Clause and zlib.
-MIT names mlx-c and the other recorded MIT components; Apache includes cexpf, TensorFlow
-and JAX as well as metal-cpp. The BSD and zlib entries cover the corresponding retained
-notice sections. This also addresses existing metadata gaps as part of the same proposed
-metadata review. Cephes retains its separately recorded original-permission interpretation;
-these entries do not relabel it with a standard license.
+MIT names mlx-c and other recorded MIT components; Apache names metal-cpp, cexpf and
+TensorFlow adaptations and retains the JAX reference notice. The BSD and zlib entries
+cover the corresponding retained notice sections. This also addresses existing metadata
+gaps as part of the same proposed metadata review. Cephes retains its separately
+recorded original-permission interpretation; these entries do not relabel it with a
+standard license. Component examples introduced by "including" are illustrative; the
+retained notices identify the complete recorded set. The opt_einsum, VkFFT, JAX,
+Random123 and CUB references/attributions are described as retained notices, without
+asserting that their expression is present in the binaries.
+
+During implementation, update `req/phase8-4-native-license-audit.md` alongside the POM: its
+current MIT/Apache-only description must describe the approved six-entry metadata and its
+scoped, illustrative component examples. The audit JSON does not repeat that description;
+review it for consistency and record finding resolutions only after validation. The
+compliance proposal lists both audit files in the implementation follow-up.
 
 The CC comment contains exactly one `{{APPROVED_NOTICE_PERMALINK}}` token. This file is a
 comment template, not a generated POM or the final literal comment. Approval here would cover

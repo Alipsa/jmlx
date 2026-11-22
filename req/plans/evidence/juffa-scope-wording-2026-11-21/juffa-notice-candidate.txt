@@ -3,7 +3,8 @@
 
 Norbert Juffa erf / erfinv adaptations (source records: CC BY-SA 4.0)
 
-Creator: Norbert Juffa (Stack Overflow user ID 780717)
+Creator: Norbert Juffa (Stack Overflow display name: njuffa; user ID 780717)
+Profile: https://stackoverflow.com/users/780717/njuffa
 
 Reviewed source material:
 - Error-function implementation, answer 35148199, revision 4, 2022-06-18:

@@ -66,10 +66,10 @@
       "path": "juffa-notice-candidate.txt",
       "kind": "literal candidate section including leading LF and separator",
       "proposedTarget": "jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
-      "sha256": "fb8df12e47314f1134786e0420efd5ecff4357b9bb351b9fc4a176fb70f47548",
-      "bytes": 3516,
-      "sectionSha256": "28e49c8caa7d1cdf5861b65a96d1d6f75e2654498945f5766829391300bf3660",
-      "sectionBytes": 3470,
+      "sha256": "1d8c17a5d94d9297247345904030ed4776f41c804e3957c27241f64d98b1dfdf",
+      "bytes": 3593,
+      "sectionSha256": "1762ce0bc5af8518c5c155f3352cd16e5af62bef0f264f529ebcf4e10c8686af",
+      "sectionBytes": 3547,
       "sectionRule": "Exclude the initial LF and separator line with its LF; preserve every following byte through EOF, including the blank line before the title and final LF."
     },
     {
@@ -90,8 +90,8 @@
       "path": "pom-licenses-candidate.json",
       "kind": "license/comment template; final permalink and literal POM pending",
       "proposedTarget": "jmlx-native-macos-arm64/build.gradle",
-      "sha256": "1bfcf6909aa345584b7702206ab894ed1569085199d6037cf32acdec6e11a70c",
-      "bytes": 2850
+      "sha256": "a299f186b34913bbbf2217534294635abbfcceb65a5ee402f4c9a67f76c748ec",
+      "bytes": 3235
     },
     {
       "path": "publication-paragraph.txt",
@@ -157,7 +157,7 @@
         "revisionComment": "Improve accuracy of polynomial approximation"
       }
     ],
-    "modificationIndications": "The candidate notice retains summaries of both reviewed revision comments and separately describes the visible MLX modifications. No additional attribution designation, copyright notice or warranty-disclaimer notice was supplied in either reviewed answer body. This observation does not determine legal sufficiency or close the owner review."
+    "answerRevisionNotesAndMlxModifications": "The candidate notice summarizes the licensor's own answer revision comments as revision notes and separately describes the visible downstream MLX modifications. The author's edits to his own answer are not labeled prior downstream modifications. No additional attribution designation, copyright notice or warranty-disclaimer notice was supplied in either reviewed answer body. This observation does not determine legal sufficiency or close the owner review."
   },
   "acceptanceRecordRequirements": {
     "location": "separate owner acceptance record",

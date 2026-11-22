@@ -112,7 +112,8 @@ Use a separate implementation PR tied to the completed decision record and draft
 | Native module `LICENSE-CC-BY-SA-4.0` | Add the unmodified official license text |
 | Native module `build.gradle` | Include that text in all three JARs; update scoped POM |
 | `req/native-license-inventory.json` | Record upstream evidence and approved packaged hashes |
-| `req/phase8-4-native-license-audit.json` | Record each resolution only after validation |
+| `req/phase8-4-native-license-audit.md` | Replace the MIT/Apache-only POM description with the approved scoped entries and illustrative examples; distinguish retained reference notices from bundled expression |
+| `req/phase8-4-native-license-audit.json` | Review metadata consistency with the updated audit/POM; record each resolution only after validation |
 | Native README and 8.4 release notes | Explain approved scope and where terms are packaged |
 | Release checks and independent smoke | Add the separate enforcement described below |
 

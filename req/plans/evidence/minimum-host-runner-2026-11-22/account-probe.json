@@ -1,0 +1,73 @@
+{
+  "uid": 503,
+  "user": "jmlxrunner",
+  "homeMode": "0o700",
+  "groups": [
+    "staff",
+    "everyone",
+    "localaccounts",
+    "com.apple.sharepoint.group.1",
+    "_lpoperator"
+  ],
+  "host": {
+    "swVers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.2.1\nBuildVersion:\t\t26B131",
+    "architecture": "arm64",
+    "virtualized": "0"
+  },
+  "runner": {
+    "agentId": 23,
+    "agentName": "jmlx-release-minimum-m5-max",
+    "workFolder": "_work",
+    "listenerVersion": "2.338.2",
+    "listenerSha256": "732456cbedb8c09870b82a63c05ba5505ad5cc3fb536ee570879a0af1fdb5087"
+  },
+  "savedEnvironment": {
+    ".env": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "containsOwnerHome": false,
+      "mode": "0o644"
+    },
+    ".path": {
+      "bytes": 63,
+      "sha256": "879f57bf25438926a82cf2cc977c10bb418ec0e62a1d35dffef8650942abbcb0",
+      "containsOwnerHome": false,
+      "mode": "0o644"
+    }
+  },
+  "isolation": {
+    "ownerGradleProperties": {
+      "readable": false,
+      "writable": false,
+      "traversable": false
+    },
+    "ownerSshDirectory": {
+      "readable": false,
+      "writable": false,
+      "traversable": false
+    },
+    "ownerSigningDirectory": {
+      "readable": false,
+      "writable": false,
+      "traversable": false
+    }
+  },
+  "tools": {
+    "python3": {
+      "selected": "/opt/homebrew/bin/python3",
+      "resolved": "/opt/homebrew/Cellar/python@3.15/3.15.2/Frameworks/Python.framework/Versions/3.15/bin/python3.15",
+      "uid": 501,
+      "gid": 80,
+      "mode": "0o755",
+      "version": "Python 3.15.2"
+    },
+    "git": {
+      "selected": "/opt/homebrew/bin/git",
+      "resolved": "/opt/homebrew/Cellar/git/2.56.1/bin/git",
+      "uid": 501,
+      "gid": 80,
+      "mode": "0o555",
+      "version": "git version 2.56.1"
+    }
+  }
+}

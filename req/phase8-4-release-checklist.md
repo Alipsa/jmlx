@@ -46,6 +46,10 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [ ] Revalidate minimum-host registration, saved environment, tool/runner versions and
   queued jobs immediately before the window. ID 23 is historical: GitHub removes persistent
   registrations after more than 14 offline days; re-register and record a new ID if necessary.
+  The [2026-11-22 account probe](phase8-4-minimum-host-setup.md#account-revalidation-2026-11-22)
+  rechecked isolation, saved environment and local runner/tool versions. GitHub still reports
+  ID 23 offline and idle. Queue review and sharing checks remain for the actual window;
+  this partial revalidation does not close the gate or prove candidate execution.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
   The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
   inventory to 26 entries. Two provenance findings (Juffa `erf`/`erfinv` and Cephes)
@@ -103,25 +107,35 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 ## Pre-candidate verification (2026-11-22)
 
 PR #116 aligned the five changelog version-cut dates to 2026-11-22. The earlier PR #105
-jinja verification below is historical: its changelog input no longer matches. A fresh
-`./gradlew :jmlx-jinja:releaseVerification` passed at clean commit
-`e081786faae7e93856e905d8378d08603a5f7124`. Its report records `CHANGELOG.md` SHA-256
-`9bc0162e0158403e06dd6b9068edec5ec655e77189b23c95092d8c5bcbf539e0`.
+jinja verification below is historical: its changelog input no longer matches. Two consecutive
+`./gradlew :jmlx-jinja:releaseVerification` runs passed at clean commit
+`cc9f49df7a08646337102ef0ca71c9de06940622`, retaining the existing evidence directory.
+The report records these contract input SHA-256 values:
+
+- `CHANGELOG.md`: `9bc0162e0158403e06dd6b9068edec5ec655e77189b23c95092d8c5bcbf539e0`
+- `req/release-checklist.md` (jinja):
+  `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`
+
+The verified commit precedes this documentation update; it is not the current HEAD.
+This update changes no jinja verification contract inputs.
 
 The isolated online/offline matrix, reproducible archives and independent consumer resolution
 passed with BellSoft JDK 25.0.5, Temurin 21.0.13+9 and pinned Node v26.7.0. The published and
 consumer-resolved runtime JAR SHA-256 was
 `8048f73b7480d8bab56d8def5ef73fd9501e5d91329f644f701c00d8d5d083c1`.
-The nine-module `releaseAll.sh --dry-run` also passed at that clean commit. Local logs are
-`/tmp/pr115-next-jinja-verification.log` and `/tmp/pr116-dry-run.log`; generated reports are
-under ignored `jmlx-jinja/build/reports/`. These checks precede the immutable candidate;
-repeat verification after any contract input changes, including the jinja release checklist.
+The nine-module `releaseAll.sh --dry-run` also passed at that clean commit. Local logs and a
+snapshot of the final Markdown/JSON reports are retained under ignored
+`build/releaseAll/pre-candidate-2026-11-22/`. The logs are
+`pr116-repeat-verification-1.log`, `pr116-repeat-verification-2.log` and
+`pr116-followup-dry-run.log`. These local files are not committed evidence.
+These checks precede the immutable candidate; repeat verification after any contract input
+changes, including the jinja release checklist.
 The final tagged candidate still requires its own verification and signed-bundle evidence.
 
 ## Historical pre-candidate verification (2026-11-20)
 
 The earlier jinja verification at PR #104 merge
-`784124ac44cfe17f8bf7f4d8c814fc30b96ff05e` predates this PR's changelog date change and
+`784124ac44cfe17f8bf7f4d8c814fc30b96ff05e` predates PR #105's changelog date change and
 is stale for that contract input. A fresh `./gradlew :jmlx-jinja:releaseVerification`
 passed at clean PR #105 commit `a37d1683463081b16cdc6cbbab0238b47af9cf4f`, after the
 changelog change was committed. Its report recorded the then-current `CHANGELOG.md` SHA-256

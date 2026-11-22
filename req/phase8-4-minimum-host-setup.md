@@ -1,6 +1,7 @@
 # Phase 8.4 minimum-host runner setup
 
-Provisioned and connectivity checked: 2026-11-16. No candidate has been executed.
+Provisioned and connectivity checked: 2026-11-16. Account revalidated: 2026-11-22.
+No candidate has been executed.
 This implements the runner prerequisites in
 [the plan](plans/phase8-4-plan.md) and
 [release workflow](../.github/workflows/release-candidate.yml).
@@ -59,7 +60,8 @@ supplied clean PATH and `.env` empty. Their digests are retained in
 [the review evidence](plans/evidence/minimum-host-runner-2026-11-16/review.json).
 Neither contains the owner's home or an inherited `JAVA_HOME`. Configuration used `env -i`,
 not the owner's shell environment. Both `RunAtLoad` and `KeepAlive` are disabled.
-The definition remains installed but unloaded; it will not start the worker on reboot.
+At the 2026-11-16 check, the definition remained installed but unloaded.
+The 2026-11-22 state is recorded below; automatic startup remains disabled.
 GitHub's own runner authentication files are private to the account. Reinspect these saved
 files before each release window; the plist alone does not control the effective environment.
 
@@ -77,6 +79,32 @@ at inspection. Public evidence retains only that boolean, without share identity
 No new share was created for `jmlxrunner`. This is not proof that File Sharing is globally
 disabled or that all network sharing access has been audited; keep the private account home
 and recheck sharing at window time.
+
+## Account revalidation (2026-11-22)
+
+The owner ran the read-only probe as `jmlxrunner`. The
+[retained account measurements](plans/evidence/minimum-host-runner-2026-11-22/account-probe.json)
+confirm UID 503, a `0700` home and no admin membership on physical ARM64 macOS 27.2.1
+(build 26B131; `kern.hv_vmm_present=0`). The account cannot read or write the owner's
+Gradle properties or traverse the owner's SSH and signing directories. These scoped
+permission checks do not establish machine-wide secret isolation.
+
+Local runner ID 23 remains `jmlx-release-minimum-m5-max`, listener 2.338.2. Its listener
+SHA-256 is `732456cbedb8c09870b82a63c05ba5505ad5cc3fb536ee570879a0af1fdb5087`.
+The saved `.env` is empty; `.path` is 63 bytes. Neither contains the owner's home;
+versions, resolved tool paths, modes and environment hashes are retained in the probe.
+Python 3.15.2 and Git 2.56.1 still resolve through owner-managed Homebrew.
+
+A read-only GitHub registration check confirmed ID 23 offline and idle, with labels
+`self-hosted`, `macOS`, `ARM64` and `jmlx-release-minimum`. A local launchd inspection
+found the service loaded, with state `not running`, active count zero and no starts.
+No listener was started or job dispatched during this revalidation. If still loaded at
+window time, skip `bootstrap` and use `kickstart` only after the window checks pass.
+
+The queued-job review, sharing review and immediate pre-window revalidation remain required.
+This probe does not close the readiness gate or establish signed-candidate Metal execution.
+
+## Starting and stopping the reviewed window
 
 For a reviewed release verification window, a host administrator can start it with:
 

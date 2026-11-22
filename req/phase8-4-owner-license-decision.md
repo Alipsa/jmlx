@@ -162,11 +162,11 @@ It accepts neither unspecified future artifacts nor changed distribution terms o
 
 **Follow-up:** merge the reviewed decision record, then prepare the next candidate under
 the release runbook. The approved notice precedes its POM permalink commit and is preserved
-by the merge; keep that ordering and ancestry for later revisions. Validate the signed
-candidate, its actual distribution and the required consumer/physical minimum-host gates.
-Applicable law remains undetermined. Both findings and the release gate remain open until
-those conditions pass. Future changes by jmlx need their own assessment. This approval does
-not authorize Maven Central publication.
+by the merge. Keep that ordering and ancestry for later revisions. Validate the signed
+candidate and its actual distribution, including the required consumer and physical
+minimum-host gates. Applicable law remains undetermined. Both findings and the release gate
+remain open until those conditions pass. Future changes by jmlx need their own assessment.
+This approval does not authorize Maven Central publication.
 
 ## Cephes: approved owner interpretation
 

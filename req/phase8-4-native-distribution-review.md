@@ -12,6 +12,10 @@ The [review manifest][review] records the PR #114 merge, successful post-merge n
 and license tasks, the immutable notice commit, and SHA-256/size of the local runtime, sources
 and Javadoc JARs. It records the five legal-text hashes from each JAR and the exact POM/module
 hashes, six actual POM license tuples, publication-source hashes and approval status.
+`surfaceSha256At` identifies the commit for every surface hash, including the owner record
+as decision context. Those hashes describe the merged source, not later PR edits to the
+decision record. `postMergeVerification` records the checked HEAD, origin/main and three
+whole-JAR digests beside the retained task output.
 The [task report][task-report] retains the successful six-license and three-JAR result.
 These are local unsigned artifacts, not a new signed release candidate.
 
@@ -37,11 +41,11 @@ The section distinguishes the three reviewed functions and their corresponding c
 forms from unrelated MLX material and Java code. It expressly identifies no CC adapter's
 license and retains the unresolved section 2(a)(5)(B) counterargument. These observations
 implement the owner's conditional interpretation, rather than creating a new grant.
+The differing BSD forum samples do not supply a new grant for these exact versions.
+Future changes by jmlx need their own assessment.
 
 The Cephes section retains Moshier's original permission and disclaimer under the accepted
-scoped interpretation. Immediate fastermath/NEON and MLX notices remain. The differing BSD
-forum samples do not grant rights for the exact reviewed Juffa versions, and future changes
-by jmlx still require their own assessment.
+scoped interpretation. Immediate fastermath/NEON and MLX notices remain.
 
 The native README and draft release notes contain the exact previously approved publication
 paragraph, beside links to the decision and immutable notice. The inspected Gradle module

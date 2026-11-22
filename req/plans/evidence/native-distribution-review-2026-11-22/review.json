@@ -17,8 +17,17 @@
     "logSha256": "6c209caad114812bc07b17db7fdc32238d8ca68d79066d6cefc8f027df9812e4",
     "report": "postmerge-license-report.json",
     "reportSha256": "d520a99b8257f746af1cfb6214b43e48dc76f07f0d213eeb0579ef64bae56830",
-    "logPath": "build/releaseAll/native-distribution-review-2026-11-22/postmerge-verification.log"
+    "logPath": "build/releaseAll/native-distribution-review-2026-11-22/postmerge-verification.log",
+    "checkoutHead": "fc9b634a5d0103e266fa550c5737bcd74e0707e6",
+    "originMainSha": "fc9b634a5d0103e266fa550c5737bcd74e0707e6",
+    "jarSha256": {
+      "jmlx-native-macos-arm64-0.1.0.jar": "cfbb7d71615727d5e5a2e84e6816c4680f1ae61f21d1a3bb5f51c91dc3eaea80",
+      "jmlx-native-macos-arm64-0.1.0-sources.jar": "5d3ed16e5dcb2127be30ff1cd94779c5e10404ccad5c465dd7276d8f1d9f73ea",
+      "jmlx-native-macos-arm64-0.1.0-javadoc.jar": "78c9ceb3bbae86b43ac96abd34f3cd05d80f3971574d02f69dd10573e7bf0728"
+    },
+    "provenance": "Checkout/ref identities and whole-JAR hashes for the merged-main run; report retains the parsed task stdout. The local log is supplementary provenance, not the only link to the checked inputs."
   },
+  "surfaceSha256At": "fc9b634a5d0103e266fa550c5737bcd74e0707e6",
   "surfaceSha256": {
     "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9",
     "README.md": "0680d44b8182e15a543d4e3d7b9ee5482d9f8357efb497e6ce7a89b3ad632d24",
@@ -252,7 +261,8 @@
       "oldNoticeSha256": "1e571151cfa05d88148c2495bf4920e2127c54f409f8974c48070003905df7bd",
       "appendedCandidateSha256": "1d8c17a5d94d9297247345904030ed4776f41c804e3957c27241f64d98b1dfdf",
       "exactConcatenation": true
-    }
+    },
+    "surfacesExaminedAt": "fc9b634a5d0103e266fa550c5737bcd74e0707e6"
   },
   "ownerDecisions": {
     "finalLiteralMetadata": "pending",

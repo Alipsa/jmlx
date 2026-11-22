@@ -39,7 +39,7 @@
     "ownerGradleProperties": {
       "readable": false,
       "writable": false,
-      "executable": false
+      "traversable": false
     },
     "ownerSshDirectory": {
       "readable": false,
@@ -93,8 +93,7 @@
     "sourceCommitMeaning": "Checkout HEAD during supplemental inspection and evidence assembly, not a timestamped anchor captured by the original probe.",
     "supplementalObservedAt": "2026-11-22T20:22:55Z",
     "commandMeaning": "Original historical invocation, with the script staged in /tmp; no equivalent invocation from the owner checkout is claimed. It did not use Python isolated mode.",
-    "originalInvocationLimitations": "The historical invocation did not use -I and used a shared temporary script directory. No tampering was observed; a hardened rerun remains required before the window.",
-    "measurementNormalization": "Renamed isolation.ownerGradleProperties.traversable to executable: the original script used os.access(path, X_OK), which tests execution for this file. No measurement value changed."
+    "originalInvocationLimitations": "The historical invocation did not use -I and used a shared temporary script directory. No tampering was observed; a hardened rerun remains required before the window."
   },
   "ownerInspection": {
     "host": {
@@ -154,9 +153,13 @@
     "requirements": [
       "Copy script out of owner checkout to a fresh jmlxrunner-owned 0700 staging directory.",
       "Run from / using an absolute script path and python3 -I.",
-      "Retain new output separately; do not replace the historical measurements."
-    ],
-    "command": "cd / && sudo -H -u jmlxrunner /usr/bin/env -i PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin /opt/homebrew/bin/python3 -I \"$probe_dir/account-probe.py\"",
-    "commandMeaning": "Run only after the documented staging procedure defines probe_dir as the absolute path of a fresh runner-owned 0700 directory and copies the reviewed script there."
+      "Retain new output separately; do not replace the historical measurements.",
+      "Verify the staged SHA-256 as jmlxrunner before execution; abort on mismatch.",
+      "Use an exit trap to clean the staging directory on success or failure.",
+      "Retain output in a fresh build/releaseAll/window-<UTC date>.<unique suffix> directory."
+    ]
+  },
+  "measurementAnnotations": {
+    "isolation.ownerGradleProperties.traversable": "Original historical key retained. The original script used os.access(path, X_OK), which tests whether this file is executable, not directory traversal. All access checks depend on parent-directory traversal; the owner home is 0700."
   }
 }

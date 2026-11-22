@@ -97,7 +97,8 @@ for the virtualization measurement. The account cannot read or write the owner's
 properties or traverse the owner's SSH and signing directories. The owner's `0700` home
 blocks traversal before the leaf paths can be reached; these checks do not independently
 establish each leaf's permissions. For Gradle properties, `X_OK` means executable, not
-traversable. The evidence explicitly records that key normalization without changing its value.
+traversable. Historical JSON retains the original `traversable` key with an annotation;
+the formatted window-time probe uses `executable` for that file.
 These scoped permission checks do not establish machine-wide secret isolation.
 
 Local runner ID 23 remains `jmlx-release-minimum-m5-max`, listener 2.338.2. Its listener
@@ -141,23 +142,40 @@ This procedure has not yet been run and does not change the historical invocatio
 From the repository root, in an administrator's Terminal:
 
 ```sh
-mkdir -p build/releaseAll/pre-candidate-2026-11-22
-probe_dir=$(/usr/bin/mktemp -d /private/tmp/jmlx-account-probe.XXXXXXXX)
-sudo /usr/bin/install -d -o jmlxrunner -g staff -m 0700 "$probe_dir"
-sudo /usr/bin/install -o jmlxrunner -g staff -m 0400 \
-  req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py \
-  "$probe_dir/account-probe.py"
 (
-  cd /
-  sudo -H -u jmlxrunner /usr/bin/env -i \
-    PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin \
-    /opt/homebrew/bin/python3 -I "$probe_dir/account-probe.py"
-) > build/releaseAll/pre-candidate-2026-11-22/window-time-account-probe.json
+  set -euo pipefail
+  probe_dir=''
+  cleanup() {
+    if [ -n "$probe_dir" ]; then
+      sudo /bin/rm -rf "$probe_dir"
+    fi
+  }
+  trap cleanup EXIT
+  mkdir -p build/releaseAll
+  window_dir=$(/usr/bin/mktemp -d "build/releaseAll/window-$(/bin/date -u +%F).XXXXXXXX")
+  probe_dir=$(/usr/bin/mktemp -d /private/tmp/jmlx-account-probe.XXXXXXXX)
+  sudo /usr/bin/install -d -o jmlxrunner -g staff -m 0700 "$probe_dir"
+  sudo /usr/bin/install -o jmlxrunner -g staff -m 0400 \
+    req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py \
+    "$probe_dir/account-probe.py"
+  expected=20e907f58b38f86aa3bc56080c9057b1ab67dd5fc520f831e87e6b3b2b597b01
+  actual=$(sudo -u jmlxrunner /usr/bin/shasum -a 256 "$probe_dir/account-probe.py")
+  actual="${actual%% *}"
+  [ "$actual" = "$expected" ] || { echo "probe script digest mismatch" >&2; exit 1; }
+  (
+    cd /
+    sudo -H -u jmlxrunner /usr/bin/env -i \
+      PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin \
+      /opt/homebrew/bin/python3 -I "$probe_dir/account-probe.py"
+  ) > "$window_dir/account-probe.partial.json"
+  mv "$window_dir/account-probe.partial.json" "$window_dir/account-probe.json"
+)
 ```
 
-Review the staged script's SHA-256 against
-`windowTimeProbe.scriptSha256` before running. After retaining the result, remove the
-staged script and directory as `jmlxrunner`. The probe does not start the runner service.
+The staged hash must match `windowTimeProbe.scriptSha256` before execution. The exit trap
+removes the staging directory on success or failure. Output is retained in a fresh directory
+named for the window's UTC date; a failed run leaves only a partial result. The probe does
+not start the runner service.
 
 ## Starting and stopping the reviewed window
 

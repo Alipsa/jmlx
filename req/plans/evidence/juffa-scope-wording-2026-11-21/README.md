@@ -50,7 +50,11 @@ reassessed for changed pins, functions, compiled material or future jmlx adaptat
 The creator line retains the recorded display name `njuffa` and a direct profile URL.
 Stack Overflow's
 [attribution guidance](https://stackoverflow.blog/2009/06/25/attribution-required/)
-(2009; checked 2026-11-22) asks for author names linked directly to their profiles.
+(2009; checked 2026-11-22) asks for links to the original questions, author names and
+direct author-profile links. This packet uses the answer links as original-question links:
+[erf answer 35148199](https://stackoverflow.com/a/35148199) opens question 35148198 at that
+answer, and [erfinv answer 49743348](https://stackoverflow.com/a/49743348) opens question
+27229371 at that answer. Both destinations were checked on 2026-11-22.
 Its [current licensing help](https://stackoverflow.com/help/licensing) points readers to the
 terms and applicable license. These references support retaining the additional identity
 information; they do not decide the outstanding scope or compliance review.

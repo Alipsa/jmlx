@@ -151,7 +151,7 @@
     "scriptSha256": "20e907f58b38f86aa3bc56080c9057b1ab67dd5fc520f831e87e6b3b2b597b01",
     "invocationGuide": "req/phase8-4-minimum-host-setup.md#window-time-account-probe",
     "requirements": [
-      "Copy script out of owner checkout to a fresh jmlxrunner-owned 0700 staging directory.",
+      "Stage the script from the recorded source commit into a fresh jmlxrunner-owned 0700 staging directory.",
       "Run from / using an absolute script path and python3 -I.",
       "Retain new output separately; do not replace the historical measurements.",
       "Verify the staged SHA-256 as jmlxrunner before execution; abort on mismatch.",

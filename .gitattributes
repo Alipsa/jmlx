@@ -35,3 +35,6 @@ jmlx-native-macos-arm64/LICENSE-CC-BY-SA-4.0 text eol=lf whitespace=-blank-at-eo
 # Implementation approval and validation evidence is byte-pinned.
 req/plans/evidence/juffa-implementation-2026-11-22/** -text
 req/native-authored-attributions.json text eol=lf
+
+# Preserve post-merge native distribution review evidence across checkout settings.
+req/plans/evidence/native-distribution-review-2026-11-22/** -text

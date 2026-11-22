@@ -64,10 +64,17 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   the owner accepted the scoped Cephes original-permission interpretation, subject to retaining
   notices and artifact validation. The
   [Cephes local verification](plans/evidence/cephes-notice-validation-2026-11-21/validation.json)
-  records the revised title and checks all three native JARs; implementation review and final
-  candidate validation remain outstanding. The owner also accepted the Juffa existing-grants
-  interpretation on 2026-11-21, subject to scope, final wording, downstream terms and artifact
-  validation. Both findings stay open.
+  records the revised title and checks all three native JARs; implementation review was
+  accepted on 2026-11-22, while final candidate validation remains outstanding. The owner
+  also accepted the Juffa existing-grants interpretation on 2026-11-21, subject to scope,
+  final wording, downstream terms and artifact validation. Both findings stay open.
+  On 2026-11-22 the owner approved the scope/wording packet. PR #114 merged as
+  `fc9b634a5d0103e266fa550c5737bcd74e0707e6`; payload and explicit license verification
+  now pass on merged main. The
+  [final metadata/downstream review](phase8-4-native-distribution-review.md)
+  supplies exact local artifact/metadata hashes and the owner conclusion accepted on
+  2026-11-22 in PR #115. The separate acceptance record pins the approved review commit and
+  document/metadata hashes. Signed-candidate and actual-distribution validation remain open.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
   organization Usage Center values and the exact signed bundle remain outstanding.

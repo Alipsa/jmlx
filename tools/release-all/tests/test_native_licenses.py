@@ -46,7 +46,13 @@ class NativeLicensesTest(unittest.TestCase):
             (self.legal / name).write_bytes(data)
             self.inventory["packagedTexts"][name] = hashlib.sha256(data).hexdigest()
         install_policy(self.root, self.inventory["components"])
-        self.audit = {"sourceEvidence": [], "unresolvedFindings": [{"id": "open-license"}]}
+        self.acceptance = self.root / R.REQUIRED_FINAL_ACCEPTANCE
+        self.acceptance.parent.mkdir(parents=True, exist_ok=True)
+        self.acceptance.write_bytes(b'{"approved": true}\n')
+        self.audit = {"sourceEvidence": [], "unresolvedFindings": [{"id": "open-license"}],
+                      "scopeWordingImplementation": {
+                          "finalReviewAcceptance": R.REQUIRED_FINAL_ACCEPTANCE,
+                          "finalReviewAcceptanceSha256": R.sha256(self.acceptance)}}
         self.save()
 
     def save(self):
@@ -63,6 +69,45 @@ class NativeLicensesTest(unittest.TestCase):
         self.audit["unresolvedFindings"] = []
         self.save()
         self.assertTrue(self.verify()["releaseReady"])
+
+    def test_final_owner_acceptance_pin_rejects_edits_missing_files_and_missing_digest(self):
+        path = self.acceptance
+        self.verify()
+        path.write_bytes(path.read_bytes() + b' ')
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record.*digest differs'):
+            self.verify()
+        path.unlink()
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record missing'):
+            self.verify()
+        self.audit['scopeWordingImplementation'].pop('finalReviewAcceptanceSha256')
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record pin missing'):
+            self.verify()
+        # Removing both fields must not turn the pin check off, even if the file exists.
+        path.write_bytes(b'{"approved": true}\n')
+        self.audit['scopeWordingImplementation'].pop('finalReviewAcceptance')
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record pin missing'):
+            self.verify()
+        self.audit['scopeWordingImplementation']['status'] = 'implemented'
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record pin missing'):
+            self.verify()
+
+    def test_final_owner_acceptance_requirement_survives_section_deletion_or_redirection(self):
+        self.verify()
+        section = self.audit.pop('scopeWordingImplementation')
+        self.save()
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record pin missing'):
+            self.verify()
+        alternate = self.root / 'req/substitute-acceptance.json'
+        alternate.write_bytes(self.acceptance.read_bytes())
+        self.audit['scopeWordingImplementation'] = dict(
+            section, finalReviewAcceptance='req/substitute-acceptance.json')
+        self.save()
+        # Even identical content and a matching digest cannot replace the required path.
+        with self.assertRaisesRegex(ValueError, 'final owner acceptance record pin missing'):
+            self.verify()
 
     def test_corrupt_cache_and_changed_wheel_fail(self):
         self.cached.write_bytes(b"unreviewed")

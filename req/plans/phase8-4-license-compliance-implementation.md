@@ -16,7 +16,8 @@ The POM carries the approved six scoped entries and literal comments. Its CC com
 notice commit `551eebeeb66a80ef3af467a6c1b4995c2a7f7034`, committed before the POM change.
 The native README and draft release notes contain the exact approved publication paragraph,
 with decision and notice links beside it. The audit describes the expanded scoped metadata.
-Final literal metadata review remains pending; these changes do not resolve either finding.
+Final literal metadata and local downstream terms were accepted on 2026-11-22 in the
+[owner record](../phase8-4-owner-license-decision.md). Candidate conditions remain open.
 
 `req/native-authored-attributions.json` separates jmlx-authored attribution requirements from
 upstream excerpts. The audit verifies its pinned local approval evidence and upstream source
@@ -56,14 +57,16 @@ section and policy deletion. Both actual consumer profiles are exercised separat
 
 ## Remaining release work
 
-Merge this implementation with a merge commit; do not squash or rebase the notice commit.
-Fetch origin and run `verifyNativeReleaseLicenses` before tagging. Its real-checkout
-pre-merge ancestry refusal is expected; positive execution is covered in an isolated history
-fixture. Shallow contributor/PR builds must not run this explicit task.
+PR #114 merged with a merge commit as `fc9b634a5d0103e266fa550c5737bcd74e0707e6`.
+The notice commit is preserved. Payload and explicit license verification passed after
+fetching and syncing main; the [post-merge report][postmerge-report] supersedes the earlier
+real-checkout ancestry refusal. Repeat these checks before candidate tagging. Shallow
+contributor/PR builds must not run the explicit history-dependent task.
 
-Per Nyfelt must review the final literal metadata and the actual downstream distribution
-terms and measures. Any resulting wording change needs another reviewed notice commit before
-updating its permalink and independent expectations. Both `NATIVE-LICENSE-1` and
+Per Nyfelt accepted the pinned final metadata and reviewed local downstream terms in
+PR #115. The signed candidate and actual distribution must preserve that treatment. Any
+resulting wording change needs another reviewed notice commit before updating its permalink
+and independent expectations. Both `NATIVE-LICENSE-1` and
 `NATIVE-LICENSE-2` stay open until their separate validation/decision conditions are met.
 
 After review, follow the release runbook for a new immutable candidate, fresh signatures and
@@ -94,3 +97,5 @@ ARM64; the updated validation record retains the results and input hashes.
 An absent origin remote now uses the same repository-configuration diagnostic as a wrong
 origin URL, without fetch advice. Helper and CLI regressions exercise the missing remote;
 the focused native suites pass on macOS and Linux ARM64, and receipt regressions pass.
+
+[postmerge-report]: evidence/native-distribution-review-2026-11-22/postmerge-license-report.json

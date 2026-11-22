@@ -10,7 +10,7 @@ Prepared 2026-11-21. Status: both owner interpretations accepted; remaining cond
 | Confirmation date | 2026-11-21; owner statements in the preparation conversation |
 | Applicable law | Not determined; pending assessment of relevant rights and grants |
 | Assessment | Owner judgment based on the evidence; reviewer is not a lawyer |
-| Juffa disposition | Interpretation accepted; scope/wording approved; terms and artifact review pending |
+| Juffa disposition | Scope/wording approved; downstream terms and artifact review pending |
 | Cephes disposition | Interpretation and Netlib-material basis accepted; validation pending |
 | Release gate | Open; neither finding has been resolved |
 

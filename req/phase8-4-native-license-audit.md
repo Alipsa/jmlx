@@ -65,8 +65,11 @@ NOTICE are packaged alongside them in all three JARs.
 | VkFFT / CUB | **Added:** MIT and source-local BSD-3-Clause notices for Metal FFT and merge-sort references |
 | Cephes | **Added:** original permission statement; remains `NATIVE-LICENSE-2` below |
 
-The POM's MIT and Apache-2.0 entries describe the module and primary bundled work. They are
-not an exhaustive transitive-license inventory; the complete notices travel in the artifacts.
+The native POM now has six scoped entries: MIT, Apache-2.0, CC BY-SA 4.0, BSD-2-Clause,
+BSD-3-Clause and zlib. Component examples are illustrative; the complete notices travel in
+the artifacts. Reference-only notices are distinguished from bundled adaptations. The CC
+entry links the approved Juffa scope and identifies the packaged full license. Final literal
+metadata and signed-artifact review remain pending under the owner decision record.
 Adaptations are identified as modifications rather than attributed as original jmlx code.
 
 ## Distribution boundary and exclusions

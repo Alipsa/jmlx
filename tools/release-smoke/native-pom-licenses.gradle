@@ -1,0 +1,79 @@
+// Independent consumer expectations reviewed against the approved template, not generated
+// from the producer POM, withXml block or authored-attribution policy at runtime.
+def requiredNativePomLicenses = [
+        ['MIT License',
+         'https://opensource.org/license/mit',
+         'Applies to the jmlx native artifact code, mlx-c, Apple/MLX contributions covered by ' +
+         'their existing MIT grants, and the other MIT components listed in ' +
+         'META-INF/THIRD-PARTY-NOTICES, including nlohmann/json, fmt, gguf-tools, FP16 and ' +
+         'supervised-lda. MIT notices are also retained there for the opt_einsum algorithm ' +
+         'attribution and VkFFT algorithm reference. The reviewed Juffa expression has ' +
+         'separately identified CC BY-SA 4.0 terms.'],
+        ['Apache License, Version 2.0',
+         'https://www.apache.org/licenses/LICENSE-2.0.txt',
+         'Applies to Apache-2.0 components identified in META-INF/THIRD-PARTY-NOTICES, ' +
+         'including vendored metal-cpp compiled into libmlx.dylib and the NVIDIA/Filipe RNC ' +
+         'Maia cexpf and TensorFlow adaptations. An Apache-2.0 notice is also retained there ' +
+         'for the JAX Threefry algorithm reference.'],
+        ['Creative Commons Attribution-ShareAlike 4.0 International',
+         'https://creativecommons.org/licenses/by-sa/4.0/',
+         'Applies to Norbert Juffa\'s covered expression in the reviewed Metal erf and Metal/CPU' +
+         ' SIMD erfinv material, including corresponding compiled forms in libmlx.dylib and ' +
+         'mlx.metallib. Apple/MLX contributions rely separately on existing MIT grants. No CC ' +
+         'adapter\'s license is identified. See ' +
+         '<https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES>' +
+         ' (scope and redistribution basis), also packaged in META-INF/THIRD-PARTY-NOTICES. The' +
+         ' complete CC license is packaged in META-INF/LICENSE-CC-BY-SA-4.0.'],
+        ['BSD 2-Clause License',
+         'https://opensource.org/license/bsd-2-clause',
+         'Applies to BSD-2-Clause material identified in META-INF/THIRD-PARTY-NOTICES, ' +
+         'including Norbert Juffa expm1f.'],
+        ['BSD 3-Clause License',
+         'https://opensource.org/license/bsd-3-clause',
+         'Applies to BSD-3-Clause components identified in META-INF/THIRD-PARTY-NOTICES, ' +
+         'including pocketfft, V8, NumPy, fastermath and PyTorch (including Metal hypot). ' +
+         'BSD-3-Clause notices are also retained there for the Random123 Threefry attribution ' +
+         'and CUB merge-sort algorithm reference.'],
+        ['zlib License',
+         'https://opensource.org/license/zlib',
+         'Applies to zlib components identified in META-INF/THIRD-PARTY-NOTICES, including ' +
+         'ThreadPool and the Julien Pommier NEON math adaptation.'],
+ ]
+
+ext.verifyNativePomLicenseBytes = { byte[] bytes ->
+    def parser = new groovy.xml.XmlParser(false, true)
+    parser.setFeature('http://apache.org/xml/features/disallow-doctype-decl', true)
+    def pom = parser.parse(new ByteArrayInputStream(bytes))
+    def localName = { node ->
+        node.name() instanceof groovy.namespace.QName ? node.name().localPart : node.name().toString()
+    }
+    def namespace = pom.name() instanceof groovy.namespace.QName ? pom.name().namespaceURI : ''
+    if (localName(pom) != 'project' || !(namespace in ['', 'http://maven.apache.org/POM/4.0.0'])) {
+        throw new GradleException('Invalid native POM root')
+    }
+    def checkNamespace
+    checkNamespace = { node ->
+        def actual = node.name() instanceof groovy.namespace.QName ? node.name().namespaceURI : ''
+        if (actual != namespace) throw new GradleException('Native POM namespace differs')
+        node.children().findAll { it instanceof Node }.each { checkNamespace(it) }
+    }
+    checkNamespace(pom)
+    def groups = pom.children().findAll { it instanceof Node && localName(it) == 'licenses' }
+    if (groups.size() != 1) throw new GradleException('Native POM license entries differ')
+    def actual = groups[0].children().collect { entry ->
+        if (!(entry instanceof Node) || localName(entry) != 'license') {
+            throw new GradleException('Native POM license entry differs')
+        }
+        def fields = entry.children()
+        if (fields.size() != 3 || fields.any { !(it instanceof Node) } ||
+                fields.collect { localName(it) }.toSet() != ['name', 'url', 'comments'].toSet() ||
+                fields.any { it.children().any { it instanceof Node } }) {
+            throw new GradleException('Native POM license fields differ')
+        }
+        ['name', 'url', 'comments'].collect { key -> fields.find { localName(it) == key }.text() }
+    }
+    if (actual.size() != requiredNativePomLicenses.size() || actual.toSet().size() != actual.size() ||
+            actual.toSet() != requiredNativePomLicenses.toSet()) {
+        throw new GradleException('Native POM licenses differ from approved literal tuples')
+    }
+}

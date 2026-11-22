@@ -19,7 +19,8 @@ class NativePublishTest(unittest.TestCase):
             root = Path(temp)
             module = root / "jmlx-native-macos-arm64"
             module.mkdir()
-            for name in ("build.gradle", "LICENSE", "NOTICE", "LICENSE-APACHE-2.0", "THIRD-PARTY-NOTICES"):
+            for name in ("build.gradle", "LICENSE", "NOTICE", "LICENSE-APACHE-2.0",
+                         "LICENSE-CC-BY-SA-4.0", "THIRD-PARTY-NOTICES"):
                 shutil.copy(ROOT / "jmlx-native-macos-arm64" / name, module)
             (root / "settings.gradle").write_text("rootProject.name='native-publish-fixture'\ninclude 'jmlx-native-macos-arm64'\n")
             with (module / "build.gradle").open("a") as stream:

@@ -2,7 +2,8 @@
 
 2026-11-21. Draft for owner review, based on PR #106 merge
 `59cc6c1` and the [scoped review](phase8-4-scoped-license-review.md).
-Status: implementation proposed; conditional owner interpretations are recorded separately.
+Status: scope and wording approved on 2026-11-22; implementation prepared for review.
+See the [implementation report](plans/phase8-4-license-compliance-implementation.md).
 No new permission grant is recorded by this proposal.
 Both `NATIVE-LICENSE-1` and `NATIVE-LICENSE-2` remain open.
 
@@ -21,7 +22,9 @@ be replaced with approved wording before packaging. No production task includes 
 
 The [current scope and wording packet][scope-wording] supplies candidate notice, native NOTICE,
 full CC text and POM template under the accepted interpretation. It supersedes the earlier
-draft's unresolved-paragraph prompt for review; its scope and wording remain unapproved.
+draft's unresolved-paragraph prompt. The owner approved its scope and wording on 2026-11-22;
+the [owner decision record](phase8-4-owner-license-decision.md) pins that approval separately
+from the preparation PR merge. Final literal metadata and downstream artifact review remain open.
 
 ## Material and distribution to decide
 
@@ -75,7 +78,8 @@ Record each answer in the decision record below, with evidence and rationale.
    contributions plus the direct section 2(a)(5)(A) offer for Juffa's expression; no CC
    adapter's license is identified. Replace the draft notice's unresolved paragraph with
    that basis and the approved scope, preserving (B)'s condition as the counterargument;
-   do not present MIT as a CC adapter's license. Final wording still requires owner approval.
+   do not present MIT as a CC adapter's license. Scope/wording approval is now recorded;
+   final literal metadata review remains pending.
 4. **Downstream terms:** review the actual distribution terms and any technological measures
    against the approved treatment. Review all publication surfaces together, including licenses
    consumers see in the POM. Do not infer compliance from Maven availability or a notice test.

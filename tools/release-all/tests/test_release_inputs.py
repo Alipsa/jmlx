@@ -10,6 +10,7 @@ import unittest
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
+from native_license_fixtures import install_policy, approved_candidate
 
 SPEC = importlib.util.spec_from_file_location("release_inputs", Path(__file__).parents[1] / "release_inputs.py")
 R = importlib.util.module_from_spec(SPEC)
@@ -126,7 +127,14 @@ class ReleaseInputsTest(unittest.TestCase):
                 for entry in self.doc["modules"]:
                     base = f"se/alipsa/{entry['module']}/0.1.0/{entry['module']}-0.1.0"
                     for suffix in (".pom", ".module", ".jar", "-sources.jar", "-javadoc.jar"):
-                        archive.writestr(base + suffix, "artifact")
+                        if suffix in (".jar", "-sources.jar", "-javadoc.jar") and entry["module"] == "jmlx-native-macos-arm64":
+                            import io
+                            buffer = io.BytesIO()
+                            with zipfile.ZipFile(buffer, "w") as nested:
+                                nested.writestr("META-INF/THIRD-PARTY-NOTICES", approved_candidate())
+                            archive.writestr(base + suffix, buffer.getvalue())
+                        else:
+                            archive.writestr(base + suffix, "artifact")
                         archive.writestr(base + suffix + ".asc", "signature")
                 if extra:
                     archive.writestr(extra, "untrusted")
@@ -142,7 +150,12 @@ class ReleaseInputsTest(unittest.TestCase):
             if command[3] == "cat-file":
                 return "tag\n"
             return ("b"*40 if command[-1] == "refs/tags/jmlx-phase8.4-rc.1" else "c"*40) + "\n"
-        with patch.object(R.subprocess, "check_output", side_effect=git):
+        with patch.object(R.subprocess, "check_output", side_effect=git), \
+                patch.object(R, "native_pom_report"), patch.object(R, "verify_notice_permalink"), \
+                patch.object(R, "check_authored_attribution"), patch.object(R, "native_notice_report"):
+            req = root / "req"
+            req.mkdir(exist_ok=True)
+            (req / "native-license-inventory.json").write_text("{}")
             digest = save_record()
             R.check_bundle(bundle, record_path, digest, manifest_path, root)
             with self.assertRaisesRegex(ValueError, "record digest"):
@@ -162,10 +175,12 @@ class ReleaseInputsTest(unittest.TestCase):
         wheel_hash = "e"*64
         bootstrap.write_text('MLX_METAL_WHEEL_SHA256="' + wheel_hash + '"\n')
         pins = {"mlxMetalVersion": "0.32.4", "mlxcCommit": "a"*40}
-        legal = {"LICENSE": b"MIT", "LICENSE-APACHE-2.0": b"Apache-2.0", "THIRD-PARTY-NOTICES": b"dependencies",
+        legal = {"LICENSE": b"MIT", "LICENSE-APACHE-2.0": b"Apache-2.0", "THIRD-PARTY-NOTICES": b"dependencies\n" + approved_candidate(),
+                 "LICENSE-CC-BY-SA-4.0": b"CC BY-SA 4.0",
                  "NOTICE": ("0.32.4 " + "a"*40 + " " + wheel_hash).encode()}
+        install_policy(root)
         inventory_file = root / "req/native-license-inventory.json"
-        inventory_file.parent.mkdir()
+        inventory_file.parent.mkdir(exist_ok=True)
         jar = root / "native.jar"
         def write_jar():
             inventory_file.write_text(json.dumps({"nativePins": pins, "wheelSha256": wheel_hash,

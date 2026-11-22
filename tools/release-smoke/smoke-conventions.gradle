@@ -112,6 +112,9 @@ ext.smokeDocsConfigurations = {
 // agreement with the POM-only resolution, and the published artifact checks (licenses, vision
 // NOTICE, JPMS names, and the native payload when the native module is selected).
 ext.smokeRegisterVerificationTasks = {
+    if (smokeProfile != 'pure-java') {
+        apply from: rootProject.file('native-legal-texts.gradle')
+    }
     tasks.register('verifyResolution') {
         def output = layout.buildDirectory.file('runtime-coordinates.txt')
         outputs.file(output)
@@ -160,6 +163,12 @@ ext.smokeRegisterVerificationTasks = {
         def sources = configurations.sourcesJars
         def expectedCount = jmlxVersions.size()
         def nativeSelected = jmlxVersions.containsKey('jmlx-native-macos-arm64')
+        if (nativeSelected) {
+            dependsOn ':pom-check:verifyNativePomLicenses'
+            inputs.files(rootProject.file('native-legal-texts.gradle'),
+                    rootProject.file('../../req/native-license-inventory.json'),
+                    rootProject.file('../../req/native-authored-attributions.json'))
+        }
         smokeVerificationInputs(it)
         doLast {
             def jmlxJars = runtime.files.findAll { it.name.startsWith('jmlx-') }
@@ -251,19 +260,21 @@ ext.smokeRegisterVerificationTasks = {
                 if (!names.contains('META-INF/NOTICE')) throw new GradleException("${nativeJar.name}: no META-INF/NOTICE")
                 def inventory = new groovy.json.JsonSlurper().parse(
                         rootProject.file('../../req/native-license-inventory.json'))
+                def policy = new groovy.json.JsonSlurper().parse(
+                        rootProject.file('../../req/native-authored-attributions.json'))
                 def nativeJars = [nativeJar,
                         javadocs.files.find { it.name.startsWith('jmlx-native-macos-arm64-') },
                         sources.files.find { it.name.startsWith('jmlx-native-macos-arm64-') }]
                 nativeJars.each { jar ->
                     if (jar == null) throw new GradleException('Native documentation artifact missing')
-                    inventory.packagedTexts.each { name, expected ->
+                    def namesToRead = (inventory.packagedTexts.keySet() +
+                            ['LICENSE', 'NOTICE', 'LICENSE-APACHE-2.0',
+                             'LICENSE-CC-BY-SA-4.0', 'THIRD-PARTY-NOTICES']).toSet()
+                    def texts = namesToRead.collectEntries { name ->
                         def bytes = entryBytes(jar, "META-INF/${name}")
-                        def digest = bytes == null ? null : java.security.MessageDigest.getInstance('SHA-256')
-                                .digest(bytes).encodeHex().toString()
-                        if (digest != expected) {
-                            throw new GradleException("${jar.name}: native notice text differs: ${name}")
-                        }
+                        bytes == null ? [:] : [(name): bytes]
                     }
+                    verifyNativeLegalTexts(texts, inventory, policy)
                 }
             }
             if (javadocs.files.size() != expectedCount) {
@@ -281,6 +292,25 @@ ext.smokeRegisterVerificationTasks = {
 // The POM-only consumer's task: the same traversal through POM-only resolution, writing the
 // coordinate report verifyPomMatchesModuleMetadata compares against the module-metadata one.
 ext.smokeRegisterPomTask = {
+    if (smokeProfile != 'pure-java') {
+        apply from: rootProject.file('native-pom-licenses.gradle')
+        def nativePom = configurations.create('nativeLicensePom') {
+            canBeConsumed = false
+            canBeResolved = true
+            transitive = false
+        }
+        dependencies.add('nativeLicensePom',
+                "se.alipsa:jmlx-native-macos-arm64:${jmlxVersions['jmlx-native-macos-arm64']}@pom")
+        tasks.register('verifyNativePomLicenses') {
+            smokeVerificationInputs(it)
+            inputs.files(nativePom)
+            inputs.file(rootProject.file('native-pom-licenses.gradle'))
+            doLast {
+                verifyNativePomLicenseBytes(nativePom.singleFile.bytes)
+                println 'Native POM license tuples verified through POM-only resolution'
+            }
+        }
+    }
     tasks.register('writeRuntimeCoordinates') {
         def output = layout.buildDirectory.file('runtime-coordinates.txt')
         outputs.file(output)

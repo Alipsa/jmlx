@@ -124,9 +124,16 @@ identified. The existing (B) counterargument remains recorded.
 | Disposition and responsible owner | Conditional accept; Per Nyfelt; finding remains open |
 | Implementation owner | Codex implements; Per Nyfelt reviews the implementation PR |
 
-**Follow-up:** implement the approved bytes and verifier extensions on a separate branch.
-Commit the approved notice before adding its POM permalink in a later commit; preserve both
-through a merge commit. Review the final literal metadata and actual downstream terms,
+PR #114 merged as `fc9b634a5d0103e266fa550c5737bcd74e0707e6` after both CI jobs passed.
+Post-merge payload and explicit license verification passed on synchronized main. The
+[final metadata and downstream review][native-final-review] records the actual artifact
+hashes, unchanged POM/module literals and a proposed owner conclusion. That conclusion and
+final literal metadata acceptance remain pending; this technical verification closes no finding.
+
+**Follow-up:** review the proposed owner conclusion and exact metadata hashes.
+The approved notice precedes its POM permalink commit and is preserved by the merge.
+Keep that ordering and ancestry for later revisions. Review the final literal metadata and
+actual downstream terms,
 validate the changed artifacts and prepare a new immutable candidate under the release
 runbook. Applicable law remains undetermined. Both findings and the release gate remain
 open. Future changes by jmlx need their own assessment.
@@ -263,3 +270,5 @@ Central publication still needs the owner's separate approval of the exact verif
 [juffa-wording]: plans/evidence/juffa-scope-wording-2026-11-21/README.md
 
 [juffa-acceptance]: plans/evidence/juffa-implementation-2026-11-22/acceptance.json
+
+[native-final-review]: phase8-4-native-distribution-review.md

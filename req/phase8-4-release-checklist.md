@@ -68,6 +68,12 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   candidate validation remain outstanding. The owner also accepted the Juffa existing-grants
   interpretation on 2026-11-21, subject to scope, final wording, downstream terms and artifact
   validation. Both findings stay open.
+  On 2026-11-22 the owner approved the scope/wording packet. PR #114 merged as
+  `fc9b634a5d0103e266fa550c5737bcd74e0707e6`; payload and explicit license verification
+  now pass on merged main. The
+  [final metadata/downstream review](phase8-4-native-distribution-review.md)
+  supplies exact local artifact/metadata hashes and a proposed owner conclusion.
+  Owner acceptance and the signed candidate's required validation remain pending.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
   organization Usage Center values and the exact signed bundle remain outstanding.

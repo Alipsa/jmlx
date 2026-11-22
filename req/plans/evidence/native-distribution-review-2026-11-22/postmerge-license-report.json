@@ -1,0 +1,10 @@
+{
+  "licenses": 6,
+  "noticePermalink": "https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
+  "noticeCommit": "551eebeeb66a80ef3af467a6c1b4995c2a7f7034",
+  "checkedJars": [
+    "jmlx-native-macos-arm64-0.1.0.jar",
+    "jmlx-native-macos-arm64-0.1.0-sources.jar",
+    "jmlx-native-macos-arm64-0.1.0-javadoc.jar"
+  ]
+}

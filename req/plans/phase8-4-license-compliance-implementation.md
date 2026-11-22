@@ -56,10 +56,11 @@ section and policy deletion. Both actual consumer profiles are exercised separat
 
 ## Remaining release work
 
-Merge this implementation with a merge commit; do not squash or rebase the notice commit.
-Fetch origin and run `verifyNativeReleaseLicenses` before tagging. Its real-checkout
-pre-merge ancestry refusal is expected; positive execution is covered in an isolated history
-fixture. Shallow contributor/PR builds must not run this explicit task.
+PR #114 merged with a merge commit as `fc9b634a5d0103e266fa550c5737bcd74e0707e6`.
+The notice commit is preserved. Payload and explicit license verification passed after
+fetching and syncing main; the [post-merge report][postmerge-report] supersedes the earlier
+real-checkout ancestry refusal. Repeat these checks before candidate tagging. Shallow
+contributor/PR builds must not run the explicit history-dependent task.
 
 Per Nyfelt must review the final literal metadata and the actual downstream distribution
 terms and measures. Any resulting wording change needs another reviewed notice commit before
@@ -94,3 +95,5 @@ ARM64; the updated validation record retains the results and input hashes.
 An absent origin remote now uses the same repository-configuration diagnostic as a wrong
 origin URL, without fetch advice. Helper and CLI regressions exercise the missing remote;
 the focused native suites pass on macOS and Linux ARM64, and receipt regressions pass.
+
+[postmerge-report]: evidence/native-distribution-review-2026-11-22/postmerge-license-report.json

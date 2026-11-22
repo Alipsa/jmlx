@@ -1,0 +1,279 @@
+{
+  "schema": 1,
+  "date": "2026-11-22",
+  "sourceMergeCommit": "fc9b634a5d0103e266fa550c5737bcd74e0707e6",
+  "implementationPr": 114,
+  "implementationHead": "f9536e711fdb38275138e25c46d003eb2ef9a3d7",
+  "implementationCi": {
+    "run": 45052708229,
+    "java": "success",
+    "native": "success"
+  },
+  "noticeCommit": "551eebeeb66a80ef3af467a6c1b4995c2a7f7034",
+  "noticePermalink": "https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
+  "postMergeVerification": {
+    "command": "./gradlew :jmlx-native-macos-arm64:verifyNativeReleasePayload :jmlx-native-macos-arm64:verifyNativeReleaseLicenses",
+    "result": "passed",
+    "logSha256": "6c209caad114812bc07b17db7fdc32238d8ca68d79066d6cefc8f027df9812e4",
+    "report": "postmerge-license-report.json",
+    "reportSha256": "d520a99b8257f746af1cfb6214b43e48dc76f07f0d213eeb0579ef64bae56830",
+    "logPath": "build/releaseAll/native-distribution-review-2026-11-22/postmerge-verification.log"
+  },
+  "surfaceSha256": {
+    "LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9",
+    "README.md": "0680d44b8182e15a543d4e3d7b9ee5482d9f8357efb497e6ce7a89b3ad632d24",
+    "jmlx-native-macos-arm64/build.gradle": "ce3aab26648c300d145d1ca021d91375e3cea4b7d7e00c197259027ada79c674",
+    "jmlx-native-macos-arm64/README.md": "30187f20e78233ba53e3f885eb52b6b00ea715c144a4938f30c08717d716283f",
+    "req/phase8-4-release-notes.md": "f17d03602c508015aba621f1a2319d480bf8502c347018afad1b4399e293b00e",
+    "req/phase8-4-owner-license-decision.md": "173d98e0f876aef1e7d9d495449d6a594993f67469af1dca32c3577bd449b8cc",
+    "req/native-license-inventory.json": "07f50ebdf90df419a6a0642b361979ff95e02ed4d36ed3a91ca25f471da09259",
+    "req/native-authored-attributions.json": "458fda282f777e1ff135380e962fb0ab4749a4baab60fac3af25711e2ffa4e3c",
+    "jmlx-native-macos-arm64/LICENSE": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9",
+    "jmlx-native-macos-arm64/LICENSE-APACHE-2.0": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+    "jmlx-native-macos-arm64/LICENSE-CC-BY-SA-4.0": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+    "jmlx-native-macos-arm64/NOTICE": "25b8aeed4d3120639107a2b197eb8269cf89eed828de7e1f1245f4249422d466",
+    "jmlx-native-macos-arm64/THIRD-PARTY-NOTICES": "9fd8e909bd2546fbce8159b16b2ff81e560a566dfad5e59fa391330968273b1c"
+  },
+  "archives": [
+    {
+      "path": "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0.jar",
+      "sha256": "cfbb7d71615727d5e5a2e84e6816c4680f1ae61f21d1a3bb5f51c91dc3eaea80",
+      "bytes": 77829121,
+      "encryptedEntries": [],
+      "metaInfEntries": [
+        "META-INF/MANIFEST.MF",
+        "META-INF/LICENSE",
+        "META-INF/NOTICE",
+        "META-INF/LICENSE-APACHE-2.0",
+        "META-INF/LICENSE-CC-BY-SA-4.0",
+        "META-INF/THIRD-PARTY-NOTICES"
+      ],
+      "legalTexts": {
+        "LICENSE-APACHE-2.0": {
+          "sha256": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+          "bytes": 11344
+        },
+        "THIRD-PARTY-NOTICES": {
+          "sha256": "9fd8e909bd2546fbce8159b16b2ff81e560a566dfad5e59fa391330968273b1c",
+          "bytes": 44290
+        },
+        "NOTICE": {
+          "sha256": "25b8aeed4d3120639107a2b197eb8269cf89eed828de7e1f1245f4249422d466",
+          "bytes": 1939
+        },
+        "LICENSE": {
+          "sha256": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9",
+          "bytes": 1063
+        },
+        "LICENSE-CC-BY-SA-4.0": {
+          "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+          "bytes": 20138
+        }
+      },
+      "juffaRawSectionSha256": "1762ce0bc5af8518c5c155f3352cd16e5af62bef0f264f529ebcf4e10c8686af",
+      "cephesRawSectionSha256": "e1679913ebcd0bb36996158d9467014df357112dcc5970ddc136379339b73d82",
+      "manifest": "Manifest-Version: 1.0\r\nAutomatic-Module-Name: se.alipsa.jmlx.nativelib.macosarm64\r\n\r\n"
+    },
+    {
+      "path": "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-sources.jar",
+      "sha256": "5d3ed16e5dcb2127be30ff1cd94779c5e10404ccad5c465dd7276d8f1d9f73ea",
+      "bytes": 23572,
+      "encryptedEntries": [],
+      "metaInfEntries": [
+        "META-INF/MANIFEST.MF",
+        "META-INF/LICENSE-APACHE-2.0",
+        "META-INF/LICENSE-CC-BY-SA-4.0",
+        "META-INF/THIRD-PARTY-NOTICES",
+        "META-INF/LICENSE",
+        "META-INF/NOTICE"
+      ],
+      "legalTexts": {
+        "LICENSE-APACHE-2.0": {
+          "sha256": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+          "bytes": 11344
+        },
+        "THIRD-PARTY-NOTICES": {
+          "sha256": "9fd8e909bd2546fbce8159b16b2ff81e560a566dfad5e59fa391330968273b1c",
+          "bytes": 44290
+        },
+        "NOTICE": {
+          "sha256": "25b8aeed4d3120639107a2b197eb8269cf89eed828de7e1f1245f4249422d466",
+          "bytes": 1939
+        },
+        "LICENSE": {
+          "sha256": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9",
+          "bytes": 1063
+        },
+        "LICENSE-CC-BY-SA-4.0": {
+          "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+          "bytes": 20138
+        }
+      },
+      "juffaRawSectionSha256": "1762ce0bc5af8518c5c155f3352cd16e5af62bef0f264f529ebcf4e10c8686af",
+      "cephesRawSectionSha256": "e1679913ebcd0bb36996158d9467014df357112dcc5970ddc136379339b73d82",
+      "manifest": "Manifest-Version: 1.0\r\n\r\n"
+    },
+    {
+      "path": "jmlx-native-macos-arm64/build/libs/jmlx-native-macos-arm64-0.1.0-javadoc.jar",
+      "sha256": "78c9ceb3bbae86b43ac96abd34f3cd05d80f3971574d02f69dd10573e7bf0728",
+      "bytes": 4175517,
+      "encryptedEntries": [],
+      "metaInfEntries": [
+        "META-INF/MANIFEST.MF",
+        "META-INF/LICENSE-APACHE-2.0",
+        "META-INF/LICENSE-CC-BY-SA-4.0",
+        "META-INF/THIRD-PARTY-NOTICES",
+        "META-INF/LICENSE",
+        "META-INF/NOTICE"
+      ],
+      "legalTexts": {
+        "LICENSE-APACHE-2.0": {
+          "sha256": "f4e92c7fe2aa066e294c0da9d08683dc9fb741ee6e6debbfad99a0c96e07c1f2",
+          "bytes": 11344
+        },
+        "THIRD-PARTY-NOTICES": {
+          "sha256": "9fd8e909bd2546fbce8159b16b2ff81e560a566dfad5e59fa391330968273b1c",
+          "bytes": 44290
+        },
+        "NOTICE": {
+          "sha256": "25b8aeed4d3120639107a2b197eb8269cf89eed828de7e1f1245f4249422d466",
+          "bytes": 1939
+        },
+        "LICENSE": {
+          "sha256": "f44fd6beb3ec3205e3efb85d1582c273402a43fe4cc613834d8a8151fd5ce4a9",
+          "bytes": 1063
+        },
+        "LICENSE-CC-BY-SA-4.0": {
+          "sha256": "28a9529c7d0bb4dc51f4bf5c116a3d16ef247a052f7591466768ddf563fd1cf5",
+          "bytes": 20138
+        }
+      },
+      "juffaRawSectionSha256": "1762ce0bc5af8518c5c155f3352cd16e5af62bef0f264f529ebcf4e10c8686af",
+      "cephesRawSectionSha256": "e1679913ebcd0bb36996158d9467014df357112dcc5970ddc136379339b73d82",
+      "manifest": "Manifest-Version: 1.0\r\n\r\n"
+    }
+  ],
+  "metadata": {
+    "pomSha256": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
+    "moduleSha256": "e8c0cd6775c976fb3013a99df55154f11197c6c13e466dc2efbfd333c800a594",
+    "pomMatchesRetainedImplementationLiteral": true,
+    "moduleMatchesRetainedImplementationLiteral": true,
+    "retainedLiterals": "req/plans/evidence/juffa-implementation-2026-11-22",
+    "licenses": [
+      {
+        "name": "MIT License",
+        "url": "https://opensource.org/license/mit",
+        "comments": "Applies to the jmlx native artifact code, mlx-c, Apple/MLX contributions covered by their existing MIT grants, and the other MIT components listed in META-INF/THIRD-PARTY-NOTICES, including nlohmann/json, fmt, gguf-tools, FP16 and supervised-lda. MIT notices are also retained there for the opt_einsum algorithm attribution and VkFFT algorithm reference. The reviewed Juffa expression has separately identified CC BY-SA 4.0 terms."
+      },
+      {
+        "name": "Apache License, Version 2.0",
+        "url": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+        "comments": "Applies to Apache-2.0 components identified in META-INF/THIRD-PARTY-NOTICES, including vendored metal-cpp compiled into libmlx.dylib and the NVIDIA/Filipe RNC Maia cexpf and TensorFlow adaptations. An Apache-2.0 notice is also retained there for the JAX Threefry algorithm reference."
+      },
+      {
+        "name": "Creative Commons Attribution-ShareAlike 4.0 International",
+        "url": "https://creativecommons.org/licenses/by-sa/4.0/",
+        "comments": "Applies to Norbert Juffa's covered expression in the reviewed Metal erf and Metal/CPU SIMD erfinv material, including corresponding compiled forms in libmlx.dylib and mlx.metallib. Apple/MLX contributions rely separately on existing MIT grants. No CC adapter's license is identified. See <https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES> (scope and redistribution basis), also packaged in META-INF/THIRD-PARTY-NOTICES. The complete CC license is packaged in META-INF/LICENSE-CC-BY-SA-4.0."
+      },
+      {
+        "name": "BSD 2-Clause License",
+        "url": "https://opensource.org/license/bsd-2-clause",
+        "comments": "Applies to BSD-2-Clause material identified in META-INF/THIRD-PARTY-NOTICES, including Norbert Juffa expm1f."
+      },
+      {
+        "name": "BSD 3-Clause License",
+        "url": "https://opensource.org/license/bsd-3-clause",
+        "comments": "Applies to BSD-3-Clause components identified in META-INF/THIRD-PARTY-NOTICES, including pocketfft, V8, NumPy, fastermath and PyTorch (including Metal hypot). BSD-3-Clause notices are also retained there for the Random123 Threefry attribution and CUB merge-sort algorithm reference."
+      },
+      {
+        "name": "zlib License",
+        "url": "https://opensource.org/license/zlib",
+        "comments": "Applies to zlib components identified in META-INF/THIRD-PARTY-NOTICES, including ThreadPool and the Julien Pommier NEON math adaptation."
+      }
+    ],
+    "moduleTopLevelFields": [
+      "formatVersion",
+      "component",
+      "createdBy",
+      "variants"
+    ],
+    "moduleVariantFields": {
+      "apiElements": [
+        "name",
+        "attributes",
+        "files"
+      ],
+      "runtimeElements": [
+        "name",
+        "attributes",
+        "files"
+      ],
+      "sourcesElements": [
+        "name",
+        "attributes",
+        "files"
+      ],
+      "javadocElements": [
+        "name",
+        "attributes",
+        "files"
+      ]
+    }
+  },
+  "manualReview": {
+    "surfacesExamined": [
+      "LICENSE",
+      "README.md",
+      "jmlx-native-macos-arm64/build.gradle",
+      "jmlx-native-macos-arm64/README.md",
+      "req/phase8-4-release-notes.md",
+      "req/phase8-4-owner-license-decision.md",
+      "req/native-license-inventory.json",
+      "req/native-authored-attributions.json",
+      "jmlx-native-macos-arm64/LICENSE",
+      "jmlx-native-macos-arm64/LICENSE-APACHE-2.0",
+      "jmlx-native-macos-arm64/LICENSE-CC-BY-SA-4.0",
+      "jmlx-native-macos-arm64/NOTICE",
+      "jmlx-native-macos-arm64/THIRD-PARTY-NOTICES"
+    ],
+    "findings": [
+      "The native artifact MIT grant covers jmlx native artifact code; NOTICE/POM distinguish other contributions and retained grants.",
+      "Juffa source/revision/creator/profile and visible-MLX-modification indications, full CC text and scoped redistribution basis are retained in every native jar.",
+      "The POM CC comment resolves the approved immutable notice permalink; actual reviewed-main and HEAD ancestry plus raw freshness now pass.",
+      "The six scoped POM entries and companion legal texts distinguish references from adapted material; Cephes retains its original-permission text.",
+      "README and draft release notes contain the exact previously approved publication paragraph, with decision and notice links.",
+      "The inspected module metadata contains component/variant/artifact data; no additional recipient-license text was identified there.",
+      "No jmlx-added restriction on licensed copying, modification or redistribution was identified in the inspected legal texts/publication descriptions.",
+      "No encrypted archive entries were observed. That fact and signatures alone do not establish the legal downstream-terms conclusion."
+    ],
+    "interpretation": "Technical observations support owner review under the existing conditional MIT/direct-CC interpretation; the section 2(a)(5)(B) counterargument remains. No new license grant or unqualified compliance conclusion is recorded.",
+    "unchangedPriorNoticeBytes": {
+      "baseCommit": "0cc1ca63311d6c5ca8f8168dffac99d8a7529563",
+      "oldNoticeSha256": "1e571151cfa05d88148c2495bf4920e2127c54f409f8974c48070003905df7bd",
+      "appendedCandidateSha256": "1d8c17a5d94d9297247345904030ed4776f41c804e3957c27241f64d98b1dfdf",
+      "exactConcatenation": true
+    }
+  },
+  "ownerDecisions": {
+    "finalLiteralMetadata": "pending",
+    "downstreamTermsConclusion": "pending",
+    "cephesImplementationAcceptance": "pending"
+  },
+  "limits": [
+    "Local unsigned artifacts at the merged implementation, not a new immutable signed candidate.",
+    "External publication/delivery terms and any changed technical measures must be checked against the eventual signed distribution.",
+    "Owner acceptance of this review, candidate execution, physical minimum-host exact-bundle verification and publication authorization remain separate.",
+    "Both native license findings remain open; RC1, its tag, ZIP and receipts are unchanged.",
+    "The full Gradle log is gitignored local provenance; the parsed task result is committed here."
+  ],
+  "releaseReady": false,
+  "referenceReview": {
+    "date": "2026-11-22",
+    "source": "https://creativecommons.org/licenses/by-sa/4.0/legalcode.en",
+    "sections": [
+      "2(a)(5)(C)",
+      "3"
+    ],
+    "method": "Official page checked through the web tool; the already-pinned complete legal text remains in all native jars. No new raw-page snapshot hash is claimed."
+  }
+}

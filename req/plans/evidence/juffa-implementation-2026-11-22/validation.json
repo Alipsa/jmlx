@@ -10,13 +10,13 @@
     "jmlx-native-macos-arm64/build.gradle": "ce3aab26648c300d145d1ca021d91375e3cea4b7d7e00c197259027ada79c674",
     "req/native-license-inventory.json": "07f50ebdf90df419a6a0642b361979ff95e02ed4d36ed3a91ca25f471da09259",
     "req/native-authored-attributions.json": "458fda282f777e1ff135380e962fb0ab4749a4baab60fac3af25711e2ffa4e3c",
-    "tools/release-all/release_inputs.py": "8c632138f6dd034f626d7d3aaaea8fd4259d52fb00d2aaaa51e6f75591a0e572",
+    "tools/release-all/release_inputs.py": "818ef3e9224c9d205885807ad8d33639cd65340662aeea3a290a88639c33b305",
     "tools/release-all/audit_native_licenses.py": "c24180152db55bdbda9fe691cc48f1f7a1e972fb81bac669769f35dfd8341fbc",
     "tools/release-all/native_suites.py": "812c5cc8475b17a395278d2247eca1e63fe0d97eadb1ba5ef4411f9e59218913",
     "tools/release-smoke/native-pom-licenses.gradle": "dace3bccb219e232b28684c02697c86d776333393a012badc7fe85405ba155d8",
     "tools/release-smoke/native-legal-texts.gradle": "40ff188a8bd5a4f0b7d50863151190267cbb0f8874b5cbb9adf0f55c50cd795d",
     "tools/release-smoke/smoke-conventions.gradle": "75a669bf40b199c54d6c29dd66541005049aa40cbcfcf1e53b21b4dd5d3ffa6e",
-    "tools/release-all/tests/test_native_licenses.py": "8659e4f2d09dc8e077e16173fb863f6417ee84c9cc488551c9f10b367f9a348c",
+    "tools/release-all/tests/test_native_licenses.py": "470fe52bf0316336d7c97eb8c15224c255eb62747f60cca942d978d24e10872e",
     "tools/release-all/tests/test_native_publish.py": "5264a242320afcbf823236c9d3075841677085fff1b3634727a8c6a18ba51df1",
     "tools/release-all/tests/test_final_receipt.py": "4cf9cf254cd12fb1a635fadc865ac4cccda0de2f29cb8e742d89c542a41901c9",
     "tools/release-all/tests/test_release_inputs.py": "fbdcec489e9b5f59e82e3365e1418331603263e86ecadd6153ba359d4568b8a6",
@@ -148,6 +148,27 @@
       "exitCode": 0,
       "log": "build/releaseAll/juffa-implementation-2026-11-22/smoke-parser.log",
       "sha256": "116364182c3f7188f536f63ceed8df1c6a0ce8ed64ac46b4a8771f462f356173"
+    },
+    {
+      "name": "missing-origin-macos-focused",
+      "command": "python3 -m unittest discover -s tools/release-all/tests -p test_native_licenses.py -v",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/missing-origin-macos-focused.log",
+      "sha256": "e4c1f84203519cc6a9c033c38aed5a452f8cee12f30b6e7afda772ce355bd007"
+    },
+    {
+      "name": "missing-origin-linux-focused",
+      "command": "linux-exec bash -lc \"cd /projects/jmlx && python3 -m unittest discover -s tools/release-all/tests -p test_native_licenses.py\"",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/missing-origin-linux-focused.log",
+      "sha256": "e5d0d4b88af016077abc587a6bb01fbb15549af3c382213c9ecdc2a44831b323"
+    },
+    {
+      "name": "missing-origin-receipt-focused",
+      "command": "python3 -m unittest discover -s tools/release-all/tests -p test_final_receipt.py",
+      "exitCode": 0,
+      "log": "build/releaseAll/juffa-implementation-2026-11-22/missing-origin-receipt-focused.log",
+      "sha256": "7257ee4ee92ade9e4fd2a2271944250ba83c1155410ca30b94c9c9663661c8a2"
     }
   ],
   "regressions": {
@@ -199,6 +220,10 @@
         "Rewrap both README prose passages; check all newly added prose lines there against 100 columns."
       ],
       "validation": "All 107 release tests pass on macOS and Linux ARM64. The shallow clone has the linked object and Git returns ancestry exit 1; explicit verification reports truncated history, then passes after unshallowing. Wrong repository/fork origins are rejected; canonical URL forms pass. The real checkout retains the expected pre-merge non-ancestor error."
+    },
+    "missingOriginFollowup": {
+      "change": "Catch git remote get-url origin failures separately and use the same repository-configuration error as a wrong URL, without fetch advice.",
+      "validation": "Helper and CLI missing-origin regressions pass. Focused native suites run 27 tests on macOS and Linux ARM64, each skipping only the unchanged Groovy fixture already covered by the prior full suites; all 13 receipt tests pass. No packaging or Groovy behavior changed."
     }
   }
 }

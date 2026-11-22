@@ -513,6 +513,19 @@ class AuthoredNativeLicensesTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'origin must point to Alipsa/jmlx'):
                     module.verify_notice_permalink(self.root, data)
 
+        git('remote', 'remove', 'origin')
+        with self.assertRaisesRegex(ValueError, 'origin must point to Alipsa/jmlx') as missing:
+            module.verify_notice_permalink(self.root, data)
+        self.assertNotIn('fetch', str(missing.exception))
+        args = [sys.executable, module.__file__, 'licenses', '--root', str(self.root),
+                '--pom', str(pom)]
+        for jar in jars:
+            args += ['--jar', str(jar)]
+        result = subprocess.run(args, text=True, capture_output=True)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('origin must point to Alipsa/jmlx on github.com', result.stderr)
+        self.assertNotIn('fetch', result.stderr)
+
     def test_explicit_cli_and_permalink_history_freshness(self):
         git, jars, R, pom, commit = self.make_release_fixture()
         report = R.native_release_licenses(self.root, pom, jars)

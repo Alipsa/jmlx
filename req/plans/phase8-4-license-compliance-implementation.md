@@ -90,3 +90,7 @@ diagnostic and succeeds after unshallowing. Origin must identify Alipsa/jmlx on 
 a canonical HTTPS or Git SSH URL; fork and wrong-host URLs are rejected. Both README prose
 passages were rewrapped. The expanded full suite passes all 107 tests on macOS and Linux
 ARM64; the updated validation record retains the results and input hashes.
+
+An absent origin remote now uses the same repository-configuration diagnostic as a wrong
+origin URL, without fetch advice. Helper and CLI regressions exercise the missing remote;
+the focused native suites pass on macOS and Linux ARM64, and receipt regressions pass.

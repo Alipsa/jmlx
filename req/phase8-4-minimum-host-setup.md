@@ -148,6 +148,14 @@ From the repository root, in an administrator's Terminal:
   probe_changes=$(git status --porcelain --untracked-files=all -- "$probe_evidence")
   [ -z "$probe_changes" ] || { echo "probe evidence differs from HEAD" >&2; exit 1; }
   source_commit=$(git rev-parse HEAD)
+  for probe_file in account-probe.py account-probe.json; do
+    working_blob=$(git hash-object --no-filters "$probe_evidence/$probe_file")
+    reviewed_blob=$(git rev-parse "$source_commit:$probe_evidence/$probe_file")
+    [ "$working_blob" = "$reviewed_blob" ] || {
+      echo "probe evidence differs from HEAD: $probe_file" >&2
+      exit 1
+    }
+  done
   probe_dir=''
   cleanup() {
     if [ -n "$probe_dir" ]; then
@@ -178,10 +186,12 @@ From the repository root, in an administrator's Terminal:
 )
 ```
 
-The checkout guard rejects staged, unstaged and untracked changes in the probe evidence
-directory before staging. Confirm that HEAD is the reviewed source commit; its SHA is
-retained in `source-commit.txt` beside the result. The guard establishes consistency with
-that commit, not its approval status. The staged hash must match
+The status check rejects visible staged, unstaged and untracked changes in the probe evidence
+directory. Direct comparisons of the script and manifest with committed blobs also reject
+content changes hidden by `assume-unchanged` or `skip-worktree`; hashing bypasses Git filters.
+Confirm that HEAD is the reviewed source commit; its SHA is retained in `source-commit.txt`.
+The blob checks bind those two inputs to that commit, without establishing its approval status.
+The staged hash must match
 `windowTimeProbe.scriptSha256` before execution. The exit trap
 removes the staging directory on success or failure. Output is retained in a fresh directory
 named for the window's UTC date only after staging and digest verification pass. A probe

@@ -16,6 +16,7 @@ import types
 
 
 EXPECTED_RELEASE_INPUTS = "85b4f940f67faf916a9263a3920a69763837176af6685cb8c8db131e4ca4e849"
+EXPECTED_PRELIMINARY = "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af"
 
 
 def command(*argv):
@@ -32,6 +33,18 @@ def main():
     preliminary = root / "req/plans/evidence/rc2-final-review-2026-11-22/preliminary.json"
     if not preliminary.is_file():
         parser.error(f"--root must contain the retained RC2 preliminary record: {preliminary}")
+    try:
+        data = preliminary.read_bytes()
+    except OSError as error:
+        parser.error(f"cannot read preliminary.json: {error}")
+    preliminary_digest = hashlib.sha256(data).hexdigest()
+    if preliminary_digest != EXPECTED_PRELIMINARY:
+        parser.error("preliminary.json differs from the reviewed RC2 record")
+    record = json.loads(data)
+    for name in record["junit"]:
+        path = Path(name)
+        if path.is_absolute() or ".." in path.parts:
+            parser.error(f"JUnit path must stay relative to --root: {name}")
 
     # Use the probe repository's reviewed implementation, never code from --root.
     tools = Path(__file__).resolve().parents[4] / "tools/release-all"
@@ -49,16 +62,19 @@ def main():
     exec(compile(source, str(implementation), "exec"), helper.__dict__)
     native_report, sha256 = helper.native_report, helper.sha256
 
-    record = json.loads(preliminary.read_text())
     forbidden = [str(Path.home()), str(root)]
-    actual = json.loads(json.dumps(native_report(
-        root / "native/install/lib", root / "scripts/bootstrap-native.sh", forbidden)))
+    try:
+        actual = json.loads(json.dumps(native_report(
+            root / "native/install/lib", root / "scripts/bootstrap-native.sh", forbidden)))
+    except (OSError, ValueError) as error:
+        parser.error(f"cannot inspect native inputs under --root: {error}")
     present = [name for name in record["junit"] if (root / name).is_file()]
     matching = [name for name in present if sha256(root / name) == record["junit"][name]]
     head = command("git", "-C", str(root), "rev-parse", "HEAD")
-    status = command("git", "-C", str(root), "status", "--porcelain")
+    status = command("git", "--no-optional-locks", "-C", str(root),
+                     "-c", "core.fsmonitor=false", "status", "--porcelain")
     if head["returncode"] or status["returncode"]:
-        raise RuntimeError("Cannot record source checkout identity")
+        parser.error("cannot record source checkout identity with git")
     result = {
         "schema": 1,
         "checkedAt": datetime.now(timezone.utc).isoformat(),
@@ -66,11 +82,12 @@ def main():
         "sourceCommitNote": "HEAD at check time, not necessarily a clean tree; native and "
                             "JUnit inputs are ignored outputs. See workingTreeStatus.",
         "workingTreeStatus": status["stdout"].splitlines(),
+        "gitStatusArgv": status["argv"],
         "probeSha256": sha256(Path(__file__)),
         "nativeReportImplementationSha256": implementation_digest,
         "nativeReportImplementationSource": "probe repository, SHA-256 checked before execution",
         "bootstrapSha256": sha256(root / "scripts/bootstrap-native.sh"),
-        "preliminarySha256": sha256(preliminary),
+        "preliminarySha256": preliminary_digest,
         "nativeReportArguments": {
             "directory": str(root / "native/install/lib"),
             "bootstrap": str(root / "scripts/bootstrap-native.sh"),

@@ -12,15 +12,26 @@ Time Machine has no configured destination or local snapshots, and no backup vol
 mounted. APFS lists one OS update snapshot; it does not establish recovery of candidate
 data. Offline backups were not searched. The retained probe records command results,
 source identity, working-tree state and the exact forbidden-path arguments. The probe uses
-its own repository's helper code and checks its reviewed SHA-256 before execution; it never
-loads helper code from the inspected tree. Reproduce it
-from the repository root with:
+its own repository's Python helper code and checks its reviewed SHA-256 before execution.
+It also verifies the inspected preliminary record against RC2's reviewed SHA-256 before
+parsing it or reading its JUnit paths. It never loads Python helper code from the inspected
+tree. Git still runs on that tree to record HEAD and status, with filesystem monitoring
+disabled and optional locks suppressed. Use a repository whose Git configuration and
+attributes you trust: configured filters may execute during status.
+
+Reproduce it from the repository root with:
 
 ```sh
 python3 req/plans/evidence/rc3-preparation-2026-11-23/recovery-check.py --root .
 ```
 
 This read-only probe reports current state; timestamps and outputs may differ later.
+Run it from a checkout that retains the reviewed helper digest
+`85b4f940f67faf916a9263a3920a69763837176af6685cb8c8db131e4ca4e849`.
+Commits `6acbc4d` and `228e694` contain that helper and earlier versions of this probe;
+the retained JSON's `sourceCommit` identifies the version used for the latest run.
+A later helper edit intentionally stops the probe until its new pin is reviewed. Preserve
+this source checkout to reproduce the retained run without changing the pin.
 
 The surviving RC2 inputs remain preserved outside Gradle clean scope at the location
 recorded in the [backup summary](plans/evidence/rc2-final-review-2026-11-22/survivor-backup.json).

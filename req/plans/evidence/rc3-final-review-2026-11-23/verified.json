@@ -1,0 +1,27 @@
+{
+  "schema": "jmlx-verified-bundle-1",
+  "bundle": "/Users/per/release-candidates/jmlx-phase8.4-rc.3/build/releaseAll/jmlx-mega-bundle.zip",
+  "preliminary": {
+    "path": "/Users/per/release-candidates/jmlx-phase8.4-rc.3/build/releaseAll/preliminary-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
+    "sha256": "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926"
+  },
+  "identityAssurance": "Local runtime measurements with operator-attested workflow/container identity; not authenticated remote provenance",
+  "reports": {
+    "macos-full": {
+      "path": "/Users/per/release-candidates/jmlx-phase8.4-rc.3/build/releaseAll/rc3-verification/consumers/macos-full.json",
+      "sha256": "4f48529783d23178de7112745cff815a6ff84a46674c85c57641d587223bb796"
+    },
+    "macos-pure": {
+      "path": "/Users/per/release-candidates/jmlx-phase8.4-rc.3/build/releaseAll/rc3-verification/consumers/macos-pure.json",
+      "sha256": "64c172a09f56fb5abc583861d497329b2f5014d9e01ce8229d93aece454c414b"
+    },
+    "linux-pure": {
+      "path": "/Users/per/release-candidates/jmlx-phase8.4-rc.3/build/releaseAll/rc3-verification/consumers/linux-pure.json",
+      "sha256": "ce78fef2398a684edd344ae3ceb071379ab067a0261a1af6690c02b812e74b12"
+    },
+    "minimum-host": {
+      "path": "/Users/per/release-candidates/jmlx-phase8.4-rc.3/build/releaseAll/rc3-verification/minimum-host-window/minimum-host-evidence/minimum-host.json",
+      "sha256": "24c82dda567db5e1effe0fa2f9e27355b6ca46a015d4e9120a5ceaacbe8f4434"
+    }
+  }
+}

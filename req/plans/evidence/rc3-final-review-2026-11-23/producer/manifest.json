@@ -1,0 +1,733 @@
+{
+    "schemaVersion": 1,
+    "revision": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6",
+    "hashes": {
+        "jmlx-core/build/publications/maven/pom-default.xml": "e1ca4629f061ac0029d6160c5c14a8e1f9cf2e5c9d2b80e154d0c60f1045509e",
+        "jmlx-ffi/build/publications/maven/pom-default.xml": "48518a94713b4b4f0c804f0d04a3196333a8e2ed96c4453876db93fbd9f28188",
+        "jmlx-jinja/build/publications/maven/pom-default.xml": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd",
+        "jmlx-langchain4j/build/publications/maven/pom-default.xml": "08e7a90f49ed52ba945331ab1af2138eaa792d1ace7e357464f902338412d20f",
+        "jmlx-models/build/publications/maven/pom-default.xml": "4480fbdfc96dcd019e680e563c23f56d73e3e3becd059b3875bfbf7ab2c0c46e",
+        "jmlx-native-macos-arm64/build/publications/maven/pom-default.xml": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
+        "jmlx-spring-ai/build/publications/maven/pom-default.xml": "2773b0af5483b5447c459b2f48398b03c84e0b7643d07a804dcdf3fff9e214dd",
+        "jmlx-tokenizer/build/publications/maven/pom-default.xml": "6f44a80b05b3e0d625fb43edec85a46998923aa4e78499be456dff2d92ba1263",
+        "jmlx-vision/build/publications/maven/pom-default.xml": "8913a0fafdf10458ffd07930dfcbe814e54f8405bc727586ec93de2afe1faeff"
+    },
+    "modulePaths": [
+        ":jmlx-core",
+        ":jmlx-ffi",
+        ":jmlx-jinja",
+        ":jmlx-langchain4j",
+        ":jmlx-models",
+        ":jmlx-native-macos-arm64",
+        ":jmlx-spring-ai",
+        ":jmlx-tokenizer",
+        ":jmlx-vision"
+    ],
+    "unpublishedProjectPaths": [
+        
+    ],
+    "versions": {
+        ":jmlx-core": "0.5.0",
+        ":jmlx-ffi": "0.5.0",
+        ":jmlx-jinja": "0.6.2",
+        ":jmlx-langchain4j": "0.1.0",
+        ":jmlx-models": "0.1.0",
+        ":jmlx-native-macos-arm64": "0.1.0",
+        ":jmlx-spring-ai": "0.1.0",
+        ":jmlx-tokenizer": "0.1.2",
+        ":jmlx-vision": "0.1.2"
+    },
+    "selected": [
+        {
+            "projectPath": ":jmlx-core",
+            "publication": "maven",
+            "pomFile": "jmlx-core/build/publications/maven/pom-default.xml",
+            "packaging": "jar",
+            "role": "module",
+            "sourcesAndJavadocRequired": true,
+            "groupId": "se.alipsa",
+            "artifactId": "jmlx-core",
+            "version": "0.5.0",
+            "dependencies": [
+                {
+                    "projectPath": ":jmlx-ffi",
+                    "scope": "compile",
+                    "origin": ":jmlx-core:compileClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-ffi",
+                    "version": "0.5.0"
+                },
+                {
+                    "projectPath": ":jmlx-ffi",
+                    "scope": "compile",
+                    "origin": ":jmlx-core:implementation",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-ffi",
+                    "version": "0.5.0"
+                },
+                {
+                    "projectPath": ":jmlx-ffi",
+                    "scope": "runtime",
+                    "origin": ":jmlx-core:runtimeClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-ffi",
+                    "version": "0.5.0"
+                },
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-ffi",
+                    "version": "0.5.0",
+                    "scope": "runtime",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedDependencies": [
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-ffi",
+                    "version": "0.5.0",
+                    "scope": "runtime",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedManagement": [
+                
+            ],
+            "unpublishedProjectDependencies": [
+                
+            ],
+            "files": [
+                "jmlx-core-0.5.0.pom",
+                "jmlx-core-0.5.0.jar",
+                "jmlx-core-0.5.0-javadoc.jar",
+                "jmlx-core-0.5.0-sources.jar",
+                "jmlx-core-0.5.0.module"
+            ],
+            "reasons": [
+                
+            ]
+        },
+        {
+            "projectPath": ":jmlx-ffi",
+            "publication": "maven",
+            "pomFile": "jmlx-ffi/build/publications/maven/pom-default.xml",
+            "packaging": "jar",
+            "role": "module",
+            "sourcesAndJavadocRequired": true,
+            "groupId": "se.alipsa",
+            "artifactId": "jmlx-ffi",
+            "version": "0.5.0",
+            "dependencies": [
+                
+            ],
+            "publishedDependencies": [
+                
+            ],
+            "publishedManagement": [
+                
+            ],
+            "unpublishedProjectDependencies": [
+                
+            ],
+            "files": [
+                "jmlx-ffi-0.5.0.pom",
+                "jmlx-ffi-0.5.0.jar",
+                "jmlx-ffi-0.5.0-javadoc.jar",
+                "jmlx-ffi-0.5.0-sources.jar",
+                "jmlx-ffi-0.5.0.module"
+            ],
+            "reasons": [
+                
+            ]
+        },
+        {
+            "projectPath": ":jmlx-jinja",
+            "publication": "maven",
+            "pomFile": "jmlx-jinja/build/publications/maven/pom-default.xml",
+            "packaging": "jar",
+            "role": "module",
+            "sourcesAndJavadocRequired": true,
+            "groupId": "se.alipsa",
+            "artifactId": "jmlx-jinja",
+            "version": "0.6.2",
+            "dependencies": [
+                
+            ],
+            "publishedDependencies": [
+                
+            ],
+            "publishedManagement": [
+                
+            ],
+            "unpublishedProjectDependencies": [
+                
+            ],
+            "files": [
+                "jmlx-jinja-0.6.2.pom",
+                "jmlx-jinja-0.6.2.jar",
+                "jmlx-jinja-0.6.2-javadoc.jar",
+                "jmlx-jinja-0.6.2-sources.jar",
+                "jmlx-jinja-0.6.2.module"
+            ],
+            "reasons": [
+                
+            ]
+        },
+        {
+            "projectPath": ":jmlx-langchain4j",
+            "publication": "maven",
+            "pomFile": "jmlx-langchain4j/build/publications/maven/pom-default.xml",
+            "packaging": "jar",
+            "role": "module",
+            "sourcesAndJavadocRequired": true,
+            "groupId": "se.alipsa",
+            "artifactId": "jmlx-langchain4j",
+            "version": "0.1.0",
+            "dependencies": [
+                {
+                    "projectPath": ":jmlx-models",
+                    "scope": "compile",
+                    "origin": ":jmlx-langchain4j:api",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0"
+                },
+                {
+                    "projectPath": ":jmlx-models",
+                    "scope": "compile",
+                    "origin": ":jmlx-langchain4j:compileClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0"
+                },
+                {
+                    "projectPath": ":jmlx-models",
+                    "scope": "compile",
+                    "origin": ":jmlx-langchain4j:implementation",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0"
+                },
+                {
+                    "projectPath": ":jmlx-models",
+                    "scope": "runtime",
+                    "origin": ":jmlx-langchain4j:runtimeClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0"
+                },
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedDependencies": [
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                },
+                {
+                    "groupId": "dev.langchain4j",
+                    "artifactId": "langchain4j-core",
+                    "version": "1.23.0",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedManagement": [
+                
+            ],
+            "unpublishedProjectDependencies": [
+                
+            ],
+            "files": [
+                "jmlx-langchain4j-0.1.0.pom",
+                "jmlx-langchain4j-0.1.0.jar",
+                "jmlx-langchain4j-0.1.0-javadoc.jar",
+                "jmlx-langchain4j-0.1.0-sources.jar",
+                "jmlx-langchain4j-0.1.0.module"
+            ],
+            "reasons": [
+                
+            ]
+        },
+        {
+            "projectPath": ":jmlx-models",
+            "publication": "maven",
+            "pomFile": "jmlx-models/build/publications/maven/pom-default.xml",
+            "packaging": "jar",
+            "role": "module",
+            "sourcesAndJavadocRequired": true,
+            "groupId": "se.alipsa",
+            "artifactId": "jmlx-models",
+            "version": "0.1.0",
+            "dependencies": [
+                {
+                    "projectPath": ":jmlx-core",
+                    "scope": "compile",
+                    "origin": ":jmlx-models:api",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-core",
+                    "version": "0.5.0"
+                },
+                {
+                    "projectPath": ":jmlx-tokenizer",
+                    "scope": "compile",
+                    "origin": ":jmlx-models:api",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-tokenizer",
+                    "version": "0.1.2"
+                },
+                {
+                    "projectPath": ":jmlx-vision",
+                    "scope": "compile",
+                    "origin": ":jmlx-models:api",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-vision",
+                    "version": "0.1.2"
+                },
+                {
+                    "projectPath": ":jmlx-core",
+                    "scope": "compile",
+                    "origin": ":jmlx-models:compileClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-core",
+                    "version": "0.5.0"
+                },
+                {
+                    "projectPath": ":jmlx-tokenizer",
+                    "scope": "compile",
+                    "origin": ":jmlx-models:compileClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-tokenizer",
+                    "version": "0.1.2"
+                },
+                {
+                    "projectPath": ":jmlx-vision",
+                    "scope": "compile",
+                    "origin": ":jmlx-models:compileClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-vision",
+                    "version": "0.1.2"
+                },
+                {
+                    "projectPath": ":jmlx-core",
+                    "scope": "compile",
+                    "origin": ":jmlx-models:implementation",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-core",
+                    "version": "0.5.0"
+                },
+                {
+                    "projectPath": ":jmlx-tokenizer",
+                    "scope": "compile",
+                    "origin": ":jmlx-models:implementation",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-tokenizer",
+                    "version": "0.1.2"
+                },
+                {
+                    "projectPath": ":jmlx-vision",
+                    "scope": "compile",
+                    "origin": ":jmlx-models:implementation",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-vision",
+                    "version": "0.1.2"
+                },
+                {
+                    "projectPath": ":jmlx-core",
+                    "scope": "runtime",
+                    "origin": ":jmlx-models:runtimeClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-core",
+                    "version": "0.5.0"
+                },
+                {
+                    "projectPath": ":jmlx-tokenizer",
+                    "scope": "runtime",
+                    "origin": ":jmlx-models:runtimeClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-tokenizer",
+                    "version": "0.1.2"
+                },
+                {
+                    "projectPath": ":jmlx-vision",
+                    "scope": "runtime",
+                    "origin": ":jmlx-models:runtimeClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-vision",
+                    "version": "0.1.2"
+                },
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-core",
+                    "version": "0.5.0",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                },
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-tokenizer",
+                    "version": "0.1.2",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                },
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-vision",
+                    "version": "0.1.2",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedDependencies": [
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-core",
+                    "version": "0.5.0",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                },
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-tokenizer",
+                    "version": "0.1.2",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                },
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-vision",
+                    "version": "0.1.2",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                },
+                {
+                    "groupId": "tools.jackson.core",
+                    "artifactId": "jackson-databind",
+                    "version": "3.3.0",
+                    "scope": "runtime",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedManagement": [
+                
+            ],
+            "unpublishedProjectDependencies": [
+                
+            ],
+            "files": [
+                "jmlx-models-0.1.0.pom",
+                "jmlx-models-0.1.0-sources.jar",
+                "jmlx-models-0.1.0.jar",
+                "jmlx-models-0.1.0-javadoc.jar",
+                "jmlx-models-0.1.0.module"
+            ],
+            "reasons": [
+                
+            ]
+        },
+        {
+            "projectPath": ":jmlx-native-macos-arm64",
+            "publication": "maven",
+            "pomFile": "jmlx-native-macos-arm64/build/publications/maven/pom-default.xml",
+            "packaging": "jar",
+            "role": "module",
+            "sourcesAndJavadocRequired": true,
+            "groupId": "se.alipsa",
+            "artifactId": "jmlx-native-macos-arm64",
+            "version": "0.1.0",
+            "dependencies": [
+                
+            ],
+            "publishedDependencies": [
+                
+            ],
+            "publishedManagement": [
+                
+            ],
+            "unpublishedProjectDependencies": [
+                
+            ],
+            "files": [
+                "jmlx-native-macos-arm64-0.1.0.pom",
+                "jmlx-native-macos-arm64-0.1.0-sources.jar",
+                "jmlx-native-macos-arm64-0.1.0.jar",
+                "jmlx-native-macos-arm64-0.1.0-javadoc.jar",
+                "jmlx-native-macos-arm64-0.1.0.module"
+            ],
+            "reasons": [
+                
+            ]
+        },
+        {
+            "projectPath": ":jmlx-spring-ai",
+            "publication": "maven",
+            "pomFile": "jmlx-spring-ai/build/publications/maven/pom-default.xml",
+            "packaging": "jar",
+            "role": "module",
+            "sourcesAndJavadocRequired": true,
+            "groupId": "se.alipsa",
+            "artifactId": "jmlx-spring-ai",
+            "version": "0.1.0",
+            "dependencies": [
+                {
+                    "projectPath": ":jmlx-models",
+                    "scope": "compile",
+                    "origin": ":jmlx-spring-ai:api",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0"
+                },
+                {
+                    "projectPath": ":jmlx-models",
+                    "scope": "compile",
+                    "origin": ":jmlx-spring-ai:compileClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0"
+                },
+                {
+                    "projectPath": ":jmlx-models",
+                    "scope": "compile",
+                    "origin": ":jmlx-spring-ai:implementation",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0"
+                },
+                {
+                    "projectPath": ":jmlx-models",
+                    "scope": "runtime",
+                    "origin": ":jmlx-spring-ai:runtimeClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0"
+                },
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedDependencies": [
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-models",
+                    "version": "0.1.0",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                },
+                {
+                    "groupId": "org.springframework.ai",
+                    "artifactId": "spring-ai-model",
+                    "version": "2.0.2",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedManagement": [
+                
+            ],
+            "unpublishedProjectDependencies": [
+                
+            ],
+            "files": [
+                "jmlx-spring-ai-0.1.0.pom",
+                "jmlx-spring-ai-0.1.0.jar",
+                "jmlx-spring-ai-0.1.0-sources.jar",
+                "jmlx-spring-ai-0.1.0-javadoc.jar",
+                "jmlx-spring-ai-0.1.0.module"
+            ],
+            "reasons": [
+                
+            ]
+        },
+        {
+            "projectPath": ":jmlx-tokenizer",
+            "publication": "maven",
+            "pomFile": "jmlx-tokenizer/build/publications/maven/pom-default.xml",
+            "packaging": "jar",
+            "role": "module",
+            "sourcesAndJavadocRequired": true,
+            "groupId": "se.alipsa",
+            "artifactId": "jmlx-tokenizer",
+            "version": "0.1.2",
+            "dependencies": [
+                {
+                    "projectPath": ":jmlx-jinja",
+                    "scope": "compile",
+                    "origin": ":jmlx-tokenizer:api",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-jinja",
+                    "version": "0.6.2"
+                },
+                {
+                    "projectPath": ":jmlx-jinja",
+                    "scope": "compile",
+                    "origin": ":jmlx-tokenizer:compileClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-jinja",
+                    "version": "0.6.2"
+                },
+                {
+                    "projectPath": ":jmlx-jinja",
+                    "scope": "compile",
+                    "origin": ":jmlx-tokenizer:implementation",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-jinja",
+                    "version": "0.6.2"
+                },
+                {
+                    "projectPath": ":jmlx-jinja",
+                    "scope": "runtime",
+                    "origin": ":jmlx-tokenizer:runtimeClasspath",
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-jinja",
+                    "version": "0.6.2"
+                },
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-jinja",
+                    "version": "0.6.2",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedDependencies": [
+                {
+                    "groupId": "se.alipsa",
+                    "artifactId": "jmlx-jinja",
+                    "version": "0.6.2",
+                    "scope": "compile",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                },
+                {
+                    "groupId": "tools.jackson.core",
+                    "artifactId": "jackson-databind",
+                    "version": "3.3.0",
+                    "scope": "runtime",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedManagement": [
+                
+            ],
+            "unpublishedProjectDependencies": [
+                
+            ],
+            "files": [
+                "jmlx-tokenizer-0.1.2.pom",
+                "jmlx-tokenizer-0.1.2-javadoc.jar",
+                "jmlx-tokenizer-0.1.2-sources.jar",
+                "jmlx-tokenizer-0.1.2.jar",
+                "jmlx-tokenizer-0.1.2.module"
+            ],
+            "reasons": [
+                
+            ]
+        },
+        {
+            "projectPath": ":jmlx-vision",
+            "publication": "maven",
+            "pomFile": "jmlx-vision/build/publications/maven/pom-default.xml",
+            "packaging": "jar",
+            "role": "module",
+            "sourcesAndJavadocRequired": true,
+            "groupId": "se.alipsa",
+            "artifactId": "jmlx-vision",
+            "version": "0.1.2",
+            "dependencies": [
+                
+            ],
+            "publishedDependencies": [
+                {
+                    "groupId": "tools.jackson.core",
+                    "artifactId": "jackson-databind",
+                    "version": "3.3.0",
+                    "scope": "runtime",
+                    "type": "jar",
+                    "classifier": "",
+                    "origin": "pom.dependencies"
+                }
+            ],
+            "publishedManagement": [
+                
+            ],
+            "unpublishedProjectDependencies": [
+                
+            ],
+            "files": [
+                "jmlx-vision-0.1.2.pom",
+                "jmlx-vision-0.1.2.jar",
+                "jmlx-vision-0.1.2-javadoc.jar",
+                "jmlx-vision-0.1.2-sources.jar",
+                "jmlx-vision-0.1.2.module"
+            ],
+            "reasons": [
+                
+            ]
+        }
+    ],
+    "excluded": [
+        
+    ],
+    "verificationScope": [
+        ":jmlx-core",
+        ":jmlx-ffi",
+        ":jmlx-jinja",
+        ":jmlx-langchain4j",
+        ":jmlx-models",
+        ":jmlx-native-macos-arm64",
+        ":jmlx-spring-ai",
+        ":jmlx-tokenizer",
+        ":jmlx-vision"
+    ],
+    "warnings": [
+        
+    ],
+    "created": "2026-11-23T14:44:25.371916Z"
+}

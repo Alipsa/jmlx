@@ -1,0 +1,6 @@
+{
+  "checkedAt": "2026-11-23T14:41:37.785620+00:00",
+  "passed": true,
+  "method": "Reviewed reproduction.verify_toolchains on full RC3 audit build log; daemon, compiler and Javadoc vendor/runtime/path checks",
+  "sourceSha256": "e178faf42cb21cd2f29bf02f3be3d1853d7ba5b66460379e58e9d6161b2c8379"
+}

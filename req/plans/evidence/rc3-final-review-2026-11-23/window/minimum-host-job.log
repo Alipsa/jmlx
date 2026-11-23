@@ -1,0 +1,346 @@
+minimum_host	Set up job	﻿2026-11-23T15:32:36.3522120Z Current runner version: '2.338.2'
+minimum_host	Set up job	2026-11-23T15:32:36.3525060Z Runner name: 'jmlx-release-minimum-m5-max'
+minimum_host	Set up job	2026-11-23T15:32:36.3525380Z Runner group name: 'Default'
+minimum_host	Set up job	2026-11-23T15:32:36.3525750Z Machine name: '<HOST>'
+minimum_host	Set up job	2026-11-23T15:32:36.3526880Z ##[group]GITHUB_TOKEN Permissions
+minimum_host	Set up job	2026-11-23T15:32:36.3527490Z Contents: read
+minimum_host	Set up job	2026-11-23T15:32:36.3527720Z Metadata: read
+minimum_host	Set up job	2026-11-23T15:32:36.3527940Z ##[endgroup]
+minimum_host	Set up job	2026-11-23T15:32:36.3528680Z Secret source: Actions
+minimum_host	Set up job	2026-11-23T15:32:36.3529020Z Cache mode: write
+minimum_host	Set up job	2026-11-23T15:32:36.3529280Z Prepare workflow directory
+minimum_host	Set up job	2026-11-23T15:32:36.4093920Z Prepare all required actions
+minimum_host	Set up job	2026-11-23T15:32:36.4116410Z Getting action download info
+minimum_host	Set up job	2026-11-23T15:32:37.0321640Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+minimum_host	Set up job	2026-11-23T15:32:38.6795010Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+minimum_host	Set up job	2026-11-23T15:32:39.4304720Z Download action repository 'actions/setup-java@v6' (SHA:d1374f8ac74474200d16ef8ecee22c7ae7a51880)
+minimum_host	Set up job	2026-11-23T15:32:40.6719140Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+minimum_host	Set up job	2026-11-23T15:32:42.2776640Z Complete job name: minimum_host
+minimum_host	Prepare job-local Gradle home	﻿2026-11-23T15:32:42.3006240Z ##[group]Run echo "GRADLE_USER_HOME=$RUNNER_TEMP/jmlx-release-gradle-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"
+minimum_host	Prepare job-local Gradle home	2026-11-23T15:32:42.3006640Z ^[[36;1mecho "GRADLE_USER_HOME=$RUNNER_TEMP/jmlx-release-gradle-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT" >> "$GITHUB_ENV"^[[0m
+minimum_host	Prepare job-local Gradle home	2026-11-23T15:32:42.3015880Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+minimum_host	Prepare job-local Gradle home	2026-11-23T15:32:42.3016080Z env:
+minimum_host	Prepare job-local Gradle home	2026-11-23T15:32:42.3016170Z   CANDIDATE_TAG: jmlx-phase8.4-rc.3
+minimum_host	Prepare job-local Gradle home	2026-11-23T15:32:42.3016300Z   CANDIDATE_SHA: 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Prepare job-local Gradle home	2026-11-23T15:32:42.3016490Z   RECORD_SHA: 929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926
+minimum_host	Prepare job-local Gradle home	2026-11-23T15:32:42.3016710Z   ZIP_SHA: 139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c
+minimum_host	Prepare job-local Gradle home	2026-11-23T15:32:42.3016870Z ##[endgroup]
+minimum_host	Check provisioned Python runtime	﻿2026-11-23T15:32:42.3327870Z ##[group]Run python3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11+ is required on the minimum host")'
+minimum_host	Check provisioned Python runtime	2026-11-23T15:32:42.3328280Z ^[[36;1mpython3 -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else "Python 3.11+ is required on the minimum host")'^[[0m
+minimum_host	Check provisioned Python runtime	2026-11-23T15:32:42.3335860Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+minimum_host	Check provisioned Python runtime	2026-11-23T15:32:42.3336030Z env:
+minimum_host	Check provisioned Python runtime	2026-11-23T15:32:42.3336110Z   CANDIDATE_TAG: jmlx-phase8.4-rc.3
+minimum_host	Check provisioned Python runtime	2026-11-23T15:32:42.3336260Z   CANDIDATE_SHA: 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Check provisioned Python runtime	2026-11-23T15:32:42.3336460Z   RECORD_SHA: 929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926
+minimum_host	Check provisioned Python runtime	2026-11-23T15:32:42.3336670Z   ZIP_SHA: 139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c
+minimum_host	Check provisioned Python runtime	2026-11-23T15:32:42.3336930Z   GRADLE_USER_HOME: <RUNNER_HOME>/actions-runner/_work/_temp/jmlx-release-gradle-45206346138-1
+minimum_host	Check provisioned Python runtime	2026-11-23T15:32:42.3337130Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	﻿2026-11-23T15:32:42.3696500Z ##[group]Run actions/checkout@v7
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3696670Z with:
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3696760Z   ref: jmlx-phase8.4-rc.3
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3696870Z   persist-credentials: false
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3709290Z   fetch-depth: 0
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3709440Z   repository: Alipsa/jmlx
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3710540Z   token: ***
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3710640Z   ssh-strict: true
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3710730Z   ssh-user: git
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3710830Z   clean: true
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3710930Z   sparse-checkout-cone-mode: true
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3711030Z   fetch-tags: false
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3711140Z   show-progress: true
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3711290Z   lfs: false
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3711370Z   submodules: false
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3711470Z   set-safe-directory: true
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3711580Z   allow-unsafe-pr-checkout: false
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3711680Z env:
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3711750Z   CANDIDATE_TAG: jmlx-phase8.4-rc.3
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3711880Z   CANDIDATE_SHA: 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3712290Z   RECORD_SHA: 929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3712500Z   ZIP_SHA: 139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3712740Z   GRADLE_USER_HOME: <RUNNER_HOME>/actions-runner/_work/_temp/jmlx-release-gradle-45206346138-1
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.3712930Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4290620Z Syncing repository: Alipsa/jmlx
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4291240Z ##[group]Getting Git version info
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4291410Z Working directory is '<RUNNER_HOME>/actions-runner/_work/jmlx/jmlx'
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4291690Z [command]/opt/homebrew/bin/git version
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4335700Z git version 2.56.1
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4342970Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4347050Z Temporarily overriding HOME='<RUNNER_HOME>/actions-runner/_work/_temp/4b7c8355-0337-47f2-bca4-8e3970833f0a' before making global git config changes
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4347460Z Adding repository directory to the temporary git global config as a safe directory
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4348610Z [command]/opt/homebrew/bin/git config --global --add safe.directory <RUNNER_HOME>/actions-runner/_work/jmlx/jmlx
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4413830Z [command]/opt/homebrew/bin/git config --local --get remote.origin.url
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4462990Z https://github.com/Alipsa/jmlx
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4469900Z ##[group]Removing previously created refs, to avoid conflicts
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4471100Z [command]/opt/homebrew/bin/git rev-parse --symbolic-full-name --verify --quiet HEAD
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4522340Z HEAD
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4643070Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.4643890Z [command]/opt/homebrew/bin/git submodule status
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.5459180Z ##[group]Cleaning the repository
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.5460560Z [command]/opt/homebrew/bin/git clean -ffdx
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.5949870Z Removing build/
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.5950060Z Removing tools/release-all/__pycache__/
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.5950240Z Removing tools/release-smoke/.gradle/
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.5950400Z Removing tools/release-smoke/app/build/
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.5950550Z Removing tools/release-smoke/build/
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.5950710Z Removing tools/release-smoke/pom-check/build/
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.5955380Z [command]/opt/homebrew/bin/git reset --hard HEAD
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.6707570Z HEAD is now at 33676837 Merge pull request #116 from Alipsa/phase8-4-candidate-preflight
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.6713260Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.6715880Z ##[group]Disabling automatic garbage collection
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.6717950Z [command]/opt/homebrew/bin/git config --local gc.auto 0
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.6778070Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.6778280Z ##[group]Setting up auth
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.6778450Z Removing SSH command configuration
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.6780410Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.6839470Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.7537080Z Removing HTTP extra header
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.7539140Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.7593590Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.8283710Z Removing includeIf entries pointing to credentials config files
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.8285960Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.8340420Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.9029500Z [command]/opt/homebrew/bin/git config --file <RUNNER_HOME>/actions-runner/_work/_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config http.https://github.com/.extraheader AUTHORIZATION: basic ***
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.9087480Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:<RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/.git.path <RUNNER_HOME>/actions-runner/_work/_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.9139650Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:<RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/.git/worktrees/*.path <RUNNER_HOME>/actions-runner/_work/_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.9192360Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.9246730Z [command]/opt/homebrew/bin/git config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.9300940Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.9301160Z ##[group]Fetching the repository
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:42.9303550Z [command]/opt/homebrew/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules origin +refs/heads/*:refs/remotes/origin/* +refs/tags/*:refs/tags/*
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:43.9877590Z From https://github.com/Alipsa/jmlx
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:43.9877850Z    33676837..33fd8d36  main               -> origin/main
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:43.9878090Z  * [new tag]           jmlx-phase8.4-rc.3 -> jmlx-phase8.4-rc.3
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:43.9883260Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:43.9883470Z ##[group]Determining the checkout info
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:43.9885590Z [command]/opt/homebrew/bin/git branch --list --remote origin/jmlx-phase8.4-rc.3
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:43.9955040Z [command]/opt/homebrew/bin/git tag --list jmlx-phase8.4-rc.3
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0015270Z jmlx-phase8.4-rc.3
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0019480Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0020420Z [command]/opt/homebrew/bin/git sparse-checkout disable
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0104710Z [command]/opt/homebrew/bin/git config --local --unset-all extensions.worktreeConfig
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0161060Z ##[group]Checking out the ref
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0162960Z [command]/opt/homebrew/bin/git checkout --progress --force refs/tags/jmlx-phase8.4-rc.3
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0334670Z Previous HEAD position was 33676837 Merge pull request #116 from Alipsa/phase8-4-candidate-preflight
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0338550Z HEAD is now at 33fd8d36 Merge pull request #120 from Alipsa/phase8-4-rc3-pre-tag
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0348610Z ##[endgroup]
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0416680Z [command]/opt/homebrew/bin/git log -1 --format=%H
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0477310Z 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0483770Z ##[group]Removing auth
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0483910Z Removing SSH command configuration
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0485070Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.0543870Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.1260250Z Removing HTTP extra header
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.1261560Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.1316190Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2015290Z Removing includeIf entries pointing to credentials config files
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2016280Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2067440Z includeif.gitdir:<RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/.git.path
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2068080Z includeif.gitdir:<RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/.git/worktrees/*.path
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2068400Z includeif.gitdir:/github/workspace/.git.path
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2069930Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2074820Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:<RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/.git.path
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2128080Z <RUNNER_HOME>/actions-runner/_work/_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2134570Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:<RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/.git.path \/Users\/jmlxrunner\/actions\-runner\/_work\/_temp\/git\-credentials\-22283b0c\-26d9\-43da\-80f8\-06c3a268ecc1\.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2193010Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:<RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/.git/worktrees/*.path
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2244620Z <RUNNER_HOME>/actions-runner/_work/_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2250030Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:<RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/.git/worktrees/*.path \/Users\/jmlxrunner\/actions\-runner\/_work\/_temp\/git\-credentials\-22283b0c\-26d9\-43da\-80f8\-06c3a268ecc1\.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2310580Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git.path
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2367190Z /github/runner_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2373790Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git.path \/github\/runner_temp\/git\-credentials\-22283b0c\-26d9\-43da\-80f8\-06c3a268ecc1\.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2432920Z [command]/opt/homebrew/bin/git config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2484680Z /github/runner_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2489670Z [command]/opt/homebrew/bin/git config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path \/github\/runner_temp\/git\-credentials\-22283b0c\-26d9\-43da\-80f8\-06c3a268ecc1\.config
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.2545510Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.3244160Z Removing credentials config '<RUNNER_HOME>/actions-runner/_work/_temp/git-credentials-22283b0c-26d9-43da-80f8-06c3a268ecc1.config'
+minimum_host	Run actions/checkout@v7	2026-11-23T15:32:44.3245880Z ##[endgroup]
+minimum_host	Fetch and verify annotated candidate identity	﻿2026-11-23T15:32:44.3305680Z ##[group]Run set -euo pipefail
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3305820Z ^[[36;1mset -euo pipefail^[[0m
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3305910Z ^[[36;1mtest "$(id -u)" != 0^[[0m
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3306050Z ^[[36;1m[[ "$CANDIDATE_TAG" =~ ^jmlx-phase8\.4-rc\.[1-9][0-9]*$ ]] || exit 2^[[0m
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3306280Z ^[[36;1mgit fetch --no-tags origin "refs/tags/$CANDIDATE_TAG:refs/tags/$CANDIDATE_TAG"^[[0m
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3306480Z ^[[36;1mtest "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"^[[0m
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3306650Z ^[[36;1mtest "$(git cat-file -t "refs/tags/$CANDIDATE_TAG")" = tag^[[0m
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3315240Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3315390Z env:
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3315490Z   CANDIDATE_TAG: jmlx-phase8.4-rc.3
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3315620Z   CANDIDATE_SHA: 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3315810Z   RECORD_SHA: 929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3316020Z   ZIP_SHA: 139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3316290Z   GRADLE_USER_HOME: <RUNNER_HOME>/actions-runner/_work/_temp/jmlx-release-gradle-45206346138-1
+minimum_host	Fetch and verify annotated candidate identity	2026-11-23T15:32:44.3316500Z ##[endgroup]
+minimum_host	Run actions/download-artifact@v4	﻿2026-11-23T15:32:45.3007050Z ##[group]Run actions/download-artifact@v4
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3007560Z with:
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3007700Z   name: verified-candidate-transfer
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3007890Z   path: build/releaseAll/candidate-input
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3008080Z   merge-multiple: false
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3008230Z   repository: Alipsa/jmlx
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3008380Z   run-id: 45206346138
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3008530Z env:
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3008670Z   CANDIDATE_TAG: jmlx-phase8.4-rc.3
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3008860Z   CANDIDATE_SHA: 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3009170Z   RECORD_SHA: 929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3009510Z   ZIP_SHA: 139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3009870Z   GRADLE_USER_HOME: <RUNNER_HOME>/actions-runner/_work/_temp/jmlx-release-gradle-45206346138-1
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3010160Z ##[endgroup]
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3813820Z Downloading single artifact
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3877580Z (node:32391) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.3877950Z (Use `node --trace-deprecation ...` to show where the warning was created)
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.8137250Z Preparing to download the following artifacts:
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:45.8138760Z - verified-candidate-transfer (ID: 14832924695, Size: 106725575, Expected Digest: sha256:aa86a36bb26b67619735b682697a5e38e051c89382932dad60113fbc9ceaa703)
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:46.1662080Z Redirecting to blob download url: https://productionresultssa0.blob.core.windows.net/actions-results/f5d6a2aa-d937-4837-8970-f3b4bafa01ad/workflow-job-run-4ea6f525-8032-5aa8-b7e0-9ae0f84496a8/artifacts/0eee5532bfb1e2a1a241ee0990b8287b9520a5e52b2b43faa816013c0744a619.zip
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:46.1664910Z Starting download of artifact to: <RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/build/releaseAll/candidate-input
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:46.7245430Z (node:32391) [DEP0005] DeprecationWarning: Buffer() is deprecated due to security and usability issues. Please use the Buffer.alloc(), Buffer.allocUnsafe(), or Buffer.from() methods instead.
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:54.6554130Z SHA256 digest of downloaded artifact is aa86a36bb26b67619735b682697a5e38e051c89382932dad60113fbc9ceaa703
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:54.6555010Z Artifact download completed successfully.
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:54.6555430Z Total of 1 artifact(s) downloaded
+minimum_host	Run actions/download-artifact@v4	2026-11-23T15:32:54.6562200Z Download artifact has finished successfully
+minimum_host	Run actions/setup-java@v6	﻿2026-11-23T15:32:54.6837110Z ##[group]Run actions/setup-java@v6
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6837340Z with:
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6837530Z   distribution: temurin
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6837740Z   java-version: 21
+minimum_host	Run actions/setup-java@v6	25
+minimum_host	Run actions/setup-java@v6	
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6837920Z   java-package: jdk
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6838100Z   check-latest: false
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6838270Z   force-download: false
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6838440Z   set-default: true
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6838600Z   server-id: github
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6838800Z   mvn-repositories-include-central: true
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6839070Z   mvn-repositories-prioritize-central: true
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6839320Z   overwrite-settings: true
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6839540Z   cache-read-only: false
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6839740Z   job-status: success
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6841860Z   token: ***
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6842060Z   show-download-progress: false
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6842330Z   problem-matcher: false
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6842510Z env:
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6842690Z   CANDIDATE_TAG: jmlx-phase8.4-rc.3
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6842970Z   CANDIDATE_SHA: 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6843390Z   RECORD_SHA: 929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6843850Z   ZIP_SHA: 139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6844360Z   GRADLE_USER_HOME: <RUNNER_HOME>/actions-runner/_work/_temp/jmlx-release-gradle-45206346138-1
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.6844720Z ##[endgroup]
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7459020Z ##[group]Installed distributions
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7528930Z Resolved Java 21.0.13+100000002.0.LTS from tool-cache
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7529510Z Setting Java 21.0.13+100000002.0.LTS as the default
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7532930Z 
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7533020Z Java configuration:
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7533120Z   Distribution: temurin
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7533250Z   Version: 21.0.13+100000002.0.LTS
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7533520Z   Path: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/21.0.13-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7533840Z 
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7537870Z Resolved Java 25.0.5+100000002.0.LTS from tool-cache
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7538090Z Setting Java 25.0.5+100000002.0.LTS as the default
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7539600Z 
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7539980Z Java configuration:
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7540120Z   Distribution: temurin
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7540250Z   Version: 25.0.5+100000002.0.LTS
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7540490Z   Path: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/25.0.5-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7540700Z 
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7540830Z ##[endgroup]
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7547400Z Creating settings.xml with server-id: github
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7549320Z Creating toolchains.xml for JDK version 21 from temurin
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7552890Z Overwriting existing file <RUNNER_HOME>/.m2/settings.xml
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7587390Z Updating existing file <RUNNER_HOME>/.m2/toolchains.xml
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7587860Z Creating toolchains.xml for JDK version 25 from temurin
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7590750Z Updating existing file <RUNNER_HOME>/.m2/toolchains.xml
+minimum_host	Run actions/setup-java@v6	2026-11-23T15:32:54.7593700Z Configured MAVEN_ARGS to include -ntp to suppress Maven transfer progress logs. Set 'show-download-progress: true' to keep the download progress output.
+minimum_host	Verify physical minimum-host execution of the exact ZIP	﻿2026-11-23T15:32:54.7627360Z ##[group]Run set -euo pipefail
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7627510Z ^[[36;1mset -euo pipefail^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7627630Z ^[[36;1mpython3 - <<'PY'^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7627740Z ^[[36;1mimport hashlib, os^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7627860Z ^[[36;1mfrom pathlib import Path^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7628050Z ^[[36;1mfor name, key in [('bundle.zip', 'ZIP_SHA'), ('preliminary.json', 'RECORD_SHA')]:^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7628310Z ^[[36;1m    with (Path('build/releaseAll/candidate-input') / name).open('rb') as stream:^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7628560Z ^[[36;1m        assert hashlib.file_digest(stream, 'sha256').hexdigest() == os.environ[key]^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7628740Z ^[[36;1mPY^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7628880Z ^[[36;1mpython3 tools/release-all/bundle_smoke.py --root "$PWD" \^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7629090Z ^[[36;1m  --bundle build/releaseAll/candidate-input/bundle.zip \^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7629320Z ^[[36;1m  --preliminary build/releaseAll/candidate-input/preliminary.json \^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7629530Z ^[[36;1m  --preliminary-sha256 "$RECORD_SHA" --kind minimum-host \^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7629740Z ^[[36;1m  --output build/releaseAll/minimum-host.json^[[0m
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7644470Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7644630Z env:
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7644760Z   CANDIDATE_TAG: jmlx-phase8.4-rc.3
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7644910Z   CANDIDATE_SHA: 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7645110Z   RECORD_SHA: 929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7645340Z   ZIP_SHA: 139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7645590Z   GRADLE_USER_HOME: <RUNNER_HOME>/actions-runner/_work/_temp/jmlx-release-gradle-45206346138-1
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7645920Z   JAVA_HOME: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/25.0.5-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7646290Z   JAVA_HOME_21_AARCH64: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/21.0.13-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7646680Z   JAVA_HOME_25_AARCH64: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/25.0.5-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7646940Z   MAVEN_ARGS: -ntp
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7647380Z   GRADLE_OPTS: -Dorg.gradle.java.installations.fromEnv=JAVA_HOME_21_ARM64,JAVA_HOME_25_ARM64 -Dorg.gradle.java.installations.auto-detect=false -Dorg.gradle.java.installations.auto-download=false
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:32:54.7647740Z ##[endgroup]
+minimum_host	Verify physical minimum-host execution of the exact ZIP	2026-11-23T15:33:12.2606660Z 24c82dda567db5e1effe0fa2f9e27355b6ca46a015d4e9120a5ceaacbe8f4434
+minimum_host	Run actions/upload-artifact@v4	﻿2026-11-23T15:33:12.2709750Z ##[group]Run actions/upload-artifact@v4
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2709890Z with:
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2709980Z   name: minimum-host-evidence
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2736960Z   path: build/releaseAll/minimum-host.json
+minimum_host	Run actions/upload-artifact@v4	build/releaseAll/minimum-host.log
+minimum_host	Run actions/upload-artifact@v4	build/releaseAll/minimum-host.runtime.xml
+minimum_host	Run actions/upload-artifact@v4	
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2737210Z   if-no-files-found: warn
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2737300Z   retention-days: 30
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2737390Z   compression-level: 6
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2737470Z   overwrite: false
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2737560Z   include-hidden-files: false
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2737650Z env:
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2737730Z   CANDIDATE_TAG: jmlx-phase8.4-rc.3
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2737870Z   CANDIDATE_SHA: 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2738060Z   RECORD_SHA: 929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2738270Z   ZIP_SHA: 139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2738520Z   GRADLE_USER_HOME: <RUNNER_HOME>/actions-runner/_work/_temp/jmlx-release-gradle-45206346138-1
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2738860Z   JAVA_HOME: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/25.0.5-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2739280Z   JAVA_HOME_21_AARCH64: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/21.0.13-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2739690Z   JAVA_HOME_25_AARCH64: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/25.0.5-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2739940Z   MAVEN_ARGS: -ntp
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.2740020Z ##[endgroup]
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.3514070Z (node:32572) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.3514440Z (Use `node --trace-deprecation ...` to show where the warning was created)
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.3532370Z Multiple search paths detected. Calculating the least common ancestor of all paths
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.3533220Z The least common ancestor is <RUNNER_HOME>/actions-runner/_work/jmlx/jmlx/build/releaseAll. This will be the root directory of the artifact
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.3533570Z With the provided path, there will be 3 files uploaded
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.3534870Z Artifact name is valid!
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.3535190Z Root directory input is valid!
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.8488520Z Beginning upload of artifact content to blob storage
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:12.8662380Z (node:32572) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:13.4509110Z Uploaded bytes 3129
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:13.6047650Z Finished uploading artifact content to blob storage!
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:13.6048710Z SHA256 digest of uploaded artifact zip is 793f4a39585fbfee8d19981a521bfa806cdf2546bd1c144f054848dd1a19e883
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:13.6050190Z Finalizing artifact upload
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:14.0569820Z Artifact minimum-host-evidence.zip successfully finalized. Artifact ID 14834007152
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:14.0571470Z Artifact minimum-host-evidence has been successfully uploaded! Final size is 3129 bytes. Artifact ID is 14834007152
+minimum_host	Run actions/upload-artifact@v4	2026-11-23T15:33:14.0583890Z Artifact download URL: https://github.com/Alipsa/jmlx/actions/runs/45206346138/artifacts/14834007152
+minimum_host	Remove job-local Gradle state	﻿2026-11-23T15:33:14.0740680Z ##[group]Run rm -rf "$GRADLE_USER_HOME"
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0741090Z ^[[36;1mrm -rf "$GRADLE_USER_HOME"^[[0m
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0766480Z shell: /opt/homebrew/bin/bash --noprofile --norc -e -o pipefail {0}
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0766970Z env:
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0767620Z   CANDIDATE_TAG: jmlx-phase8.4-rc.3
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0768000Z   CANDIDATE_SHA: 33fd8d36aa7468a51f3e6ecc57bb581bf83731d6
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0768560Z   RECORD_SHA: 929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0769140Z   ZIP_SHA: 139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0769830Z   GRADLE_USER_HOME: <RUNNER_HOME>/actions-runner/_work/_temp/jmlx-release-gradle-45206346138-1
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0770710Z   JAVA_HOME: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/25.0.5-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0771730Z   JAVA_HOME_21_AARCH64: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/21.0.13-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0772820Z   JAVA_HOME_25_AARCH64: <RUNNER_HOME>/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/25.0.5-100000002.0.LTS/aarch64/Contents/Home
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0773530Z   MAVEN_ARGS: -ntp
+minimum_host	Remove job-local Gradle state	2026-11-23T15:33:14.0773790Z ##[endgroup]
+minimum_host	Post Run actions/setup-java@v6	﻿2026-11-23T15:33:14.1611280Z Post job cleanup.
+minimum_host	Post Run actions/checkout@v7	﻿2026-11-23T15:33:14.2139830Z Post job cleanup.
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.2669850Z [command]/opt/homebrew/bin/git version
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.2736630Z git version 2.56.1
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.2749550Z Temporarily overriding HOME='<RUNNER_HOME>/actions-runner/_work/_temp/37e40ebd-7be3-48a2-848e-24fcae1e5f33' before making global git config changes
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.2749950Z Adding repository directory to the temporary git global config as a safe directory
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.2751310Z [command]/opt/homebrew/bin/git config --global --add safe.directory <RUNNER_HOME>/actions-runner/_work/jmlx/jmlx
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.2810660Z Removing SSH command configuration
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.2812940Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp core\.sshCommand
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.2869340Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.3575370Z Removing HTTP extra header
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.3577230Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.3630420Z [command]/opt/homebrew/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.4323920Z Removing includeIf entries pointing to credentials config files
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.4326520Z [command]/opt/homebrew/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
+minimum_host	Post Run actions/checkout@v7	2026-11-23T15:33:14.4379770Z [command]/opt/homebrew/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
+minimum_host	Complete job	﻿2026-11-23T15:33:14.5115080Z Cleaning up orphan processes
+minimum_host	Complete job	2026-11-23T15:33:14.8866400Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/download-artifact@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

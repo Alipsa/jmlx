@@ -1,0 +1,43 @@
+RC3_DAEMON={"home":"<HOME>/.sdkman/candidates/java/25.0.5.0+11-librca","vendor":"BellSoft","runtime":"25.0.5+11-LTS","gradleUserHome":"<HOME>/.gradle"}
+RC3_DAEMON={"home":"<HOME>/.sdkman/candidates/java/25.0.5.0+11-librca","vendor":"BellSoft","runtime":"25.0.5+11-LTS","gradleUserHome":"<HOME>/.gradle"}
+
+> Task :buildSrc:compileJava
+RC3_COMPILER={"task":":compileJava","home":"/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home","runtime":"21.0.13+9-LTS","vendor":"Eclipse Temurin"}
+
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes
+> Task :buildSrc:jar UP-TO-DATE
+
+> Task :jmlx-jinja:compileJava
+RC3_COMPILER={"task":":jmlx-jinja:compileJava","home":"/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home","runtime":"21.0.13+9-LTS","vendor":"Eclipse Temurin"}
+
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes
+
+> Task :jmlx-jinja:compileTestJava
+RC3_COMPILER={"task":":jmlx-jinja:compileTestJava","home":"/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home","runtime":"21.0.13+9-LTS","vendor":"Eclipse Temurin"}
+
+> Task :jmlx-jinja:processTestResources UP-TO-DATE
+> Task :jmlx-jinja:testClasses
+
+> Task :jmlx-jinja:releaseVerification FAILED
+RC3_VERIFIER_EXECUTABLE=null
+
+FAILURE: Build failed with an exception.
+
+* Where:
+Initialization script '<CANDIDATE>/build/releaseAll/rc3-verification/toolchain-observation.init.gradle' line: 14
+
+* What went wrong:
+Execution failed for task ':jmlx-jinja:releaseVerification' (registered in build file 'jmlx-jinja/build.gradle').
+> java.lang.NullPointerException (no error message)
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 2s
+6 actionable tasks: 4 executed, 2 up-to-date

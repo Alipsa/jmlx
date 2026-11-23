@@ -1,0 +1,39 @@
+diff --git a/jmlx-jinja/build.gradle b/jmlx-jinja/build.gradle
+index d373e8a..4eb1b07 100644
+--- a/jmlx-jinja/build.gradle
++++ b/jmlx-jinja/build.gradle
+@@ -6,7 +6,7 @@ plugins {
+ // jmlx-jinja is a dependency-free Java 21 library; keep that promise even though
+ // the rest of jmlx currently targets Java 25. It is versioned independently of the
+ // other jmlx modules because it was migrated from the standalone hfjinja project.
+-version = '0.6.2'
++version = '0.6.1'
+ 
+ java {
+     toolchain {
+diff --git a/jmlx-tokenizer/build.gradle b/jmlx-tokenizer/build.gradle
+index 3ffbf3c..760fd34 100644
+--- a/jmlx-tokenizer/build.gradle
++++ b/jmlx-tokenizer/build.gradle
+@@ -6,7 +6,7 @@ plugins {
+ // Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: an
+ // "independent release" that inherits the root version is not independent at all. The line
+ // started at 0.1.0 in Phase 8.1.
+-version = '0.1.2'
++version = '0.1.1'
+ 
+ // Pure Java with no native dependency, so it is not bound to the root's Java 25 toolchain
+ // (which exists for jmlx-core/jmlx-ffi's Panama FFM). Targeting 21 matches jmlx-jinja and
+diff --git a/jmlx-vision/build.gradle b/jmlx-vision/build.gradle
+index abbc6fe..a189e58 100644
+--- a/jmlx-vision/build.gradle
++++ b/jmlx-vision/build.gradle
+@@ -6,7 +6,7 @@ plugins {
+ // Its own version line, deliberately independent of the root's 0.5.0-SNAPSHOT: jmlx-vision's
+ // line started at 0.1.0 in Phase 8.1 -- same reasoning jmlx-tokenizer used for its own first
+ // version.
+-version = '0.1.2'
++version = '0.1.1'
+ 
+ // Pure Java with no native dependency, so it is not bound to the root's Java 25 toolchain (which
+ // exists for jmlx-core/jmlx-ffi's Panama FFM). Targeting 21 matches jmlx-jinja and

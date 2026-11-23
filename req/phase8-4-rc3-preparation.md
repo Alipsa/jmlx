@@ -1,5 +1,10 @@
 # Phase 8.4 replacement candidate preparation
 
+RC3 was cut on 2026-11-23 at PR #120 merge and completed exact-candidate technical
+verification; see the [final review](phase8-4-rc3-final-review.md). Owner sign-off,
+license-finding disposition and current Portal account capacity remain pending.
+The preparation history below precedes that candidate cut.
+
 Preparation began on 2026-11-23 after PR #117 merged. No RC3 tag, signed bundle,
 receipt, owner acceptance or publication is asserted by this document. RC2 remains
 blocked; its historical packet is unchanged.

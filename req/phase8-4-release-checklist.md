@@ -1,12 +1,11 @@
 # Phase 8.4 release readiness
 
-RC2 technical verification passed on 2026-11-22, but its required candidate checkout and
-producer inputs are missing as of 2026-11-23. Acceptance and publication are blocked pending
-original-input recovery or a fully verified replacement candidate. Owner signed-candidate/
-delivery review, jinja human sign-off and current Portal capacity confirmation remain open.
-The tagged candidate is
-`jmlx-phase8.4-rc.2` at `33676837f66993b5a809644dbbdc6e6550417334`.
-Replacement preparation: [RC3 preparation](phase8-4-rc3-preparation.md).
+RC3 technical verification passed on 2026-11-23, including all four exact-ZIP consumers
+and final-receipt revalidation before and after its minimum-host window. The current
+candidate is `jmlx-phase8.4-rc.3` at `33fd8d36aa7468a51f3e6ecc57bb581bf83731d6`.
+See the [RC3 review](phase8-4-rc3-final-review.md). Owner signed-candidate/delivery review,
+license-finding disposition, jinja human sign-off and current Portal capacity remain open.
+RC2 remains historical and blocked by its lost candidate checkout/producer inputs.
 No publication authorized or performed.
 Plan: [phase8-4-plan.md](plans/phase8-4-plan.md).
 Local verification: [implementation report](phase8-4-implementation-report.md).
@@ -19,14 +18,15 @@ The [post-plugin artifact audit](phase8-4-pure-java-audit.md) at PR #97 merge
 `98190d44fd725b484e98e5e8b7b41efa925e0b23` supports the committed all-new manifest.
 The owner approved the audited tuple 2026-11-17. The RC2 audit and exact-candidate
 minimum-host run passed at the tagged SHA; see the [RC2 evidence](phase8-4-rc2-final-review.md).
-Those historical results do not resolve the missing-input revalidation blocker.
+The replacement [RC3 review](phase8-4-rc3-final-review.md) retains the audit repeated at
+its final tagged SHA and the passing exact-candidate minimum-host run.
 
 | Module | Proposed decision | Evidence / remaining work |
 | --- | --- | --- |
 | jinja | new 0.6.2 | All JARs and POM match Central; `.module` Gradle version differs 9.7.0 → 9.9.0 |
 | tokenizer | new 0.1.2 | All JARs match; POM/module Jackson dependency differs 3.1.2 → 3.3.0, module Gradle version also differs |
 | vision | new 0.1.2 | All JARs match; POM/module Jackson dependency differs 3.1.2 → 3.3.0, module Gradle version also differs |
-| native/ffi/core/models/adapters | first releases per manifest | RC2 cut and historical verification complete; receipt revalidation blocked |
+| native/ffi/core/models/adapters | first releases per manifest | RC3 technical verification and final receipt revalidation passed |
 
 Any reuse-to-new change reopens tuple review. Module checks use checkout dependencies;
 mixed-source artifact smoke must establish the real published graph independently.
@@ -45,10 +45,10 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [x] Hosted PR #94 [CI run 43628489480](https://github.com/Alipsa/jmlx/actions/runs/43628489480)
   passed both Java and native jobs, including required-native-suite execution and artifact smoke.
 - [x] Owner approved raising the supported native minimum to macOS 27.2.x (2026-11-16).
-  The local physical Apple Silicon Mac runs 27.2.1; RC2 exact-candidate execution passed
+  The local physical Apple Silicon Mac runs 27.2.1; RC3 exact-candidate execution passed
   in the dedicated account. The
   `jmlxrunner` account and runner registration were provisioned and connectivity checked
-  on 2026-11-16; the worker is stopped after the RC2 verification window.
+  on 2026-11-16; the worker is stopped after the RC3 verification window.
 - [x] Revalidate minimum-host registration, saved environment, tool/runner versions and
   queued jobs immediately before the window. ID 23 is historical: GitHub removes persistent
   registrations after more than 14 offline days; re-register and record a new ID if necessary.
@@ -63,6 +63,9 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   offline and unloaded. Guest read-write settings remained configured; recheck before any
   new window.
   See the [RC2 review](phase8-4-rc2-final-review.md) for the completed window evidence.
+  RC3 repeated the checks on 2026-11-23, retaining timestamped probes and source sidecars.
+  The [RC3 review](phase8-4-rc3-final-review.md) records the post-window service removal,
+  offline runner and disabled SMB observation; guest read-write settings remain configured.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
   The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
   inventory to 26 entries. Two provenance findings (Juffa `erf`/`erfinv` and Cephes)
@@ -95,7 +98,8 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   the signed candidate and planned delivery remains open.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
-  organization Usage Center values remain outstanding. RC2 ZIP inventory is retained in its review.
+  organization Usage Center values remain outstanding. The RC3 ZIP inventory is retained
+  in its review; it passes the conservative upload-size check only.
 - [x] Integrate released upstream plugin 2.6.0 and verify the clean historical 8.1 fixture.
   [Compatibility evidence](phase8-4-plugin-2.6.0-compatibility.md) records the unpushed scratch
   commit, expected published-tuple refusal, eligible-three dry-run and HTTPS upload fixture.
@@ -104,35 +108,38 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [x] Approve the audited tuple after minimum-host readiness; repeat audit at final candidate SHA.
   The owner approved the tuple 2026-11-17. The [RC2 review](phase8-4-rc2-final-review.md)
   retains the successful audit comparison at `33676837f66993b5a809644dbbdc6e6550417334`.
-  A replacement candidate needs its own audit; this closes only the historical RC2 work.
+  The [RC3 review](phase8-4-rc3-final-review.md) retains its own audit at
+  `33fd8d36aa7468a51f3e6ecc57bb581bf83731d6`. A replacement needs its own audit.
 - [x] Merge the approved release-version PR after review and green CI.
   [PR #104](https://github.com/Alipsa/jmlx/pull/104) merged 2026-11-20 as
   `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e`;
   [merge-commit CI run 44815990385](https://github.com/Alipsa/jmlx/actions/runs/44815990385)
   passed Java and native checks, both release-smoke profiles and required-native-suite verification.
-- [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
+- [x] Before tagging, review and align the jinja, tokenizer, vision, core and models
   changelog version-cut dates with the final candidate cut date.
-  RC3 pre-tag preparation aligns these dates to 2026-11-23. This gate remains open
-  until review and the candidate cut. If the cut moves to a later date, align them again
-  and repeat both jinja verification passes after that change.
-- [ ] Restore revalidatable candidate provenance before acceptance or publication.
-  RC2 tag/SHA, signed bundle and all consumer runs were historically verified, but the
-  original candidate checkout is missing, including four pinned producer JSON files and all
-  104 digest-pinned JUnit XML reports. Recovery also needs matching staged `native/install/lib`
-  and the preliminary record restored at its original path (an identical copy survives).
-  The [replacement recovery check](plans/evidence/rc3-preparation-2026-11-23/recovery-check.json)
-  establishes that the main checkout's native report matches RC2, but none of its 104
-  JUnit reports matches.
-  Recovering only the four JSON files is insufficient; see the RC2 review.
-  [RC2 final review](phase8-4-rc2-final-review.md) retains the receipt, exact reports, artifact
-  comparison and ZIP inventory. All four consumer reports pass. Owner acceptance of this
-  signed candidate and the changed Javadoc/module checksums remains pending.
+  PR #120 reviewed these dates and RC3 was cut on 2026-11-23. Both jinja passes repeated
+  at the tag. A replacement cut on a later date must realign them and repeat verification.
+- [x] Restore revalidatable candidate provenance before acceptance or publication.
+  RC3 replaces the blocked RC2 candidate. Its complete durable candidate/audit checkouts
+  and second local backup retain all receipt inputs, including 104 original JUnit XML
+  reports. All four exact-ZIP consumers and final-receipt revalidation passed. The
+  [RC3 review](phase8-4-rc3-final-review.md) records 170 verified receipt/window backup pins.
+  This does not restore RC2 or close owner acceptance. A replacement needs fresh evidence.
 - [ ] Review concrete verified-bundle receipt, then explicitly authorize Central publication.
 - [ ] Verify all nine exact Central coordinates and selected Java 21 subset on both platforms.
 - [ ] Merge development-bump PR only after Central verification.
   In that PR, update AGENTS.md's version paragraph and remove the Phase 8.4 release-window note.
 
-## RC3 pre-tag verification (2026-11-23)
+## RC3 exact-candidate review (2026-11-23)
+
+The [final review](phase8-4-rc3-final-review.md) pins the technically verified candidate,
+all exact-tag verification reports and the saved signed ZIP. Its publication manifest
+SHA-256 is `3a4db7f34c748e293195152a425813fe6368cfa2ca12999375eebfb4f61ddd64`.
+Root `check` verifies its recursive evidence inventory, sizes, digests and review document.
+Jinja human sign-off, signed-candidate/delivery acceptance, license disposition and current
+Portal account capacity remain pending. No publication is authorized.
+
+## Historical RC3 pre-tag verification (2026-11-23)
 
 Two consecutive `./gradlew :jmlx-jinja:releaseVerification` passes and the nine-module
 `./releaseAll.sh --dry-run` passed at clean commit
@@ -155,10 +162,9 @@ environment preflight used the BellSoft `21.0.12+1.1-librca` launcher. See the p
 toolchain notes and timestamped version observation. The changelog input is
 `5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`; the jinja release
 checklist input remains `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`.
-These passes precede this PR's shared evidence-guard change to root `build.gradle`; root
-`:check` separately validates the new guard. Human sign-off remains open. Repeat
-exact-candidate checks and the final audit for RC3. Realign dates and repeat both passes if
-the actual cut date changes.
+These passes preceded PR #120's shared evidence-guard change to root `build.gradle`;
+root `:check` separately validated that guard. The exact-tag passes and audit supersede
+this pre-tag record; see the RC3 exact-candidate review above. Human sign-off remains open.
 
 ## Historical pre-candidate verification (2026-11-22)
 

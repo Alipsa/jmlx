@@ -1,0 +1,21 @@
+import groovy.json.JsonOutput
+println('RC3_DAEMON=' + JsonOutput.toJson([home: System.getProperty('java.home'), vendor: System.getProperty('java.vendor'), runtime: System.getProperty('java.runtime.version'), gradleUserHome: gradle.gradleUserHomeDir.absolutePath]))
+gradle.beforeProject { p ->
+    p.tasks.withType(JavaCompile).configureEach { t ->
+        doFirst { println('RC3_COMPILER=' + JsonOutput.toJson([task: t.path, home: t.javaCompiler.get().metadata.installationPath.asFile.absolutePath, runtime: t.javaCompiler.get().metadata.javaRuntimeVersion, vendor: t.javaCompiler.get().metadata.vendor])) }
+    }
+    p.tasks.withType(Javadoc).configureEach { t ->
+        doFirst { println('RC3_JAVADOC=' + JsonOutput.toJson([task: t.path, home: t.javadocTool.get().metadata.installationPath.asFile.absolutePath, runtime: t.javadocTool.get().metadata.javaRuntimeVersion, vendor: t.javadocTool.get().metadata.vendor])) }
+    }
+    p.tasks.withType(JavaExec).configureEach { t ->
+        if (t.name == 'releaseVerification') {
+            doFirst {
+                def selectedExecutable = t.javaLauncher.get().executablePath.asFile.absolutePath
+                println('RC3_VERIFIER_EXECUTABLE=' + selectedExecutable)
+                def process = new ProcessBuilder(selectedExecutable, '-XshowSettings:properties', '-version').redirectErrorStream(true).start()
+                println(process.inputStream.getText('UTF-8'))
+                if (process.waitFor() != 0) throw new GradleException('Verifier JVM identity probe failed')
+            }
+        }
+    }
+}

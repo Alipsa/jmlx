@@ -1072,6 +1072,7 @@ tasks.named('check') {
             tasks.named('verifyHfReferenceGoldens'),
             tasks.named('verifyRc2ReviewEvidence'),
             tasks.named('verifyRc3PreTagEvidence'),
+            tasks.named('verifyRc3ReviewEvidence'),
             tasks.named('verifyImageOracleDependencyPins'),
             tasks.named('verifyImageOracleFixtureDigests'),
             tasks.named('verifyDecodeBaselineManifest'),
@@ -1081,14 +1082,15 @@ tasks.named('check') {
 
 // Packets use either a historical name-to-pin map or a recursive list of path/size/digest pins.
 def registerReviewEvidenceCheck = { String taskName, String packetPath, String label,
-        boolean requireReviewDocument ->
+        boolean requireReviewDocument, String manifestName = 'review.json',
+        boolean repositoryRelativePaths = false ->
     tasks.register(taskName) {
         group = 'verification'
         description = "Verifies the retained ${label} evidence inventory and pins."
         def evidenceDir = file(packetPath)
-        def reviewFile = new File(evidenceDir, 'review.json')
+        def reviewFile = new File(evidenceDir, manifestName)
         inputs.dir(evidenceDir)
-        // Only RC2 pins a separate review document; follow-up guides remain editable.
+        // A packet may pin its review document; living follow-up guides remain editable.
         def configuredReview = new groovy.json.JsonSlurper().parse(reviewFile)
         if (configuredReview.reviewDocument instanceof Map) {
             inputs.file(configuredReview.reviewDocument.path)
@@ -1109,6 +1111,17 @@ def registerReviewEvidenceCheck = { String taskName, String packetPath, String l
             }
             if (!(pins instanceof List) || pins.isEmpty()) {
                 throw new GradleException("${label} evidence requires retainedFiles pins")
+            }
+            if (repositoryRelativePaths) {
+                def prefix = packetPath + '/'
+                pins = pins.collect { pin ->
+                    if (!(pin instanceof Map) || !(pin.path instanceof String)
+                            || !pin.path.startsWith(prefix)) {
+                        throw new GradleException(
+                                "${label} evidence path must be inside ${packetPath}: ${pin}")
+                    }
+                    pin + [path: pin.path.substring(prefix.length())]
+                }
             }
             def verifyPin = { File base, pin ->
                 if (!(pin instanceof Map) || !(pin.path instanceof String)
@@ -1134,10 +1147,10 @@ def registerReviewEvidenceCheck = { String taskName, String packetPath, String l
             }
             pins.each { verifyPin(evidenceDir, it) }
             def names = pins.collect { it.path }
-            if (names.toSet().size() != names.size() || 'review.json' in names) {
+            if (names.toSet().size() != names.size() || manifestName in names) {
                 throw new GradleException("${label} evidence has duplicate or reserved paths")
             }
-            def expectedNames = (names + ['review.json']) as Set
+            def expectedNames = (names + [manifestName]) as Set
             def actualNames = [] as Set
             // Do not follow directory symlinks. Finder metadata is outside the packet inventory.
             def paths = java.nio.file.Files.walk(evidenceDir.toPath())
@@ -1165,6 +1178,9 @@ registerReviewEvidenceCheck('verifyRc2ReviewEvidence',
         'req/plans/evidence/rc2-final-review-2026-11-22', 'RC2 review', true)
 registerReviewEvidenceCheck('verifyRc3PreTagEvidence',
         'req/plans/evidence/rc3-pre-tag-2026-11-23', 'RC3 pre-tag', false)
+registerReviewEvidenceCheck('verifyRc3ReviewEvidence',
+        'req/plans/evidence/rc3-final-review-2026-11-23', 'RC3 review', true,
+        'publication-review.json', true)
 
 tasks.register('verifyHfReferenceGoldens') {
     group = 'verification'

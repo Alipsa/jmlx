@@ -1,0 +1,100 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "se.alipsa",
+    "module": "jmlx-native-macos-arm64",
+    "version": "0.1.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.9.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "jmlx-native-macos-arm64-0.1.0.jar",
+          "url": "jmlx-native-macos-arm64-0.1.0.jar",
+          "size": 77829121,
+          "sha512": "0b2b85ab5c82038b8c51965fad507f66f4794b76c5eac2f1566d1c8310f4e745f4f5896607fe9a56b57917a134103c752f75a9e20c018968818b6bed2b8bb451",
+          "sha256": "cfbb7d71615727d5e5a2e84e6816c4680f1ae61f21d1a3bb5f51c91dc3eaea80",
+          "sha1": "0cf7ac7deaae86268c0e5f84d3c38a2d427fdbf6",
+          "md5": "2683adc8ade7af87763cf5b0b02392fa"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "jmlx-native-macos-arm64-0.1.0.jar",
+          "url": "jmlx-native-macos-arm64-0.1.0.jar",
+          "size": 77829121,
+          "sha512": "0b2b85ab5c82038b8c51965fad507f66f4794b76c5eac2f1566d1c8310f4e745f4f5896607fe9a56b57917a134103c752f75a9e20c018968818b6bed2b8bb451",
+          "sha256": "cfbb7d71615727d5e5a2e84e6816c4680f1ae61f21d1a3bb5f51c91dc3eaea80",
+          "sha1": "0cf7ac7deaae86268c0e5f84d3c38a2d427fdbf6",
+          "md5": "2683adc8ade7af87763cf5b0b02392fa"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "jmlx-native-macos-arm64-0.1.0-sources.jar",
+          "url": "jmlx-native-macos-arm64-0.1.0-sources.jar",
+          "size": 23572,
+          "sha512": "e8092072344ad5d1f966c6ce55aa1bf4d5d10cec0312a0e1103e7bff3ebd51946dec5cd56948ef4af7c74281ab7bd03172a41f670f2eb10969f3c845d670c94b",
+          "sha256": "5d3ed16e5dcb2127be30ff1cd94779c5e10404ccad5c465dd7276d8f1d9f73ea",
+          "sha1": "ac0df2b71b5769608ceb170a3fc22f4555cf2ac1",
+          "md5": "2ca033dcaff1ca32a9d30398de0b5018"
+        }
+      ]
+    },
+    {
+      "name": "javadocElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "javadoc",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "jmlx-native-macos-arm64-0.1.0-javadoc.jar",
+          "url": "jmlx-native-macos-arm64-0.1.0-javadoc.jar",
+          "size": 4175517,
+          "sha512": "39c62509a1f4294fbb410fdf36d681eff6ddd021ae7e3ba5dd4d4df16f45d21b5bea5049a6ade597ddc3e71d54935d4bfeb68ddce4cf3496103af8d51fc09d46",
+          "sha256": "78c9ceb3bbae86b43ac96abd34f3cd05d80f3971574d02f69dd10573e7bf0728",
+          "sha1": "49dd4c4f99025167e6284d4ef9393bfe4e2583cc",
+          "md5": "5b7055c5ea937a59b3e90a6ec9aacc44"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "schema": "jmlx-bundle-smoke-1",
+  "kind": "macos-pure",
+  "passed": true,
+  "bundleSha256": "139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c",
+  "preliminarySha256": "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926",
+  "candidateSha": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6",
+  "environment": {
+    "system": "Darwin",
+    "architecture": "arm64",
+    "kernel": "27.2.0",
+    "launcherJava": "openjdk version \"25.0.5\" 2026-10-20 LTS\nOpenJDK Runtime Environment (build 25.0.5+11-LTS)\nOpenJDK 64-Bit Server VM (build 25.0.5+11-LTS, mixed mode, sharing)",
+    "osVersion": "27.2.1",
+    "swVers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.2.1\nBuildVersion:\t\t26B131",
+    "chip": "Apple M5 Max",
+    "virtualized": false
+  },
+  "command": [
+    "bash",
+    "/Users/per/release-candidates/jmlx-phase8.4-rc.3/tools/release-smoke/run.sh",
+    "candidate",
+    "--profile",
+    "pure-java",
+    "--bundle",
+    "/Users/per/release-candidates/jmlx-phase8.4-rc.3/build/releaseAll/jmlx-mega-bundle.zip",
+    "--bundle-record",
+    "/Users/per/release-candidates/jmlx-phase8.4-rc.3/build/releaseAll/preliminary-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
+    "--bundle-record-sha256",
+    "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926"
+  ],
+  "consumerRuntime": {
+    "java.vendor": "Eclipse Adoptium",
+    "java.version": "21.0.13",
+    "java.runtime.version": "21.0.13+9-LTS",
+    "java.vm.name": "OpenJDK 64-Bit Server VM",
+    "java.feature": "21",
+    "java.home": "/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home"
+  },
+  "consumerRuntimeFile": "macos-pure.runtime.xml",
+  "runId": null,
+  "identityAssurance": "Local measurements; workflow run ID and container image are operator attestations, not authenticated provenance",
+  "outputs": {
+    "macos-pure.log": "2778dc89614783996cc772fbf1d58be180565850a53fbd75b628a861f4c781a5",
+    "macos-pure.runtime.xml": "0714fdf283a643745a41a64af9ad6388b2370b45b4133256d485a72efe7397ba"
+  }
+}

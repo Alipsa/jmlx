@@ -1,0 +1,7 @@
+{
+  "observedAt": "2026-11-23T15:31:07.007158+00:00",
+  "runs": [],
+  "matchingJobs": [],
+  "approvalRequiredRuns": [],
+  "limits": "Paginated snapshot of exposed jobs; needs-blocked jobs may not be exposed. Reviewed workflows restrict release label to manual main dispatch."
+}

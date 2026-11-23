@@ -1,0 +1,8 @@
+{
+  "startedAt": "2026-11-23T15:31:12.548993+00:00",
+  "finishedAt": "2026-11-23T15:31:13.969826+00:00",
+  "sourceCommit": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6",
+  "scriptSha256": "20e907f58b38f86aa3bc56080c9057b1ab67dd5fc520f831e87e6b3b2b597b01",
+  "outputSha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+  "method": "root-staged runner-owned 0700 temporary directory, script mode 0400; sudo -H -u jmlxrunner env -i python3 -I; cwd /"
+}

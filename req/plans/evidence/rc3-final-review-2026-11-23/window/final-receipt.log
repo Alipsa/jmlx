@@ -1,0 +1,11 @@
+db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6
+{
+  "checkedAt": "2026-11-23T15:34:07.682089+00:00",
+  "runId": "45206346138",
+  "jobId": 137803124482,
+  "runnerId": 23,
+  "runnerVersionFromActualJobSetup": "2.338.2",
+  "workflowIdentityMatchesReviewedMain": true,
+  "verifiedReceiptSha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
+  "finalReceiptRevalidatedBeforeWindowEnd": true
+}

@@ -1,0 +1,23 @@
+import groovy.json.JsonOutput
+
+gradle.projectsEvaluated {
+    rootProject.tasks.register('auditToolchains') {
+        doLast {
+            def result = [:]
+            ['jmlx-jinja', 'jmlx-tokenizer', 'jmlx-vision'].each { name ->
+                def p = rootProject.project(':' + name)
+                result[name] = [:]
+                [compiler: p.tasks.named('compileJava').get().javaCompiler.get(),
+                 javadoc: p.tasks.named('javadoc').get().javadocTool.get()].each { role, tool ->
+                    def m = tool.metadata
+                    result[name][role] = [home: m.installationPath.asFile.absolutePath,
+                        vendor: m.vendor, languageVersion: m.languageVersion.toString(),
+                        runtimeVersion: m.javaRuntimeVersion, jvmVersion: m.jvmVersion]
+                }
+            }
+            println('AUDIT_TOOLCHAINS=' + JsonOutput.toJson(result))
+        }
+    }
+}
+
+println('AUDIT_DAEMON=' + groovy.json.JsonOutput.toJson([home: System.getProperty('java.home'), vendor: System.getProperty('java.vendor'), runtimeVersion: System.getProperty('java.runtime.version'), gradleVersion: gradle.gradleVersion]))

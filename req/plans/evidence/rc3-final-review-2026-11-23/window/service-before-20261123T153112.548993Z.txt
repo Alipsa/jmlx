@@ -1,0 +1,50 @@
+system/com.alipsa.jmlx-release-runner = {
+	active count = 0
+	path = /Library/LaunchDaemons/com.alipsa.jmlx-release-runner.plist
+	type = LaunchDaemon
+	state = not running
+
+	program = <RUNNER_HOME>/actions-runner/runsvc.sh
+	arguments = {
+		<RUNNER_HOME>/actions-runner/runsvc.sh
+	}
+
+	working directory = <RUNNER_HOME>/actions-runner
+
+	stdout path = <RUNNER_HOME>/Library/Logs/jmlx-release-runner/stdout.log
+	stderr path = <RUNNER_HOME>/Library/Logs/jmlx-release-runner/stderr.log
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		OSLogRateLimit => 64
+		USER => jmlxrunner
+		ACTIONS_RUNNER_SVC => 1
+		PATH => /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+		LOGNAME => jmlxrunner
+		HOME => <RUNNER_HOME>
+		XPC_SERVICE_NAME => com.alipsa.jmlx-release-runner
+	}
+
+	domain = system
+	username = jmlxrunner
+	group = staff
+
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 0
+	last exit code = (never exited)
+
+	spawn type = interactive (4)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	job state = uninitialized
+	sanitizer flags = 0x0
+
+	properties = creates session | inferred program | needs LWCR update | managed LWCR
+}

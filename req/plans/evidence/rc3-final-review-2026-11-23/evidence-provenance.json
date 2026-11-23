@@ -908,21 +908,21 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/admin-window.py",
-      "bytes": 7576,
-      "sha256": "9ec7563715a43a84f33e16ef673300fe52b7c8d7b9dda8df2fd690b34429be22",
+      "bytes": 7550,
+      "sha256": "a39ef058c65a955736a96c370d6d02763e007011a31e035e1d3ca1d33187b58f",
       "originalBytes": 7576,
       "originalSha256": "9ec7563715a43a84f33e16ef673300fe52b7c8d7b9dda8df2fd690b34429be22",
       "originalPath": "<REVIEW_FIXES>/admin-window-revised.py",
-      "representation": "exact original"
+      "representation": "Post-review revision; originalBytes/originalSha256 identify the preceding retained review version, not these revised bytes."
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/driver-history.json",
-      "bytes": 2111,
-      "sha256": "98d63074dcc364166475d9a75f00cbb182deeac116ceca992f00ad8162977e40",
+      "bytes": 2966,
+      "sha256": "6959ecb9a6c27325fb9d14fb480bf8951f6af5c3cc4ba5b0d34025ab711c6a79",
       "originalBytes": 2111,
       "originalSha256": "98d63074dcc364166475d9a75f00cbb182deeac116ceca992f00ad8162977e40",
       "originalPath": "<REVIEW_FIXES>/driver-history.json",
-      "representation": "exact original"
+      "representation": "Post-review revision; originalBytes/originalSha256 identify the preceding retained review version, not these revised bytes."
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/preservation-repair.json",
@@ -935,8 +935,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/compare-native.py",
-      "bytes": 4853,
-      "sha256": "ba0f8a57995f1f576a606979d2abdb2dfd39dac44e4c1f6a94215b65b6f242a5",
+      "bytes": 5028,
+      "sha256": "01be3169aafea0f20797075637bee8de21b39189c168cf9c5903916dc64439b3",
       "representation": "comparison recipe authored for this review; no separate original"
     }
   ]

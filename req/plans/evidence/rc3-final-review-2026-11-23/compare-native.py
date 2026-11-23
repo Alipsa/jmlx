@@ -45,6 +45,9 @@ def main():
                 metadata[suffix] = pin
     if len(metadata) != 2:
         parser.error("approval must identify exactly one native POM and module metadata pin")
+    legal_texts = approval.get("approvedLocalLegalTexts")
+    if not isinstance(legal_texts, dict) or not legal_texts:
+        parser.error("approval must identify non-empty native legal text pins")
     report = {
         "comparedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
         "bundleSha256": BUNDLE_SHA256,
@@ -70,7 +73,7 @@ def main():
                 encrypted = [item.filename for item in jar.infolist() if item.flag_bits & 1]
                 if encrypted:
                     parser.error("encrypted native archive entries: " + entry)
-                for name, expected in approval["approvedLocalLegalTexts"].items():
+                for name, expected in legal_texts.items():
                     body = jar.read("META-INF/" + name)
                     if sha(body) != expected["sha256"] or len(body) != expected["bytes"]:
                         parser.error("legal text differs: " + entry + "/" + name)

@@ -11,8 +11,8 @@
   "verifiedReceiptSha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
   "reviewDocument": {
     "path": "req/phase8-4-rc3-final-review.md",
-    "bytes": 13487,
-    "sha256": "561c90544c92bb6746344a684948cab4512596c2598c82fd5e02c51101ceb651"
+    "bytes": 14232,
+    "sha256": "dd0e20a351480239b9be21e17a356029a713605ba1fb7a0125aa1182dc3b51bf"
   },
   "technicalVerification": {
     "rootCheck": "passed",
@@ -51,7 +51,9 @@
     "Original candidate paths and complete native/build output must survive; the verifier is not relocatable.",
     "Durable backups are on this Mac; minimum-host execution uses the same physical Mac under a separate account.",
     "Historical approved/native cached Javadoc producer JVM is unestablished; exact archive bytes match.",
-    "Pending human/Portal records are explicit placeholders, not approval."
+    "Pending human/Portal records are explicit placeholders, not approval.",
+    "No window-time digest pins the admin helper. The retained original is believed to be the executed helper; its raw digest was recorded at 15:36:06Z, after the 15:34:19Z stop observation. Method records pin only the probe script.",
+    "Historical helper snapshots retain assert gates disabled by optimization and the runner-owned-directory staging race. The new review-only admin helper fixes the race and uses explicit checks; it was not executed in the window. See driver-history.json before any reuse."
   ],
   "retainedFiles": [
     {
@@ -91,8 +93,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/compare-native.py",
-      "bytes": 4853,
-      "sha256": "ba0f8a57995f1f576a606979d2abdb2dfd39dac44e4c1f6a94215b65b6f242a5"
+      "bytes": 5028,
+      "sha256": "01be3169aafea0f20797075637bee8de21b39189c168cf9c5903916dc64439b3"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/linux-pure.json",
@@ -156,13 +158,13 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/driver-history.json",
-      "bytes": 2111,
-      "sha256": "98d63074dcc364166475d9a75f00cbb182deeac116ceca992f00ad8162977e40"
+      "bytes": 2966,
+      "sha256": "6959ecb9a6c27325fb9d14fb480bf8951f6af5c3cc4ba5b0d34025ab711c6a79"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/evidence-provenance.json",
-      "bytes": 53668,
-      "sha256": "4347af3ff81e6e66a51b01cc53d509684a4985b04c7ba40ab6d74e05528774bb"
+      "bytes": 53886,
+      "sha256": "f9819f8bb571232843fec6fdd1b9946f58573ad1ac385e7dda73fad13b81cd2d"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/historical-native-approval.json",
@@ -436,8 +438,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/admin-window.py",
-      "bytes": 7576,
-      "sha256": "9ec7563715a43a84f33e16ef673300fe52b7c8d7b9dda8df2fd690b34429be22"
+      "bytes": 7550,
+      "sha256": "a39ef058c65a955736a96c370d6d02763e007011a31e035e1d3ca1d33187b58f"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/bootout-20261123T153419.953676Z.json",

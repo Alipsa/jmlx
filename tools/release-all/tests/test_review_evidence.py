@@ -65,6 +65,10 @@ check.dependsOn tasks.named('verifyPacket')
 
             prepare()
             run(True)
+            # Another packet's digest must not invalidate this packet's reference.
+            with checklist.open("a") as stream:
+                stream.write("Later packet publication manifest SHA-256 is `" + "0" * 64 + "`.\n")
+            run(True)
             finder = payload.parent / ".DS_Store"
             finder.write_bytes(b"Finder")
             run(True)

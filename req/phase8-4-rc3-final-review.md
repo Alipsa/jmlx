@@ -121,13 +121,22 @@ At the retained post-window observation on 2026-11-23, SMB sharing was disabled;
 read-write settings remained configured. Re-enabling the share would restore those settings.
 This is a dated observation, not a continuing sharing guarantee. The runner was confirmed
 offline/idle and its launchd service absent. The shutdown command succeeded, but its
-immediate assertion observed `SIGTERMed` while launchd removed the service. The executed
-helper is retained as `window/admin-window-original.py`. The backed-up post-window wait
+immediate assertion observed `SIGTERMed` while launchd removed the service. The helper
+believed to have run is retained as `window/admin-window-original.py`. Its raw digest was recorded only in
+`backup-verification.json` at 15:36:06Z, after the stop observation at 15:34:19Z.
+Window method records pin the probe script, not the helper; no window-time digest
+establishes that these helper bytes ran. The backed-up post-window wait
 revision is `window/admin-window-backup-snapshot.py`; it did not run in the window.
 `window/admin-window.py` is a new review-only revision using explicit `SystemExit` safety
-checks that remain active under `python -O`. It also waits for removal and has not been run
-as root. The archived start/stop/watcher wrappers resolved their `admin-window.py` basename
-to the executed original during the window, not to this new revision. The original
+checks that remain active under `python -O`. It creates the probe exclusively without
+following symlinks while the directory is root-owned, transfers file ownership by descriptor,
+and transfers directory ownership last. It also waits for removal and has not been run
+as root. Historical copies retain the staging race and have not been rewritten. The
+archived start/stop/watcher wrappers are believed to have resolved their `admin-window.py`
+basename to the original during the window, not to this new revision. Historical queue,
+watcher and preservation helpers retain `assert` gates that optimization can disable;
+the start wrapper invokes the queue helper without `-I`. These are historical records
+and must not be reused as hardened drivers. The original
 observation and later confirmation are retained. No candidate rerun was needed.
 
 The final technical receipt was created and revalidated before the shutdown signal, then

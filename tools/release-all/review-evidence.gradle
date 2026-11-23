@@ -96,9 +96,10 @@ ext.registerReviewEvidenceCheck = { String taskName, String packetPath, String l
                 verifyPin(rootDir, review.reviewDocument)
             }
             if (checklistPath != null) {
-                def matches = (file(checklistPath).getText('UTF-8') =~
-                        /publication manifest\s+SHA-256 is `([0-9a-f]{64})`/)
-                if (matches.size() != 1 || sha256File(reviewFile) != matches[0][1]) {
+                def expectedDigest = sha256File(reviewFile)
+                def reference = /publication manifest\s+SHA-256 is `/ + expectedDigest + /`/
+                def matches = (file(checklistPath).getText('UTF-8') =~ reference)
+                if (matches.size() != 1) {
                     throw new GradleException(
                             "${label} manifest digest differs from the checklist reference")
                 }

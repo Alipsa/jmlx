@@ -19,10 +19,10 @@
     "successfulLinuxDriver": "verification/resume-linux.py"
   },
   "adminWindow": {
-    "executed": "window/admin-window-original.py",
     "backedUpPostWindowRevision": "window/admin-window-backup-snapshot.py",
     "newUnexecutedRevision": "window/admin-window.py",
-    "notes": "The original helper was used for start/connected/stop. The backup snapshot adds shutdown waiting and was revised after the window; its preserved raw original was restored to its verified backup bytes. The new helper revision replaces asserts with explicit SystemExit checks and was never executed in the RC3 window."
+    "notes": "The original helper is believed to have been used for start/connected/stop. Its raw digest was recorded only in backup-verification.json at 15:36:06Z, after the stop observation at 15:34:19Z. Window method records pin the probe, not the helper; no window-time helper digest establishes which bytes ran. The backup snapshot adds shutdown waiting and was revised after the window; its preserved raw original was restored to its verified backup bytes. The new review-only helper uses explicit SystemExit checks, writes the probe with exclusive no-follow creation while its directory is root-owned, transfers file ownership by descriptor, and gives the directory away last. It was never executed in the RC3 window.",
+    "believedExecuted": "window/admin-window-original.py"
   },
   "wrapperScripts": {
     "retained": [
@@ -30,6 +30,6 @@
       "window/stop-window.sh",
       "window/watch-window.py"
     ],
-    "notes": "Their admin-window.py basename resolved to the executed original helper during the window. It does not identify the new revision of that basename in this packet."
+    "notes": "Their admin-window.py basename is believed to have resolved to the original helper during the window. It does not identify the new revision of that basename in this packet. Historical queue-check.py, watch-window.py and verification/preserve-inputs.py retain assert gates; PYTHONOPTIMIZE can disable them, and start-window.sh invokes queue-check.py without -I. The revised admin helper repeats the queue checks under sudo -I, but these retained wrappers must not be reused as hardened drivers. Historical helper snapshots also retain the runner-owned-directory staging race; only the unexecuted revision fixes it."
   }
 }

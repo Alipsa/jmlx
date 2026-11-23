@@ -1,14 +1,12 @@
 """The retained RC3 comparator requires a complete, unencrypted native publication set."""
 
 import contextlib
-import ast
 import hashlib
 import importlib.util
 import io
 import json
 from pathlib import Path
 import sys
-import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -64,15 +62,17 @@ class CompareRc3NativeTest(unittest.TestCase):
             approval["approvedMetadata"].insert(1, {"path": "literal-cc-pom-comment.txt"})
         return bundle, approval
 
-    def run_comparison(self, bundle, approval, error=None):
+    def run_comparison(self, bundle, approval, error=None, bad_pin=None):
         source = self.root / "approval.json"
         source.write_text(json.dumps(approval))
         output = self.root / "comparison.json"
         argv = [str(SOURCE), "--bundle", str(bundle), "--approval", str(source),
                 "--output", str(output)]
         stderr = io.StringIO()
-        with patch.object(self.module, "APPROVAL_SHA256", sha(source.read_bytes())), \
-                patch.object(self.module, "BUNDLE_SHA256", sha(bundle.read_bytes())), \
+        approval_pin = "0" * 64 if bad_pin == "approval" else sha(source.read_bytes())
+        bundle_pin = "0" * 64 if bad_pin == "bundle" else sha(bundle.read_bytes())
+        with patch.object(self.module, "APPROVAL_SHA256", approval_pin), \
+                patch.object(self.module, "BUNDLE_SHA256", bundle_pin), \
                 patch.object(sys, "argv", argv), contextlib.redirect_stderr(stderr):
             if error:
                 with self.assertRaises(SystemExit):
@@ -103,17 +103,51 @@ class CompareRc3NativeTest(unittest.TestCase):
     def test_encrypted_entries_are_rejected(self):
         self.run_comparison(*self.fixture(encrypted=True), error="encrypted native archive entries")
 
-    def test_revised_admin_checks_survive_optimization(self):
-        helper = SOURCE.parent / "window/admin-window.py"
-        self.assertFalse(any(isinstance(node, ast.Assert)
-                             for node in ast.walk(ast.parse(helper.read_text()))))
-        result = subprocess.run(
-            [sys.executable, "-O", "-c",
-             "import os,runpy,sys; os.geteuid=lambda:1000; "
-             "runpy.run_path(sys.argv[1],run_name='__main__')", str(helper)],
-            capture_output=True, text=True, timeout=30)
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("Administrator authentication required", result.stderr)
+    def test_archive_digest_and_size_mismatches_are_rejected(self):
+        for field, value in (("sha256", "0" * 64), ("bytes", 0)):
+            bundle, approval = self.fixture()
+            approval["localArtifactsReviewed"][0][field] = value
+            with self.subTest(field=field):
+                self.run_comparison(bundle, approval, "native archive differs")
+
+    def test_legal_text_digest_and_size_mismatches_are_rejected(self):
+        for field, value in (("sha256", "0" * 64), ("bytes", 0)):
+            bundle, approval = self.fixture()
+            approval["approvedLocalLegalTexts"]["NOTICE"][field] = value
+            with self.subTest(field=field):
+                self.run_comparison(bundle, approval, "legal text differs")
+
+    def test_empty_or_missing_legal_text_pins_are_rejected(self):
+        for value in ({}, None, []):
+            bundle, approval = self.fixture()
+            approval["approvedLocalLegalTexts"] = value
+            with self.subTest(value=value):
+                self.run_comparison(bundle, approval, "non-empty native legal text pins")
+        del approval["approvedLocalLegalTexts"]
+        self.run_comparison(bundle, approval, "non-empty native legal text pins")
+
+    def test_duplicate_metadata_pin_is_rejected(self):
+        bundle, approval = self.fixture()
+        approval["approvedMetadata"].append(approval["approvedMetadata"][0])
+        self.run_comparison(bundle, approval, "duplicate native metadata pin")
+
+    def test_three_archives_with_wrong_names_are_rejected(self):
+        bundle, approval = self.fixture()
+        approval["localArtifactsReviewed"][0]["path"] = "other.jar"
+        self.run_comparison(bundle, approval, "runtime, sources and Javadoc archives")
+
+    def test_reviewed_input_digest_mismatches_are_rejected(self):
+        for source in ("approval", "bundle"):
+            with self.subTest(source=source):
+                self.run_comparison(*self.fixture(),
+                                    error="differs from the reviewed RC3 inputs", bad_pin=source)
+
+    def test_metadata_digest_and_size_mismatches_are_rejected(self):
+        for field, value in (("sha256", "0" * 64), ("bytes", 0)):
+            bundle, approval = self.fixture()
+            approval["approvedMetadata"][0][field] = value
+            with self.subTest(field=field):
+                self.run_comparison(bundle, approval, "native metadata differs")
 
 
 if __name__ == "__main__":

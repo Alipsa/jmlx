@@ -3,19 +3,19 @@ import datetime, hashlib, json, os, plistlib, re, shutil, subprocess, sys, tempf
 from pathlib import Path
 root = Path('<CANDIDATE>')
 e = root / 'build/releaseAll/rc3-verification/minimum-host-window'
-if not os.geteuid() == 0:
+if os.geteuid() != 0:
     raise SystemExit('Administrator authentication required')
 mode = sys.argv[1]
-if not mode in ['start', 'connected', 'stop']:
-    raise SystemExit("Safety check failed: mode in ['start', 'connected', 'stop']")
+if mode not in ['start', 'connected', 'stop']:
+    raise SystemExit("Expected window mode: ['start', 'connected', 'stop']")
 now = datetime.datetime.now(datetime.timezone.utc)
 stamp = now.strftime('%Y%m%dT%H%M%S.%fZ')
 commit = subprocess.check_output(['/usr/bin/git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
-if not commit == '33fd8d36aa7468a51f3e6ecc57bb581bf83731d6':
-    raise SystemExit("Safety check failed: commit == '33fd8d36aa7468a51f3e6ecc57bb581bf83731d6'")
+if commit != '33fd8d36aa7468a51f3e6ecc57bb581bf83731d6':
+    raise SystemExit("Candidate commit changed; restore the reviewed RC3 checkout")
 plist = Path('/Library/LaunchDaemons/com.alipsa.jmlx-release-runner.plist')
 expected = root / 'req/plans/evidence/minimum-host-runner-2026-11-16/com.alipsa.jmlx-release-runner.plist'
-if not plistlib.loads(plist.read_bytes()) == plistlib.loads(expected.read_bytes()):
+if plistlib.loads(plist.read_bytes()) != plistlib.loads(expected.read_bytes()):
     raise SystemExit('Runner service definition differs from reviewed file')
 service = 'system/com.alipsa.jmlx-release-runner'
 if mode == 'stop':
@@ -30,7 +30,7 @@ if mode == 'start':
     if not (flags and all((value == '0' for value in flags))):
         raise SystemExit('An SMB share is enabled; review sharing before the window')
     queue = json.loads((e / 'queue-review.json').read_text())
-    if not (not queue['matchingJobs'] and (not queue['approvalRequiredRuns'])):
+    if queue['matchingJobs'] or queue['approvalRequiredRuns']:
         raise SystemExit('Unexpected release-label jobs or approval-required runs')
     age = (now - datetime.datetime.fromisoformat(queue['observedAt'])).total_seconds()
     if not 0 <= age <= 180:
@@ -38,16 +38,19 @@ if mode == 'start':
 probe_source = 'req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.py'
 data = subprocess.check_output(['/usr/bin/git', '-C', str(root), 'show', commit + ':' + probe_source])
 manifest = json.loads(subprocess.check_output(['/usr/bin/git', '-C', str(root), 'show', commit + ':req/plans/evidence/minimum-host-runner-2026-11-22/account-probe.json']))
-if not hashlib.sha256(data).hexdigest() == manifest['windowTimeProbe']['scriptSha256']:
-    raise SystemExit("Safety check failed: hashlib.sha256(data).hexdigest() == manifest['windowTimeProbe']['scriptSha256']")
+if hashlib.sha256(data).hexdigest() != manifest['windowTimeProbe']['scriptSha256']:
+    raise SystemExit("Account probe digest differs from the reviewed manifest")
 stage = Path(tempfile.mkdtemp(prefix='jmlx-rc3-account-probe-', dir='/private/tmp'))
 try:
-    os.chown(stage, 503, 20)
-    os.chmod(stage, 448)
+    # Keep the directory root-owned until all privileged file writes are finished.
     probe = stage / 'account-probe.py'
-    probe.write_bytes(data)
-    os.chown(probe, 503, 20)
-    os.chmod(probe, 256)
+    fd = os.open(probe, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o400)
+    with os.fdopen(fd, 'wb') as stream:
+        stream.write(data)
+        stream.flush()
+        os.fchown(stream.fileno(), 503, 20)
+    os.chmod(stage, 0o700)
+    os.chown(stage, 503, 20, follow_symlinks=False)
     output = subprocess.check_output(['/usr/bin/sudo', '-H', '-u', 'jmlxrunner', '/usr/bin/env', '-i', 'PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin', '/opt/homebrew/bin/python3', '-I', str(probe)], cwd='/')
 finally:
     shutil.rmtree(stage)
@@ -62,12 +65,12 @@ if mode == 'start':
         raise SystemExit('Account isolation changed')
     if not all((not value for fields in r['isolation'].values() for value in fields.values())):
         raise SystemExit('Owner-private paths are accessible')
-    if not r['savedEnvironment']['.path']['sha256'] == baseline['savedPath']['sha256']:
-        raise SystemExit("Safety check failed: r['savedEnvironment']['.path']['sha256'] == baseline['savedPath']['sha256']")
-    if not r['savedEnvironment']['.env']['sha256'] == baseline['savedEnvironment']['sha256']:
-        raise SystemExit("Safety check failed: r['savedEnvironment']['.env']['sha256'] == baseline['savedEnvironment']['sha256']")
-    if not all((not value['containsOwnerHome'] for value in r['savedEnvironment'].values())):
-        raise SystemExit("Safety check failed: all((not value['containsOwnerHome'] for value in r['savedEnvironment'].values()))")
+    if r['savedEnvironment']['.path']['sha256'] != baseline['savedPath']['sha256']:
+        raise SystemExit("Runner saved path differs from the reviewed baseline")
+    if r['savedEnvironment']['.env']['sha256'] != baseline['savedEnvironment']['sha256']:
+        raise SystemExit("Runner saved environment differs from the reviewed baseline")
+    if any(value['containsOwnerHome'] for value in r['savedEnvironment'].values()):
+        raise SystemExit("Runner saved environment exposes the owner home")
     if not (r['runner']['agentId'] == 23 and r['runner']['listenerVersion'] == baseline['runner']['listenerVersion'] and (r['runner']['listenerSha256'] == baseline['runner']['listenerSha256'])):
         raise SystemExit('Runner identity/version changed; review it before starting')
     for key, value in r['tools'].items():
@@ -76,7 +79,7 @@ if mode == 'start':
             raise SystemExit('Toolchain changed: ' + key)
     status = subprocess.run(['/bin/launchctl', 'print', service], capture_output=True, text=True)
     (e / ('service-before-' + stamp + '.txt')).write_text(status.stdout + status.stderr)
-    if not 'state = running' not in status.stdout:
+    if 'state = running' in status.stdout:
         raise SystemExit('Runner already running; inspect it first')
     if status.returncode:
         subprocess.run(['/bin/launchctl', 'bootstrap', 'system', str(plist)], check=True)
@@ -91,6 +94,6 @@ if mode == 'stop':
         status = subprocess.run(['/bin/launchctl', 'print', service], capture_output=True, text=True)
         observations.append({'observedAt': datetime.datetime.now(datetime.timezone.utc).isoformat(), 'returncode': status.returncode, 'stdout': status.stdout, 'stderr': status.stderr})
     (e / ('shutdown-confirmation-' + stamp + '.json')).write_text(json.dumps(observations, indent=2) + '\n')
-    if not status.returncode != 0:
+    if status.returncode == 0:
         raise SystemExit('Runner service still loaded after waiting 30 seconds; inspect retained observations')
 print(mode + ' completed; account probe and service/sharing evidence retained', flush=True)

@@ -1,5 +1,5 @@
 {
-  "comparedAt": "2026-11-23T15:45:34.165618+00:00",
+  "comparedAt": "2026-11-23T16:56:31.301241+00:00",
   "bundleSha256": "139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c",
   "approvalRecordSha256": "ba210deade57f036aa52880ef066b1b21a32bd82bfc41ce7605d47ba544dc257",
   "nativeArtifacts": [
@@ -93,15 +93,15 @@
   ],
   "nativeMetadata": [
     {
-      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.pom",
-      "bytes": 4149,
-      "sha256": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
-      "matchesApprovedLiteral": true
-    },
-    {
       "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.module",
       "bytes": 3584,
       "sha256": "e8c0cd6775c976fb3013a99df55154f11197c6c13e466dc2efbfd333c800a594",
+      "matchesApprovedLiteral": true
+    },
+    {
+      "entry": "se/alipsa/jmlx-native-macos-arm64/0.1.0/jmlx-native-macos-arm64-0.1.0.pom",
+      "bytes": 4149,
+      "sha256": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
       "matchesApprovedLiteral": true
     }
   ],

@@ -1,0 +1,6 @@
+START buildsrc-check
+PASS buildsrc-check
+START release-selftest
+PASS release-selftest
+START jinja-pass-1
+jinja-pass-1 failed; inspect retained log

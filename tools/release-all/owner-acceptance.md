@@ -34,6 +34,15 @@ The verifier requires that commit to descend from the candidate. It does not che
 `origin/main` ref, which may be stale; the separately authorized acceptance digest attests
 to the exact reviewed commit, and the operator must confirm its PR was reviewed and merged.
 
+A technical packet may be committed while owner decisions, jinja sign-off or the current
+Portal snapshot are explicitly pending. Such a packet cannot support acceptance. Before
+acceptance, retain those completed records in a superseding reviewed packet commit,
+update the review document and its digest, regenerate the manifest and update its
+checklist digest. Review and merge that superseding commit, then cite its new commit and
+manifest digest in the acceptance record. Setting acceptance decisions to `true` does
+not replace the missing records. The verifier checks pins and owner attestations; it does
+not independently determine whether the document's substantive review is complete.
+
 After the owner reviews that packet, retain their explicit decision in a separate JSON
 record. Its required fields are:
 

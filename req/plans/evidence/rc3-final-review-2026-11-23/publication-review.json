@@ -11,8 +11,8 @@
   "verifiedReceiptSha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
   "reviewDocument": {
     "path": "req/phase8-4-rc3-final-review.md",
-    "bytes": 11046,
-    "sha256": "1907fe0b0ff588d86e6688ac7e9d0c4b337c8a1a0f443833e9ad746d122d6d43"
+    "bytes": 13487,
+    "sha256": "561c90544c92bb6746344a684948cab4512596c2598c82fd5e02c51101ceb651"
   },
   "technicalVerification": {
     "rootCheck": "passed",
@@ -91,8 +91,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/compare-native.py",
-      "bytes": 3578,
-      "sha256": "41df37a5b16a4ffa0f64e92c597ad690e4f1a31b9ff075f489af21f31118e63b"
+      "bytes": 4853,
+      "sha256": "ba0f8a57995f1f576a606979d2abdb2dfd39dac44e4c1f6a94215b65b6f242a5"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/linux-pure.json",
@@ -155,9 +155,14 @@
       "sha256": "66afa117a854de662cb5f7673b2f38e7e5c8ea7a74e1bff15222f61136f6fa23"
     },
     {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/driver-history.json",
+      "bytes": 2111,
+      "sha256": "98d63074dcc364166475d9a75f00cbb182deeac116ceca992f00ad8162977e40"
+    },
+    {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/evidence-provenance.json",
-      "bytes": 51282,
-      "sha256": "02dc9ddcd900708537b62cc16a2e16ada37e34c242ce046832075f7ef6a08715"
+      "bytes": 53668,
+      "sha256": "4347af3ff81e6e66a51b01cc53d509684a4985b04c7ba40ab6d74e05528774bb"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/historical-native-approval.json",
@@ -265,6 +270,11 @@
       "sha256": "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926"
     },
     {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/preservation-repair.json",
+      "bytes": 651,
+      "sha256": "c357a81abf164a0eeff5f814b3b655310e90259ec19fdffc53c514e5c375cb4c"
+    },
+    {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/producer/bundle-receipt.json",
       "bytes": 176,
       "sha256": "f49a5d26c15a2c11e8a1d249b8c65873bf98888505e7097ff096941f8d876f6e"
@@ -283,6 +293,11 @@
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/producer/task-evidence-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
       "bytes": 1815,
       "sha256": "4203eb55223b3495dc7bc144924b75853c9f9a57eed24babebc4f9aeaa3af032"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/buildsrc-check-invocation.json",
+      "bytes": 1641,
+      "sha256": "4df68f25d70f2d5d86c00a97f0236bc747b33684aa9561f39048f004424e8a23"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/buildsrc-check.log",
@@ -310,6 +325,11 @@
       "sha256": "10b727f8cfb48d991daa71b118df346bb43b801794f6e590407081a6caaa5f2b"
     },
     {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/instrumentation-failure-candidate-driver.log",
+      "bytes": 147,
+      "sha256": "679b2704bd5e9499864b27e18fbc140eedf2f33b9deab038e3cd0756a7cf2281"
+    },
+    {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/instrumentation-failure-jinja-pass-1-invocation.json",
       "bytes": 1738,
       "sha256": "9731fd007287b577c26c451d422250b6e62f059b350814524015d07f7bc2755e"
@@ -323,6 +343,11 @@
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/linux-consumer-driver.log",
       "bytes": 81,
       "sha256": "5b6be10cbab92e10e0063ef64ab1bc8819b4816379fcc6901af45ef8ea033dab"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/linux-launch-failure-invocation.json",
+      "bytes": 924,
+      "sha256": "e28db094e93df79922c09c0a652c6f3708587ae2fb26619867bd7eb089ac21c1"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/native-module.json",
@@ -343,6 +368,11 @@
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/producer-input-backup.json",
       "bytes": 24767,
       "sha256": "1d1ea8ea43f3f307899d3c8f6dad58565a7b8f70cda518200f05edea261115e1"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/release-selftest-invocation.json",
+      "bytes": 1634,
+      "sha256": "86fdbeeb2edcfc4caa426d8a7b7caaf9bb4c5392a9c8c3ee45f3dc10890e140e"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/release-selftest.log",
@@ -377,7 +407,7 @@
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/signed-native-comparison.json",
       "bytes": 4448,
-      "sha256": "0d273b2d91646264998c8287b9471f268c7b4292f76b330c56d5855ff99a1b1a"
+      "sha256": "82a12cc85e3b1429b959a6b7ff1376d3dad17a3c07ad56059149bdeb036b38c8"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/toolchain-observation.init.gradle",
@@ -395,14 +425,19 @@
       "sha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6"
     },
     {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/admin-window-backup-snapshot.py",
+      "bytes": 6181,
+      "sha256": "b2a813bb3070efceee414ade0c6302bfe0dc2bced7641f85809451fc5d1a5385"
+    },
+    {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/admin-window-original.py",
       "bytes": 5606,
       "sha256": "42dfa84dc2285767810959fb8fdd06fb949eb8c889bfef3f4680e4f3a9428ba1"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/admin-window.py",
-      "bytes": 6181,
-      "sha256": "b2a813bb3070efceee414ade0c6302bfe0dc2bced7641f85809451fc5d1a5385"
+      "bytes": 7576,
+      "sha256": "9ec7563715a43a84f33e16ef673300fe52b7c8d7b9dda8df2fd690b34429be22"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/bootout-20261123T153419.953676Z.json",
@@ -554,5 +589,10 @@
       "bytes": 378,
       "sha256": "01973be60604c8a9994e617fb6a20b7cbeb8641112835cbb0136147b9534032b"
     }
-  ]
+  ],
+  "acceptanceEligibility": {
+    "eligible": false,
+    "reason": "Required owner decisions, jinja human sign-off and current Portal snapshot remain pending.",
+    "requiredNextStep": "A superseding reviewed and merged packet commit must retain completed records, revise the review document, regenerate its pin and publication manifest, and update the checklist manifest digest. Acceptance must identify that superseding commit and digest, not this incomplete packet."
+  }
 }

@@ -112,9 +112,9 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   passed Java and native checks, both release-smoke profiles and required-native-suite verification.
 - [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
   changelog version-cut dates with the final candidate cut date.
-  RC2 used 2026-11-22; those dates are retained during preparation. This gate is
-  reopened. Align and review the actual cut date in the final pre-tag PR, then rerun
-  the affected verification after that change.
+  RC3 pre-tag preparation aligns these dates to 2026-11-23. This gate remains open
+  until review and the candidate cut. If the cut moves to a later date, align them again
+  and repeat both jinja verification passes after that change.
 - [ ] Restore revalidatable candidate provenance before acceptance or publication.
   RC2 tag/SHA, signed bundle and all consumer runs were historically verified, but the
   original candidate checkout is missing, including four pinned producer JSON files and all
@@ -132,7 +132,35 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [ ] Merge development-bump PR only after Central verification.
   In that PR, update AGENTS.md's version paragraph and remove the Phase 8.4 release-window note.
 
-## Pre-candidate verification (2026-11-22)
+## RC3 pre-tag verification (2026-11-23)
+
+Two consecutive `./gradlew :jmlx-jinja:releaseVerification` passes and the nine-module
+`./releaseAll.sh --dry-run` passed at clean commit
+`b4ee4d75836f3f5fe4445e72a690dae2fd1b7887`. The [pre-tag
+packet](plans/evidence/rc3-pre-tag-2026-11-23/review.json) retains both complete reports,
+logs and supporting evidence, with sizes and SHA-256 pins. Public copies normalize local
+paths; available original bytes are preserved outside Gradle clean scope at the packet's
+`durableOriginals` location. The later `toolchain-observation.txt` has only a normalized
+copy; no separate raw original was preserved. Root `check` enforces the recursive inventory
+and every retained file's size and SHA-256 through `verifyRc3PreTagEvidence`. This checks
+consistency; the packet manifest's reviewed SHA-256 is
+`111c400f280042aacdebfeab348b9c8c124b70f8d547daee27f1246b4c310452`. The reports record the
+outer (invoking) Gradle daemon as BellSoft 25.0.5 and Node v26.7.0. The inner daemon JVM was
+not recorded; matching the outer JVM through inherited `JAVA_HOME` is an assumption. The
+inner candidate build logs resolve
+`/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home`. A later version
+observation of that installation reports Temurin 21.0.13+9; it does not prove the version at
+pass time. The successful passes did not record the verifier JVM identity; the failed
+environment preflight used the BellSoft `21.0.12+1.1-librca` launcher. See the packet's
+toolchain notes and timestamped version observation. The changelog input is
+`5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`; the jinja release
+checklist input remains `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`.
+These passes precede this PR's shared evidence-guard change to root `build.gradle`; root
+`:check` separately validates the new guard. Human sign-off remains open. Repeat
+exact-candidate checks and the final audit for RC3. Realign dates and repeat both passes if
+the actual cut date changes.
+
+## Historical pre-candidate verification (2026-11-22)
 
 PR #116 aligned the five changelog version-cut dates to 2026-11-22. The earlier PR #105
 jinja verification below is historical: its changelog input no longer matches. Two consecutive
@@ -144,13 +172,9 @@ The report records these contract input SHA-256 values:
 - `req/release-checklist.md` (jinja):
   `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`
 
-At this PR's head the changelog digest is again
-`9bc0162e0158403e06dd6b9068edec5ec655e77189b23c95092d8c5bcbf539e0`.
-The `5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26` digest existed
-only in PR #118's initial commit, before its date edit was reverted. PR #116 verification
-remains historical because it did not run at the replacement candidate commit. Final pre-tag
-date alignment will change this contract input; repeat both verification passes for the
-replacement after its final changes.
+This changelog input was superseded by RC3 pre-tag date alignment; see the section above.
+PR #116 verification is historical and stale for that input. The RC3 changelog digest also
+briefly existed in PR #118's initial commit before that PR reverted its date edit.
 
 The isolated online/offline matrix, reproducible archives and independent consumer resolution
 passed with BellSoft JDK 25.0.5, Temurin 21.0.13+9 and pinned Node v26.7.0. The published and
@@ -161,10 +185,8 @@ snapshot of the final Markdown/JSON reports are retained under ignored
 `build/releaseAll/pre-candidate-2026-11-22/`. The logs are
 `pr116-repeat-verification-1.log`, `pr116-repeat-verification-2.log` and
 `pr116-followup-dry-run.log`. These local files are not committed evidence.
-These checks precede the immutable candidate; repeat verification after any contract input
-changes, including the jinja release checklist.
-RC2 subsequently completed its tagged verification; its current revalidation blocker is
-recorded above. A replacement candidate requires fresh verification and signed-bundle evidence.
+These checks preceded RC2, which subsequently completed its tagged verification. Its current
+revalidation blocker and the replacement candidate gates are recorded above.
 
 ## Historical pre-candidate verification (2026-11-20)
 

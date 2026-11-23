@@ -46,3 +46,8 @@ req/plans/evidence/rc2-final-review-2026-11-22/*.log whitespace=-blank-at-eol
 
 # Preserve RC3 preparation recovery evidence bytes.
 req/plans/evidence/rc3-preparation-2026-11-23/** -text
+
+# Preserve RC3 pre-tag verification evidence bytes.
+req/plans/evidence/rc3-pre-tag-2026-11-23/** -text
+# Generated corpus reports retain their original trailing blank line.
+req/plans/evidence/rc3-pre-tag-2026-11-23/**/corpus-coverage.md whitespace=-blank-at-eof

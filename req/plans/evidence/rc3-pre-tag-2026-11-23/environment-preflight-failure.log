@@ -1,0 +1,32 @@
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:compileJava UP-TO-DATE
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes UP-TO-DATE
+> Task :jmlx-jinja:compileTestJava UP-TO-DATE
+> Task :jmlx-jinja:processTestResources UP-TO-DATE
+> Task :jmlx-jinja:testClasses UP-TO-DATE
+
+> Task :jmlx-jinja:releaseVerification FAILED
+Exception in thread "main" java.lang.IllegalStateException: required Node v26.7.0, got v26.13.0
+	at se.alipsa.jmlx.jinja.release.ReleaseVerifierMain.verifyEnvironment(ReleaseVerifierMain.java:205)
+	at se.alipsa.jmlx.jinja.release.ReleaseVerifierMain.verifyEnvironment(ReleaseVerifierMain.java:189)
+	at se.alipsa.jmlx.jinja.release.ReleaseVerifierMain.main(ReleaseVerifierMain.java:44)
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':jmlx-jinja:releaseVerification' (registered in build file 'jmlx-jinja/build.gradle').
+> Process 'command '<HOME>/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java'' finished with non-zero exit value 1
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 500ms
+6 actionable tasks: 1 executed, 5 up-to-date

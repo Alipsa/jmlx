@@ -7,6 +7,7 @@
 # req/benchmarks/phase8-2/evidence-index.json and verified by Phase82SummaryVerifierTest)
 !req/benchmarks/phase8-2/raw/**/*.log
 !req/plans/evidence/pure-java-audit-2026-11-16/*.log
+!req/plans/evidence/rc3-pre-tag-2026-11-23/**/*.log
 
 # BlueJ files
 *.ctxt

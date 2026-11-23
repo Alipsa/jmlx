@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.5.0] - 2026-11-22
+## [0.5.0] - 2026-11-23
 
 Date denotes the version cut, not publication to Maven Central.
 

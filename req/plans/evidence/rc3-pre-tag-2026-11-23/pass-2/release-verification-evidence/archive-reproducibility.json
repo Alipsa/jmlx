@@ -1,0 +1,7 @@
+{
+  "archives": [
+    {"name": "jmlx-jinja-0.6.2.jar", "firstSha256": "8048f73b7480d8bab56d8def5ef73fd9501e5d91329f644f701c00d8d5d083c1", "secondSha256": "8048f73b7480d8bab56d8def5ef73fd9501e5d91329f644f701c00d8d5d083c1"},
+    {"name": "jmlx-jinja-0.6.2-sources.jar", "firstSha256": "ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5", "secondSha256": "ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5"},
+    {"name": "jmlx-jinja-0.6.2-javadoc.jar", "firstSha256": "c9602ee3f5971d5ffa802ded99c10c5d4750b3829ad6df623d610047f380e8e8", "secondSha256": "c9602ee3f5971d5ffa802ded99c10c5d4750b3829ad6df623d610047f380e8e8"}
+  ]
+}

@@ -1071,6 +1071,7 @@ tasks.named('check') {
     dependsOn tasks.named('verifyMlxApiInventory'), tasks.named('verifyMlxApiCallSites'),
             tasks.named('verifyHfReferenceGoldens'),
             tasks.named('verifyRc2ReviewEvidence'),
+            tasks.named('verifyRc3PreTagEvidence'),
             tasks.named('verifyImageOracleDependencyPins'),
             tasks.named('verifyImageOracleFixtureDigests'),
             tasks.named('verifyDecodeBaselineManifest'),
@@ -1078,45 +1079,92 @@ tasks.named('check') {
             tasks.named('verifyQwen35ReferenceGoldens')
 }
 
-tasks.register('verifyRc2ReviewEvidence') {
-    group = 'verification'
-    description = 'Verifies the retained RC2 evidence inventory and review document.'
-    def evidenceDir = file('req/plans/evidence/rc2-final-review-2026-11-22')
-    def reviewFile = new File(evidenceDir, 'review.json')
-    inputs.dir(evidenceDir)
-    // Only the retained packet and its review document are frozen; follow-up guides remain editable.
-    def review = new groovy.json.JsonSlurper().parse(reviewFile)
-    inputs.file(review.reviewDocument.path)
-    doLast {
-        def expectedNames = (review.retainedFiles.keySet() + ['review.json']) as Set
-        // Finder metadata is ignored by Git and is not part of the evidence packet.
-        def actualNames = evidenceDir.listFiles().findAll { it.name != '.DS_Store' }
-                .collect { it.name } as Set
-        if (actualNames != expectedNames) {
-            throw new GradleException('RC2 review evidence inventory differs: '
-                    + "missing=${expectedNames - actualNames}, unlisted=${actualNames - expectedNames}")
+// Packets use either a historical name-to-pin map or a recursive list of path/size/digest pins.
+def registerReviewEvidenceCheck = { String taskName, String packetPath, String label,
+        boolean requireReviewDocument ->
+    tasks.register(taskName) {
+        group = 'verification'
+        description = "Verifies the retained ${label} evidence inventory and pins."
+        def evidenceDir = file(packetPath)
+        def reviewFile = new File(evidenceDir, 'review.json')
+        inputs.dir(evidenceDir)
+        // Only RC2 pins a separate review document; follow-up guides remain editable.
+        def configuredReview = new groovy.json.JsonSlurper().parse(reviewFile)
+        if (configuredReview.reviewDocument instanceof Map) {
+            inputs.file(configuredReview.reviewDocument.path)
         }
-        def verifyPin = { File base, String name, String digest, bytes ->
-            if (!(bytes instanceof Number) || !(bytes.toString() ==~ /0|[1-9][0-9]*/)) {
-                throw new GradleException(
-                        "RC2 review evidence requires a nonnegative integer size: ${name}")
+        doLast {
+            def review = new groovy.json.JsonSlurper().parse(reviewFile)
+            if (requireReviewDocument && !(review.reviewDocument instanceof Map)) {
+                throw new GradleException("${label} evidence requires its pinned reviewDocument")
             }
-            def target = new File(base, name).canonicalFile
-            if (!target.toPath().startsWith(base.canonicalFile.toPath()) || !target.isFile()) {
-                throw new GradleException("RC2 review evidence missing or outside its root: ${name}")
+            def pins = review.retainedFiles
+            if (pins instanceof Map) {
+                pins = pins.collect { name, pin ->
+                    if (!(pin instanceof Map)) {
+                        throw new GradleException("${label} evidence pin must be an object: ${name}")
+                    }
+                    pin + [path: name]
+                }
             }
-            if (!(digest ==~ /[0-9a-f]{64}/) || sha256File(target) != digest
-                    || target.length() != bytes) {
-                throw new GradleException("RC2 review evidence digest/size differs: ${name}")
+            if (!(pins instanceof List) || pins.isEmpty()) {
+                throw new GradleException("${label} evidence requires retainedFiles pins")
+            }
+            def verifyPin = { File base, pin ->
+                if (!(pin instanceof Map) || !(pin.path instanceof String)
+                        || pin.path.isEmpty() || pin.path.contains('\\')
+                        || pin.path.startsWith('/')
+                        || pin.path.split('/', -1).any { it in ['', '.', '..'] }) {
+                    throw new GradleException("${label} evidence requires a relative file path: ${pin}")
+                }
+                if (!(pin.bytes instanceof Number)
+                        || !(pin.bytes.toString() ==~ /0|[1-9][0-9]*/)) {
+                    throw new GradleException(
+                            "${label} evidence requires a nonnegative integer size: ${pin.path}")
+                }
+                def target = new File(base, pin.path).canonicalFile
+                if (!target.toPath().startsWith(base.canonicalFile.toPath()) || !target.isFile()) {
+                    throw new GradleException(
+                            "${label} evidence missing or outside its root: ${pin.path}")
+                }
+                if (!(pin.sha256 instanceof String) || !(pin.sha256 ==~ /[0-9a-f]{64}/)
+                        || sha256File(target) != pin.sha256 || target.length() != pin.bytes) {
+                    throw new GradleException("${label} evidence digest/size differs: ${pin.path}")
+                }
+            }
+            pins.each { verifyPin(evidenceDir, it) }
+            def names = pins.collect { it.path }
+            if (names.toSet().size() != names.size() || 'review.json' in names) {
+                throw new GradleException("${label} evidence has duplicate or reserved paths")
+            }
+            def expectedNames = (names + ['review.json']) as Set
+            def actualNames = [] as Set
+            // Do not follow directory symlinks. Finder metadata is outside the packet inventory.
+            def paths = java.nio.file.Files.walk(evidenceDir.toPath())
+            try {
+                paths.filter { !java.nio.file.Files.isDirectory(it,
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS) }
+                        .filter { it.fileName.toString() != '.DS_Store' }
+                        .forEach { actualNames.add(evidenceDir.toPath().relativize(it)
+                                .toString().replace(File.separator, '/')) }
+            } finally {
+                paths.close()
+            }
+            if (actualNames != expectedNames) {
+                throw new GradleException("${label} evidence inventory differs: "
+                        + "missing=${expectedNames - actualNames}, "
+                        + "unlisted=${actualNames - expectedNames}")
+            }
+            if (review.reviewDocument != null) {
+                verifyPin(rootDir, review.reviewDocument)
             }
         }
-        review.retainedFiles.each { name, pin ->
-            verifyPin(evidenceDir, name, pin.sha256, pin.bytes)
-        }
-        verifyPin(rootDir, review.reviewDocument.path,
-                review.reviewDocument.sha256, review.reviewDocument.bytes)
     }
 }
+registerReviewEvidenceCheck('verifyRc2ReviewEvidence',
+        'req/plans/evidence/rc2-final-review-2026-11-22', 'RC2 review', true)
+registerReviewEvidenceCheck('verifyRc3PreTagEvidence',
+        'req/plans/evidence/rc3-pre-tag-2026-11-23', 'RC3 pre-tag', false)
 
 tasks.register('verifyHfReferenceGoldens') {
     group = 'verification'

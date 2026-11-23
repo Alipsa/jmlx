@@ -136,24 +136,29 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 
 Two consecutive `./gradlew :jmlx-jinja:releaseVerification` passes and the nine-module
 `./releaseAll.sh --dry-run` passed at clean commit
-`b4ee4d75836f3f5fe4445e72a690dae2fd1b7887`. The
-[pre-tag packet](plans/evidence/rc3-pre-tag-2026-11-23/review.json) retains both complete
-reports, logs and supporting evidence, with sizes and SHA-256 pins. Public copies normalize
-local paths; original bytes are preserved outside Gradle clean scope at the packet's
-`durableOriginals` location. Root `check` enforces the recursive inventory and every retained
-file's size and SHA-256 through `verifyRc3PreTagEvidence`.
-The reports record the inner Gradle daemon as BellSoft 25.0.5 and Node v26.7.0; the inner
-candidate build logs resolve `/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home`.
-A later version observation of that installation reports Temurin 21.0.13+9; it does not prove
-the version at pass time. The successful passes did not record the verifier JVM identity;
-the failed environment preflight used the BellSoft `21.0.12+1.1-librca` launcher.
-See the packet's toolchain notes and timestamped version observation. The changelog input is
-`5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`;
-the jinja release checklist input remains
-`377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`.
+`b4ee4d75836f3f5fe4445e72a690dae2fd1b7887`. The [pre-tag
+packet](plans/evidence/rc3-pre-tag-2026-11-23/review.json) retains both complete reports,
+logs and supporting evidence, with sizes and SHA-256 pins. Public copies normalize local
+paths; available original bytes are preserved outside Gradle clean scope at the packet's
+`durableOriginals` location. The later `toolchain-observation.txt` has only a normalized
+copy; no separate raw original was preserved. Root `check` enforces the recursive inventory
+and every retained file's size and SHA-256 through `verifyRc3PreTagEvidence`. This checks
+consistency; the packet manifest's reviewed SHA-256 is
+`111c400f280042aacdebfeab348b9c8c124b70f8d547daee27f1246b4c310452`. The reports record the
+outer (invoking) Gradle daemon as BellSoft 25.0.5 and Node v26.7.0. The inner daemon JVM was
+not recorded; matching the outer JVM through inherited `JAVA_HOME` is an assumption. The
+inner candidate build logs resolve
+`/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home`. A later version
+observation of that installation reports Temurin 21.0.13+9; it does not prove the version at
+pass time. The successful passes did not record the verifier JVM identity; the failed
+environment preflight used the BellSoft `21.0.12+1.1-librca` launcher. See the packet's
+toolchain notes and timestamped version observation. The changelog input is
+`5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`; the jinja release
+checklist input remains `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`.
 These passes precede this PR's shared evidence-guard change to root `build.gradle`; root
 `:check` separately validates the new guard. Human sign-off remains open. Repeat
-exact-candidate checks and the final audit for RC3. Realign dates and repeat both passes if the actual cut date changes.
+exact-candidate checks and the final audit for RC3. Realign dates and repeat both passes if
+the actual cut date changes.
 
 ## Historical pre-candidate verification (2026-11-22)
 

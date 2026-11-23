@@ -13,10 +13,6 @@
     "dryRun": 0
   },
   "toolchains": {
-    "innerGradleDaemon": {
-      "recordedVersion": "BellSoft 25.0.5",
-      "buildNumberNote": "25.0.5+11 observed later at the JAVA_HOME installation; successful reports omit build number."
-    },
     "innerCandidateJava21": {
       "recordedPath": "/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home",
       "versionAtPassTime": "not recorded",
@@ -32,11 +28,19 @@
       "checkedAt": "2026-11-23T14:06:22.221913+00:00",
       "path": "toolchain-observation.txt",
       "scope": "Current installation versions, not contemporaneous pass evidence."
+    },
+    "outerGradleDaemon": {
+      "recordedVersion": "BellSoft 25.0.5",
+      "buildNumberNote": "25.0.5+11 observed later at the JAVA_HOME installation; successful reports omit build number."
+    },
+    "innerGradleDaemon": {
+      "successfulPasses": "not recorded",
+      "inference": "Inner builds inherit JAVA_HOME and likely used the same JVM as the invoking daemon; their JVM identity is not established by the retained evidence."
     }
   },
   "humanSignOff": "pending",
   "durableOriginals": "~/release-candidates/jmlx-phase8.4-rc.3-pre-tag-2026-11-23",
-  "normalization": "Public text copies replace repository root with <REPOSITORY>, home with <HOME>, and macOS per-user temporary root with <TMP>/. Original byte sizes and hashes refer to durable originals; public size/digest pins refer to committed normalized copies.",
+  "normalization": "Public text copies replace repository root with <REPOSITORY>, home with <HOME>, and macOS per-user temporary root with <TMP>/. Original byte sizes and hashes refer to durable originals; public size/digest pins refer to committed normalized copies. Exception: toolchain-observation.txt is retained only as normalized text; no separate raw original was preserved.",
   "environmentPreflights": "Initial attempts failed before verification: wrong default Node version; missing explicit Java 21 home for dry-run. Both logs retained separately.",
   "retainedFiles": [
     {
@@ -168,7 +172,8 @@
     {
       "path": "toolchain-observation.txt",
       "bytes": 900,
-      "sha256": "a66abbb86d2b35f9acf1a0d7c0f0e5535b6924fae3787bd9c68bcea6a01d0830"
+      "sha256": "a66abbb86d2b35f9acf1a0d7c0f0e5535b6924fae3787bd9c68bcea6a01d0830",
+      "provenance": "Normalized observation only; no separate raw original was preserved, so original size and SHA-256 are unavailable."
     }
   ],
   "pinEnforcement": "Root check depends on verifyRc3PreTagEvidence: recursive inventory and every retained size/SHA-256 pin; Finder .DS_Store files excluded."

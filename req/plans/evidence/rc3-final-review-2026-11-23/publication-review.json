@@ -1,7 +1,7 @@
 {
   "schema": "jmlx-publication-review-1",
   "preparedOn": "2026-11-23",
-  "status": "technical verification and four owner review decisions recorded; current Portal capacity and final publication authorization pending",
+  "status": "technical verification and four owner decisions recorded; supplied increased Portal namespace size allowance insufficient; publication authorization pending",
   "candidate": {
     "name": "jmlx-phase8.4-rc.3",
     "object": "146f7cf1b8b4557f20d732436dcdba6c45d20a55",
@@ -11,8 +11,8 @@
   "verifiedReceiptSha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
   "reviewDocument": {
     "path": "req/phase8-4-rc3-final-review.md",
-    "bytes": 15411,
-    "sha256": "e4acfd4150855d6f19db9742aed1ded1aa0d8433df0bb208f3237c0bf60dd3b0"
+    "bytes": 16534,
+    "sha256": "b16418462f8f2abab8088f0b2fb223a65bfcfacc53ecd7ef9f527f6317730cbc"
   },
   "technicalVerification": {
     "rootCheck": "passed",
@@ -163,8 +163,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/evidence-provenance.json",
-      "bytes": 56622,
-      "sha256": "777c0c598b86f3d9239709b5d8fe86b62328e20ac6b2a777b08280aa57660b32"
+      "bytes": 57907,
+      "sha256": "cc1abe15ce14122bbbbabce37cb31bdb815af8938614de19773b263f6b6ceee6"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/historical-native-approval.json",
@@ -278,8 +278,18 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-capacity-status.json",
-      "bytes": 440,
-      "sha256": "a0c00019579ac03b282067a7ebb3be884e7f7cfad0581e5b5244b2e71345c998"
+      "bytes": 7233,
+      "sha256": "bb248b5084d7851a4a84cbb3f3db658be5af91f465f672fe6247749aa4766f5f"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-namespace-usage.csv",
+      "bytes": 72,
+      "sha256": "a5e074f67cf3584705bf68c947173aaaadcd4c20fede61bdd387c5efe49582ae"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-usage-center.txt",
+      "bytes": 792,
+      "sha256": "ff50354585309ee5dd2cddf795fb6ef627f24b3f985d6afb7e634dc38f078a67"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/preliminary.json",
@@ -609,7 +619,7 @@
   ],
   "acceptanceEligibility": {
     "eligible": false,
-    "reason": "Current Portal account capacity and final publication authorization remain pending.",
+    "reason": "The exact RC3 candidate exceeds the supplied se.alipsa increased 100 MB monthly size allowance; sufficient capacity and final publication authorization remain unconfirmed.",
     "requiredNextStep": "A superseding reviewed and merged packet commit must retain completed records, revise the review document, regenerate its pin and publication manifest, and update the checklist manifest digest. Acceptance must identify that superseding commit and digest, not this incomplete packet."
   }
 }

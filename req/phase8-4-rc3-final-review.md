@@ -191,7 +191,20 @@ The ZIP measures 106,730,869 bytes, with 270 files totaling 107,448,758 bytes. I
 unique filenames and conservative upload-size check pass. This is not a Portal account
 capacity verdict. The [capacity status][capacity] requests current Usage Center scope,
 plan/classification, monthly byte/file/release-event usage and limits, adjusted-limit expiry
-and grace/enforcement banners. No current account snapshot has been supplied.
+and grace/enforcement banners. The owner supplied namespace usage for `se.alipsa`:
+5.45 MB, 222 files and 8 release events. The row is retained in
+`portal-namespace-usage.csv`, with projections in the capacity status. It supplies no
+organization totals or limits. The owner's later `portal-usage-center.txt` identifies
+Alipsa and `se.alipsa`'s Increased allowance: 100 MB, 1,000 files and 20 release events,
+with current-month usage matching the CSV. The zero Alipsa overview is separate from the
+increased namespace allowance. RC3's candidate bytes alone exceed 100 MB under either
+decimal or binary interpretation; with current usage, projected counts are 492 files and
+an expected 9 events. The capacity gate is blocked by size. Sufficient increased size
+allowance or an applicable exemption is needed, with plan/classification, grant/expiry,
+actual observation time and grace/enforcement details still outstanding. No upload
+rejection or current enforcement state is inferred. The owner reported the Central Support
+increase/exemption request sent on 2026-11-23; the capacity status records that attestation.
+Sonatype's response remains outstanding, and the request alone closes no capacity gate.
 
 Temporary draft Release 455573517 retains only the exact ZIP and preliminary record;
 downloaded asset bytes matched both expected digests. Keep it unpublished. Archive the

@@ -1,0 +1,52 @@
+Alipsa
+
+Track your publishing activity and usage across your organisation and namespace. Usage metrics help you understand your footprint and optimize publishing activity.
+
+Usage Overview
+Aggregated publishing activity for the current month across all namespaces in your organization.
+
+Release Size
+0% MoM
+
+0 B
+of 80 MB limit
+
+0%
+File Count
+0% MoM
+
+0
+of 1,000 limit
+
+0%
+Release Count
+0% MoM
+
+0
+of 7 limit
+
+0%
+Relative Popularity
+60.14
+vs. all Maven Central publishers
+(Last 3 months)
+
+i
+1 namespace has increased limits. View all
+Usage by Namespace
+Publishing activity for the current month across individual namespaces in your organization.
+
+Filter by namespace
+Export CSV
+MONTHLY TRENDS
+se.alipsaIncreased ▾
+5.45 MB of 100 MB limit
+
+5%
+222 of 1,000 limit
+
+22%
+8 of 20 limit
+
+40%
+View ›

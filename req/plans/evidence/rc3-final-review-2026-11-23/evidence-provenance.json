@@ -977,6 +977,24 @@
       "bytes": 1235,
       "sha256": "e88f513cf7036b5da945b3ccb86748fe0c38b09a7a3a73447eb93b08aea17332",
       "representation": "Owner human sign-off recorded from the approved review proposal; supersedes the earlier generated pending placeholder. Historical verifier reports remain unchanged."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-namespace-usage.csv",
+      "bytes": 72,
+      "sha256": "a5e074f67cf3584705bf68c947173aaaadcd4c20fede61bdd387c5efe49582ae",
+      "representation": "Owner-provided CSV header and row retained verbatim with a terminal newline; no separate Portal export or authenticated query is asserted."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-capacity-status.json",
+      "bytes": 7233,
+      "sha256": "bb248b5084d7851a4a84cbb3f3db658be5af91f465f672fe6247749aa4766f5f",
+      "representation": "Structured assessment of owner-supplied Usage Center evidence and owner report that the support request was sent. Namespace size allowance remains insufficient; Sonatype response, plan, badge expiry and enforcement state are unknown."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-usage-center.txt",
+      "bytes": 792,
+      "sha256": "ff50354585309ee5dd2cddf795fb6ef627f24b3f985d6afb7e634dc38f078a67",
+      "representation": "Owner-supplied Usage Center text retained with a terminal newline. Selected organization and increased namespace limits are supplied text, not an authenticated account query or independently captured screenshot."
     }
   ]
 }

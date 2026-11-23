@@ -986,9 +986,15 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-capacity-status.json",
-      "bytes": 2280,
-      "sha256": "c1527d8a679147db9d34a026e27319415785cf8119cbf3a8732d3424c87e1c9f",
-      "representation": "Partial namespace usage recorded from the owner conversation; account limits and capacity verdict remain pending. Replaces the earlier generated empty status placeholder."
+      "bytes": 6287,
+      "sha256": "a03677ae4c757b353eb366e7cbed36be5268cdb1d948431e1717042438a88757",
+      "representation": "Structured assessment of owner-supplied namespace CSV and Alipsa Usage Center text. Increased namespace size allowance is insufficient for RC3; plan, badge expiry and actual enforcement state remain unknown."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-usage-center.txt",
+      "bytes": 792,
+      "sha256": "ff50354585309ee5dd2cddf795fb6ef627f24b3f985d6afb7e634dc38f078a67",
+      "representation": "Owner-supplied Usage Center text retained with a terminal newline. Selected organization and increased namespace limits are supplied text, not an authenticated account query or independently captured screenshot."
     }
   ]
 }

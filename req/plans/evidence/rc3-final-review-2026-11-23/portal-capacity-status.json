@@ -1,5 +1,5 @@
 {
-  "status": "partial owner-provided namespace usage retained; account limits and capacity confirmation pending",
+  "status": "capacity gate blocked: exact RC3 candidate exceeds displayed se.alipsa increased monthly release-size allowance",
   "usageCenterSnapshot": {
     "source": "Owner-provided CSV row in the release preparation conversation; no authenticated account query was performed.",
     "recordedAt": "2026-11-23T21:30:20.552026+00:00",
@@ -25,15 +25,15 @@
     "adjustedLimitOrExemption": null,
     "adjustedLimitExpiry": null,
     "graceOrEnforcementBanner": null,
-    "limits": "The displayed release size may be rounded; its byte-unit convention and exact underlying value were not supplied. The row supplies neither organization totals nor entitlements or enforcement status. Null values mean unknown, not absent or unlimited."
+    "limits": "The displayed release size may be rounded; its byte-unit convention and exact underlying value were not supplied. The row supplies neither organization totals nor entitlements or enforcement status. Null values mean unknown, not absent or unlimited.",
+    "snapshotRole": "Earlier namespace-only CSV; supplemented by usageCenterDetailedSnapshot and capacityAssessment below."
   },
   "requestedFields": [
-    "observation time",
-    "organization/namespace scope",
+    "actual observation time",
     "plan and account classification",
-    "monthly bytes/files/release events used and allowed",
-    "adjusted-limit expiry",
-    "grace/enforcement banner"
+    "Increased badge grant and expiry details",
+    "grace/enforcement banner",
+    "sufficient increased namespace size allowance or applicable exemption for the exact RC3 inventory"
   ],
   "measurement": "portal-bundle-measurement.json",
   "publicationCapacityConfirmed": false,
@@ -46,5 +46,83 @@
     "releaseCount": 9,
     "releaseSize": "Displayed current usage of 5.45 MB plus 107,448,758 candidate published-file bytes; no exact total established.",
     "assumptions": "No intervening namespace releases; this combined deployment adds one namespace release event. Actual Portal accounting and organization-wide headroom still require account confirmation."
-  }
+  },
+  "usageCenterDetailedSnapshot": {
+    "source": "Owner-supplied Usage Center text in the release preparation conversation; no authenticated account query or screenshot capture was performed.",
+    "recordedAt": "2026-11-23T21:35:53.037734+00:00",
+    "observedAt": null,
+    "selectedPeriod": "current month (as displayed; no explicit calendar-month label supplied)",
+    "organization": "Alipsa",
+    "rawRecord": {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-usage-center.txt",
+      "bytes": 792,
+      "sha256": "ff50354585309ee5dd2cddf795fb6ef627f24b3f985d6afb7e634dc38f078a67"
+    },
+    "organizationOverview": {
+      "releaseSizeUsedBytes": 0,
+      "releaseSizeLimitDisplay": "80 MB",
+      "fileCount": 0,
+      "fileCountLimit": 1000,
+      "releaseCount": 0,
+      "releaseCountLimit": 7
+    },
+    "namespace": {
+      "name": "se.alipsa",
+      "badge": "Increased",
+      "releaseSizeUsedDisplay": "5.45 MB",
+      "releaseSizeLimitDisplay": "100 MB",
+      "fileCount": 222,
+      "fileCountLimit": 1000,
+      "releaseCount": 8,
+      "releaseCountLimit": 20
+    },
+    "relativePopularity": {
+      "value": 60.14,
+      "period": "Last 3 months",
+      "usedInCapacityDecision": false
+    },
+    "scopeAccounting": {
+      "basis": "Sonatype Usage Center documentation: a namespace with its own increased limit is evaluated against its own usage and limits, outside organization aggregate usage and limits.",
+      "source": "https://central.sonatype.org/publish/publish-portal-usage-center/",
+      "recheckedOn": "2026-11-23",
+      "interpretation": "Use the supplied se.alipsa increased limits; do not apply Alipsa overview limits to this namespace or add its usage to the zero overview. The earlier CSV matches the detailed namespace values."
+    },
+    "planAndAccountClassification": null,
+    "increasedLimitGrantedAt": null,
+    "increasedLimitExpiry": null,
+    "graceOrEnforcementBanner": null,
+    "unknownsMeaning": "Plan, badge grant/expiry details and grace/enforcement state were not included in the supplied text. Null means unknown, not absent."
+  },
+  "capacityAssessment": {
+    "scope": "se.alipsa increased namespace allowance in organization Alipsa",
+    "candidatePublishedFileBytes": 107448758,
+    "candidateFiles": 270,
+    "plannedPublishOperations": 1,
+    "projectedFileCount": 492,
+    "fileCountLimit": 1000,
+    "fileCountWithinDisplayedLimit": true,
+    "projectedReleaseCount": 9,
+    "releaseCountLimit": 20,
+    "releaseCountWithinDisplayedLimit": true,
+    "sizeLimitDisplay": "100 MB",
+    "sizeDisplayUnitConvention": "not established",
+    "candidateAloneExceedsDisplayedSizeLimit": true,
+    "unitInterpretationChecks": [
+      {
+        "interpretation": "decimal MB",
+        "limitBytes": 100000000,
+        "candidateAloneExcessBytes": 7448758
+      },
+      {
+        "interpretation": "binary MiB represented as MB",
+        "limitBytes": 104857600,
+        "candidateAloneExcessBytes": 2591158
+      }
+    ],
+    "releaseSizeTotal": "107,448,758 candidate bytes plus the displayed current usage of 5.45 MB; exact current bytes and exact total are unknown.",
+    "outcome": "The capacity gate cannot pass on the displayed allowance. Candidate bytes alone exceed 100 MB under either conventional unit interpretation; existing usage increases the excess.",
+    "enforcementOutcome": "Not established: actual account grace/enforcement state is unknown; no upload was attempted.",
+    "assumptions": "No intervening releases; the planned combined deployment adds one namespace release event."
+  },
+  "requiredNextStep": "Obtain sufficient increased namespace release-size allowance or an applicable exemption and retain scope, grant/expiry and enforcement evidence; confirm plan/account classification and refresh usage before publication."
 }

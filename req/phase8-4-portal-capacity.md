@@ -3,8 +3,9 @@
 Reviewed 2026-11-16 at PR #101 merge `102e03ea43e508042ec4d43a61802b448a525267`.
 Revised 2026-11-17 (review rounds 1 and 2).
 Status: RC3 signed-bundle measurement and technical receipt revalidation complete.
-Namespace usage supplied by the owner is retained; account limits and capacity remain
-pending. RC2 measurements remain historical. This procedure does not authorize publication.
+The owner's Usage Center text identifies Alipsa and increased limits for se.alipsa.
+RC3 exceeds that namespace's displayed 100 MB size allowance; the capacity gate remains
+blocked. RC2 measurements remain historical. This procedure does not authorize publication.
 
 ## Current official sources
 
@@ -120,10 +121,40 @@ to 492 files and an expected 9 release events. Published-file size would add 107
 bytes to the displayed 5.45 MB. The display may be rounded and its byte-unit convention
 was not supplied, so this is not an exact byte total. The snapshot's observation time and
 billing month were not supplied; the status records only when the row was retained.
-Organization totals, allowed monthly metrics, plan/account classification, adjusted-limit
-or exemption details and any grace/enforcement banners remain unknown. No capacity verdict
-or publication authorization follows from the namespace row. Refresh the account snapshot
-immediately before publishing. A replacement bundle must be measured against its own digest.
+The owner then supplied the [Usage Center text](plans/evidence/rc3-final-review-2026-11-23/portal-usage-center.txt)
+for organization **Alipsa**, explicitly labeled current-month activity:
+
+| Scope | Size used / limit | Files used / limit | Release events used / limit |
+| --- | --- | --- | --- |
+| Alipsa overview | 0 B / 80 MB | 0 / 1,000 | 0 / 7 |
+| se.alipsa (Increased) | 5.45 MB / 100 MB | 222 / 1,000 | 8 / 20 |
+
+The [Usage Center documentation](https://central.sonatype.org/publish/publish-portal-usage-center/),
+rechecked 2026-11-23, explains that namespaces with their own increased limits are
+assessed separately and excluded from organization aggregate usage and limits. The
+namespace row matches the earlier CSV; the zero organization overview does not replace
+its usage or its increased allowance. Relative popularity (60.14, last three months) is
+informational and does not affect this assessment.
+
+**RC3 exceeds the namespace size allowance.** Its 107,448,758 published-file bytes alone
+exceed 100,000,000 bytes by 7,448,758 bytes, or even 100 MiB (104,857,600 bytes) by
+2,591,158 bytes, before adding the existing displayed 5.45 MB. File and expected event
+counts would be 492 / 1,000 and 9 / 20, respectively. Exact current byte usage and the
+size display's unit convention remain unknown; neither changes the size conclusion.
+The account-capacity gate remains blocked and no upload has been attempted. This is not
+a finding that the Portal has rejected an upload: the actual grace/enforcement state is
+not supplied.
+
+Before publication, obtain sufficient increased release-size allowance or an applicable
+exemption for `se.alipsa` and retain its scope, grant/expiry and enforcement details.
+Sonatype's [publishing-limits procedure](https://central.sonatype.org/publish/maven-central-publishing-limits/)
+directs publishers expecting an over-limit release to contact Central Support in advance
+and allows requests for increased limits or exemptions. A request should identify Alipsa,
+`se.alipsa`, jmlx's Apple Silicon native-runtime packaging, the exact 107,448,758-byte
+nine-module candidate, current displayed usage, and the need to accommodate that inventory.
+The owner's plan/account classification is still unconfirmed. Click the Increased badge
+for grant/expiry details and retain any grace/enforcement banner. Refresh usage immediately
+before publishing; a replacement bundle must be measured against its own digest.
 
 ## RC2 measurement (2026-11-22)
 

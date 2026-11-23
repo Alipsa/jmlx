@@ -18,7 +18,12 @@ class OwnerAcceptanceTest(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
         self.git("init", "-q")
-        self.record = {"tag": {"name": "rc3", "sha": "a" * 40, "object": "b" * 40},
+        self.write("candidate.txt", "candidate")
+        self.git("add", ".")
+        self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@localhost",
+                 "commit", "-qm", "candidate")
+        candidate = self.git("rev-parse", "HEAD").strip()
+        self.record = {"tag": {"name": "rc3", "sha": candidate, "object": "b" * 40},
                        "bundleSha256": "c" * 64}
         self.receipt = self.root / "receipt.json"
         self.receipt.write_text('{}')
@@ -26,7 +31,8 @@ class OwnerAcceptanceTest(unittest.TestCase):
                     "verifiedReceiptSha256": A.digest(self.receipt.read_bytes())}
         self.packet = {"schema": "jmlx-publication-review-1", **identity,
                        "reviewDocument": self.write("review.md", "Reviewed differences and delivery"),
-                       "retainedFiles": [self.write("jinja-signoff.md", "Human sign-off")]}
+                       "retainedFiles": [self.write("jinja-signoff.md", "Human sign-off"),
+                                         self.write("receipt.json", "{}")]}
         packet_pin = self.write("packet.json", json.dumps(self.packet))
         self.git("add", ".")
         self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@localhost",
@@ -114,4 +120,62 @@ class OwnerAcceptanceTest(unittest.TestCase):
                      "commit", "-qm", mutation)
             self.acceptance["reviewPacket"] = {**pin, "commit": self.git("rev-parse", "HEAD").strip()}
             with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                self.verify()
+
+    def commit_packet(self, text):
+        pin = self.write("packet.json", text)
+        self.git("add", "packet.json")
+        self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@localhost",
+                 "commit", "-qm", "updated packet")
+        self.acceptance["reviewPacket"] = {**pin, "commit": self.git("rev-parse", "HEAD").strip()}
+
+    def test_duplicate_decision_rejected_even_with_authorized_digest(self):
+        data = json.dumps(self.acceptance).replace('"publicationAuthorized": true',
+                 '"publicationAuthorized": false, "publicationAuthorized": true')
+        self.path.write_text(data)
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            A.verify(self.root, self.receipt, self.record, self.path, A.digest(data.encode()))
+
+    def test_duplicate_packet_key_rejected(self):
+        data = json.dumps(self.packet).replace('"retainedFiles":',
+                                              '"retainedFiles": [], "retainedFiles":')
+        self.commit_packet(data)
+        with self.assertRaisesRegex(ValueError, "duplicate"):
+            self.verify()
+
+    def test_final_receipt_must_be_retained(self):
+        self.packet["retainedFiles"] = self.packet["retainedFiles"][:1]
+        self.commit_packet(json.dumps(self.packet))
+        with self.assertRaisesRegex(ValueError, "must retain the final verified receipt"):
+            self.verify()
+
+    def test_unrelated_packet_commit_rejected(self):
+        self.git("checkout", "--orphan", "unrelated")
+        self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@localhost",
+                 "commit", "-qm", "unrelated packet")
+        self.acceptance["reviewPacket"]["commit"] = self.git("rev-parse", "HEAD").strip()
+        with self.assertRaisesRegex(ValueError, "must descend"):
+            self.verify()
+
+    def test_accepted_at_requires_utc_timestamp(self):
+        for value in ("x", "2026-11-23", "2026-11-23T12:00:00", "2026-11-23T12:00:00+01:00"):
+            self.acceptance["acceptedAt"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "UTC timestamp"):
+                self.verify()
+        self.acceptance["acceptedAt"] = "2026-11-23T12:00:00+00:00"
+        self.verify()
+
+    def test_malformed_packet_fields_have_context(self):
+        original = copy.deepcopy(self.acceptance)
+        for value in (None, [], {}):
+            self.acceptance = copy.deepcopy(original)
+            self.acceptance["reviewPacket"] = value
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "review[Pp]|review packet"):
+                self.verify()
+        self.acceptance = original
+        for key in ("reviewDocument", "retainedFiles"):
+            packet = copy.deepcopy(self.packet)
+            del packet[key]
+            self.commit_packet(json.dumps(packet))
+            with self.subTest(key=key), self.assertRaisesRegex(ValueError, "review packet"):
                 self.verify()

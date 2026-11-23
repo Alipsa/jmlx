@@ -84,11 +84,6 @@ def verify(root, receipt_path):
     return receipt, record
 
 
-def plugin_digests(root, receipt_path):
-    _, record = verify(root, receipt_path)
-    return record["bundleSha256"], record["pluginReceipt"]["manifestHash"]
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)

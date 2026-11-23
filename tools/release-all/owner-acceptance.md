@@ -5,7 +5,8 @@ not infer consent from technical checks, a merged preparation PR, or PR #115's c
 metadata acceptance. No actual acceptance is included with this implementation.
 
 After creating and revalidating the final technical receipt, commit the replacement review
-packet and its evidence in a follow-up PR. Keep the tagged candidate unchanged. The packet
+packet and its evidence in a follow-up PR based on the candidate commit or a descendant.
+Keep the tagged candidate unchanged. The packet
 uses this JSON structure (angle-bracket values below are placeholders):
 
 ```json
@@ -29,6 +30,9 @@ license findings, and the current Portal capacity snapshot. Pins describe immuta
 blobs at the packet commit, so subsequent changes to living release documents do not
 invalidate them. Use repository-relative paths without `.` or `..` components. Ensure
 the candidate repository has fetched the reviewed packet commit before verification.
+The verifier requires that commit to descend from the candidate. It does not check a local
+`origin/main` ref, which may be stale; the separately authorized acceptance digest attests
+to the exact reviewed commit, and the operator must confirm its PR was reviewed and merged.
 
 After the owner reviews that packet, retain their explicit decision in a separate JSON
 record. Its required fields are:
@@ -57,6 +61,11 @@ record. Its required fields are:
   }
 }
 ```
+
+Both JSON records reject duplicate keys at every nesting level. `acceptedAt` must be an
+ISO 8601 timestamp with a `T` separator and an explicit UTC offset (`Z` or `+00:00`).
+The packet must retain a blob whose SHA-256 matches the final receipt being uploaded.
+Jinja report/log completeness and human sign-off remain owner attestations.
 
 All decisions must be literal `true` to upload. Set them only from actual owner approval;
 the example deliberately grants none. Retain the acceptance outside the immutable

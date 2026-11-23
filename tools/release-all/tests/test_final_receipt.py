@@ -95,13 +95,6 @@ class FinalReceiptTest(unittest.TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def test_plugin_digests_are_reviewed_record_anchors_after_full_verification(self):
-        self.assertEqual(F.plugin_digests(self.root, self.path),
-                         (self.record["bundleSha256"], self.record["pluginReceipt"]["manifestHash"]))
-        self.bundle.write_bytes(b"changed")
-        with self.assertRaises(ValueError):
-            F.plugin_digests(self.root, self.path)
-
     def test_plugin_digests_cli_stdout_contract(self):
         stdout = io.StringIO()
         with patch("release_inputs.check_bundle", return_value=self.record), \

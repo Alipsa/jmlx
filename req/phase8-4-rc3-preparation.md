@@ -43,14 +43,16 @@ The preparation checkout is `~/release-candidates/jmlx-phase8.4-rc.3-preparation
 It retains the initial preparation commit, including its provisional date changes; it is
 not the final candidate checkout and is not updated by subsequent PR fixes.
 
-The replacement keeps the approved nine-module tuple. Its five version-cut dates retain
-RC2's 2026-11-22 values until alignment and review in the final pre-tag PR.
+The replacement keeps the approved nine-module tuple. The final pre-tag PR aligns its five
+version-cut dates to 2026-11-23. If the candidate is cut on a later date, align them again
+and repeat both jinja verification passes after that change.
 Replacement evidence must identify its own source commit and ZIP digest throughout.
 
 Before cutting the replacement:
 
-1. Review and merge the
-   [final owner-acceptance upload gate](../tools/release-all/owner-acceptance.md).
+1. Completed: [PR #119](https://github.com/Alipsa/jmlx/pull/119) merged the
+   [final owner-acceptance upload gate](../tools/release-all/owner-acceptance.md) as
+   `cd4271e76ec7f768e468ce8649f0217be362a495`.
    It binds acceptance to the actual replacement bundle, final receipt and committed review
    packet, including explicit jinja human sign-off. Implementation does not grant acceptance.
 2. Merge the reviewed preparation and gate changes, then align and review the cut dates

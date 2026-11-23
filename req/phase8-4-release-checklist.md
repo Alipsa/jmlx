@@ -112,9 +112,9 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   passed Java and native checks, both release-smoke profiles and required-native-suite verification.
 - [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
   changelog version-cut dates with the final candidate cut date.
-  RC2 used 2026-11-22; those dates are retained during preparation. This gate is
-  reopened. Align and review the actual cut date in the final pre-tag PR, then rerun
-  the affected verification after that change.
+  RC3 pre-tag preparation aligns these dates to 2026-11-23. This gate remains open
+  until review and the candidate cut. If the cut moves to a later date, align them again
+  and repeat both jinja verification passes after that change.
 - [ ] Restore revalidatable candidate provenance before acceptance or publication.
   RC2 tag/SHA, signed bundle and all consumer runs were historically verified, but the
   original candidate checkout is missing, including four pinned producer JSON files and all
@@ -144,13 +144,11 @@ The report records these contract input SHA-256 values:
 - `req/release-checklist.md` (jinja):
   `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`
 
-At this PR's head the changelog digest is again
-`9bc0162e0158403e06dd6b9068edec5ec655e77189b23c95092d8c5bcbf539e0`.
-The `5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26` digest existed
-only in PR #118's initial commit, before its date edit was reverted. PR #116 verification
-remains historical because it did not run at the replacement candidate commit. Final pre-tag
-date alignment will change this contract input; repeat both verification passes for the
-replacement after its final changes.
+The RC3 pre-tag date alignment supersedes the changelog digest above with
+`5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`.
+PR #116 verification is stale for this contract input and remains historical. Repeat both
+verification passes after the replacement's final policy input changes. The same digest
+briefly existed in PR #118's initial commit before that PR reverted its date edit.
 
 The isolated online/offline matrix, reproducible archives and independent consumer resolution
 passed with BellSoft JDK 25.0.5, Temurin 21.0.13+9 and pinned Node v26.7.0. The published and

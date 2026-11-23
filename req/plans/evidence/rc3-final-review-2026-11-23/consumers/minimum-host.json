@@ -1,0 +1,52 @@
+{
+  "schema": "jmlx-bundle-smoke-1",
+  "kind": "minimum-host",
+  "passed": true,
+  "bundleSha256": "139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c",
+  "preliminarySha256": "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926",
+  "candidateSha": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6",
+  "environment": {
+    "system": "Darwin",
+    "architecture": "arm64",
+    "kernel": "27.2.0",
+    "launcherJava": "openjdk version \"25.0.5.1\" 2026-11-17 LTS\nOpenJDK Runtime Environment Temurin-25.0.5.1+2 (build 25.0.5.1+2-LTS)\nOpenJDK 64-Bit Server VM Temurin-25.0.5.1+2 (build 25.0.5.1+2-LTS, mixed mode, sharing)",
+    "osVersion": "27.2.1",
+    "swVers": "ProductName:\t\tmacOS\nProductVersion:\t\t27.2.1\nBuildVersion:\t\t26B131",
+    "chip": "Apple M5 Max",
+    "virtualized": false
+  },
+  "command": [
+    "bash",
+    "/Users/jmlxrunner/actions-runner/_work/jmlx/jmlx/tools/release-smoke/run.sh",
+    "candidate",
+    "--profile",
+    "all",
+    "--bundle",
+    "/Users/jmlxrunner/actions-runner/_work/jmlx/jmlx/build/releaseAll/candidate-input/bundle.zip",
+    "--bundle-record",
+    "/Users/jmlxrunner/actions-runner/_work/jmlx/jmlx/build/releaseAll/candidate-input/preliminary.json",
+    "--bundle-record-sha256",
+    "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926"
+  ],
+  "consumerRuntime": {
+    "java.vendor": "Eclipse Adoptium",
+    "java.version": "25.0.5.1",
+    "java.runtime.version": "25.0.5.1+2-LTS",
+    "java.vm.name": "OpenJDK 64-Bit Server VM",
+    "java.feature": "25",
+    "java.home": "/Users/jmlxrunner/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/25.0.5-100000002.0.LTS/aarch64/Contents/Home"
+  },
+  "consumerRuntimeFile": "minimum-host.runtime.xml",
+  "runId": "45206346138",
+  "identityAssurance": "Local measurements; workflow run ID and container image are operator attestations, not authenticated provenance",
+  "outputs": {
+    "minimum-host.log": "afab8b3c9af469448f46403b752cc2981e2a32e8f6c14dc958f018faa2baa069",
+    "minimum-host.runtime.xml": "66afa117a854de662cb5f7673b2f38e7e5c8ea7a74e1bff15222f61136f6fa23"
+  },
+  "workflow": {
+    "ref": "refs/heads/main",
+    "event": "workflow_dispatch",
+    "workflowRef": "Alipsa/jmlx/.github/workflows/release-candidate.yml@refs/heads/main",
+    "sha": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6"
+  }
+}

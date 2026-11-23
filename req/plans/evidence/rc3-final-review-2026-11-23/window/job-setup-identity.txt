@@ -1,0 +1,18 @@
+minimum_host	Set up job	﻿2026-11-23T15:32:36.3522120Z Current runner version: '2.338.2'
+minimum_host	Set up job	2026-11-23T15:32:36.3525060Z Runner name: 'jmlx-release-minimum-m5-max'
+minimum_host	Set up job	2026-11-23T15:32:36.3525380Z Runner group name: 'Default'
+minimum_host	Set up job	2026-11-23T15:32:36.3525750Z Machine name: '<HOST>'
+minimum_host	Set up job	2026-11-23T15:32:36.3526880Z ##[group]GITHUB_TOKEN Permissions
+minimum_host	Set up job	2026-11-23T15:32:36.3527490Z Contents: read
+minimum_host	Set up job	2026-11-23T15:32:36.3527720Z Metadata: read
+minimum_host	Set up job	2026-11-23T15:32:36.3527940Z ##[endgroup]
+minimum_host	Set up job	2026-11-23T15:32:36.3528680Z Secret source: Actions
+minimum_host	Set up job	2026-11-23T15:32:36.3529020Z Cache mode: write
+minimum_host	Set up job	2026-11-23T15:32:36.3529280Z Prepare workflow directory
+minimum_host	Set up job	2026-11-23T15:32:36.4093920Z Prepare all required actions
+minimum_host	Set up job	2026-11-23T15:32:36.4116410Z Getting action download info
+minimum_host	Set up job	2026-11-23T15:32:37.0321640Z Download action repository 'actions/checkout@v7' (SHA:3d3c42e5aac5ba805825da76410c181273ba90b1)
+minimum_host	Set up job	2026-11-23T15:32:38.6795010Z Download action repository 'actions/download-artifact@v4' (SHA:d3f86a106a0bac45b974a628896c90dbdf5c8093)
+minimum_host	Set up job	2026-11-23T15:32:39.4304720Z Download action repository 'actions/setup-java@v6' (SHA:d1374f8ac74474200d16ef8ecee22c7ae7a51880)
+minimum_host	Set up job	2026-11-23T15:32:40.6719140Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)
+minimum_host	Set up job	2026-11-23T15:32:42.2776640Z Complete job name: minimum_host

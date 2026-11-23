@@ -1,23 +1,24 @@
 # Phase 8.4 release notes — draft
 
-Not published. RC2 historical technical verification passed, but missing candidate checkout/
-producer inputs now block receipt revalidation and acceptance. Owner signed-candidate/delivery
-acceptance, Portal capacity and publication authorization remain pending. The
-[RC2 review](phase8-4-rc2-final-review.md) records the exact tag, SHA, signed ZIP and receipt.
+Not published. RC3 technical verification and final-receipt revalidation passed. Owner
+signed-candidate/delivery acceptance, jinja human sign-off, license-finding disposition,
+Portal capacity and publication authorization remain pending. The
+[RC3 review](phase8-4-rc3-final-review.md) records the exact tag, SHA, signed ZIP and receipt.
 Module release tags and deployment identity remain for the authorized publication record.
 
 The proposed tuple is native/models/adapters 0.1.0, ffi/core 0.5.0, jinja 0.6.2,
 tokenizer/vision 0.1.2. See the [readiness checklist](phase8-4-release-checklist.md) and
 [manifest](../tools/release-smoke/released-8.4.json). The
 [post-plugin artifact audit](phase8-4-pure-java-audit.md) supports new pure-Java versions;
-the approved tuple's RC2 technical verification is complete. The original 8.1 coordinates
+the approved tuple's RC3 technical verification is complete. The original 8.1 coordinates
 remain available unchanged.
 
 Native inference requires Java 25 and is supported on Apple Silicon macOS 27.2 or later
 (all 27.2.x patch releases). The supported minimum was raised by owner decision on 2026-11-16.
-Physical RC2 execution passed on Apple M5 Max, macOS 27.2.1 (26B131), using the dedicated
+Physical RC3 execution passed on Apple M5 Max, macOS 27.2.1 (26B131), using the dedicated
 non-admin runner account in
-[run 45076371223](https://github.com/Alipsa/jmlx/actions/runs/45076371223).
+[run 45206346138](https://github.com/Alipsa/jmlx/actions/runs/45206346138).
+This is the same physical Mac as the local macOS runs, under a separate account.
 No claim of all Apple GPU families is made. Pure-Java modules retain their Java 21
 headless contract.
 
@@ -48,5 +49,7 @@ The native distribution retains MLX's MIT grant for Apple/MLX contributions and 
 
 See the [owner decision](phase8-4-owner-license-decision.md) and
 [approved notice](https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES).
-Final local metadata was accepted in PR #115. The signed RC2 comparison and documented
-Javadoc/module checksum differences await owner acceptance in the final review.
+Final local metadata was accepted in PR #115. All five signed RC3 native publications
+match those approved byte pins, including Javadoc and module metadata. Owner acceptance
+of the signed candidate, delivery terms and license-finding disposition remains pending
+in the [RC3 review](phase8-4-rc3-final-review.md).

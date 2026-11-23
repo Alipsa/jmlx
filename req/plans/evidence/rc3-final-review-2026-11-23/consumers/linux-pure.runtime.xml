@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+<comment>Measured smoke consumer JVM</comment>
+<entry key="java.vendor">BellSoft</entry>
+<entry key="java.version">21.0.12.1</entry>
+<entry key="java.runtime.version">21.0.12.1+1-LTS</entry>
+<entry key="java.vm.name">OpenJDK 64-Bit Server VM</entry>
+<entry key="java.feature">21</entry>
+<entry key="java.home">/root/.sdkman/candidates/java/21.0.12+1.1-librca</entry>
+</properties>

@@ -1,0 +1,949 @@
+{
+  "assembledAt": "2026-11-23T17:03:03.876217+00:00",
+  "reviewFixesRoot": "~/release-candidates/jmlx-phase8.4-rc.3-review-fixes-2026-11-23",
+  "candidateRoot": "~/release-candidates/jmlx-phase8.4-rc.3",
+  "auditRoot": "~/release-candidates/jmlx-phase8.4-rc.3-audit",
+  "backupRoot": "~/release-candidates/jmlx-phase8.4-rc.3-backup-2026-11-23",
+  "normalization": "UTF-8 copies replace candidate/audit/repository roots, owner/runner homes, macOS per-user temporary paths and incidental user/host labels. Original sizes/SHA-256 identify durable originals. Exact final/preliminary receipts, producer JSON, consumers and account probes retain raw bytes for their cross-file pins; these contain necessary absolute local paths. The archived post-window Python snapshot also strips trailing whitespace. Generated pending-decision files and this provenance index have no separate historical originals.",
+  "files": [
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verified.json",
+      "bytes": 1523,
+      "sha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
+      "originalBytes": 1523,
+      "originalSha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
+      "originalPath": "<CANDIDATE>/build/releaseAll/verified.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/preliminary.json",
+      "bytes": 23005,
+      "sha256": "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926",
+      "originalBytes": 23005,
+      "originalSha256": "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926",
+      "originalPath": "<CANDIDATE>/build/releaseAll/preliminary-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/producer/manifest.json",
+      "bytes": 26288,
+      "sha256": "0b56735c59f147375d89ce109eccda80e7d6d889c119e013d1fe9b4ffc6c9e1a",
+      "originalBytes": 26288,
+      "originalSha256": "0b56735c59f147375d89ce109eccda80e7d6d889c119e013d1fe9b4ffc6c9e1a",
+      "originalPath": "<CANDIDATE>/build/releaseAll/manifest.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/producer/bundle-receipt.json",
+      "bytes": 176,
+      "sha256": "f49a5d26c15a2c11e8a1d249b8c65873bf98888505e7097ff096941f8d876f6e",
+      "originalBytes": 176,
+      "originalSha256": "f49a5d26c15a2c11e8a1d249b8c65873bf98888505e7097ff096941f8d876f6e",
+      "originalPath": "<CANDIDATE>/build/releaseAll/bundle-receipt.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/producer/task-evidence-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
+      "bytes": 1815,
+      "sha256": "4203eb55223b3495dc7bc144924b75853c9f9a57eed24babebc4f9aeaa3af032",
+      "originalBytes": 1815,
+      "originalSha256": "4203eb55223b3495dc7bc144924b75853c9f9a57eed24babebc4f9aeaa3af032",
+      "originalPath": "<CANDIDATE>/build/releaseAll/task-evidence-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/producer/gradle-argv-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
+      "bytes": 1681,
+      "sha256": "7db86b92599ffdb5029bdd16ce3d2e59fb3cb4e874772fa35d4e667484e3a12f",
+      "originalBytes": 1681,
+      "originalSha256": "7db86b92599ffdb5029bdd16ce3d2e59fb3cb4e874772fa35d4e667484e3a12f",
+      "originalPath": "<CANDIDATE>/build/releaseAll/gradle-argv-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/macos-full.json",
+      "bytes": 1991,
+      "sha256": "4f48529783d23178de7112745cff815a6ff84a46674c85c57641d587223bb796",
+      "originalBytes": 1991,
+      "originalSha256": "4f48529783d23178de7112745cff815a6ff84a46674c85c57641d587223bb796",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/macos-full.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/macos-full.log",
+      "bytes": 2983,
+      "sha256": "af5dbbefddc970b688a93cd9f1fe57b95fca66962f80454a0cb467599b658ef0",
+      "originalBytes": 2983,
+      "originalSha256": "af5dbbefddc970b688a93cd9f1fe57b95fca66962f80454a0cb467599b658ef0",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/macos-full.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/macos-full.runtime.xml",
+      "bytes": 503,
+      "sha256": "e8b147f2b912c98a03c6e33564c007e2b47549dd9c7d8c300093217a3d519d2b",
+      "originalBytes": 503,
+      "originalSha256": "e8b147f2b912c98a03c6e33564c007e2b47549dd9c7d8c300093217a3d519d2b",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/macos-full.runtime.xml",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/macos-pure.json",
+      "bytes": 2015,
+      "sha256": "64c172a09f56fb5abc583861d497329b2f5014d9e01ce8229d93aece454c414b",
+      "originalBytes": 2015,
+      "originalSha256": "64c172a09f56fb5abc583861d497329b2f5014d9e01ce8229d93aece454c414b",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/macos-pure.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/macos-pure.log",
+      "bytes": 2118,
+      "sha256": "2778dc89614783996cc772fbf1d58be180565850a53fbd75b628a861f4c781a5",
+      "originalBytes": 2118,
+      "originalSha256": "2778dc89614783996cc772fbf1d58be180565850a53fbd75b628a861f4c781a5",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/macos-pure.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/macos-pure.runtime.xml",
+      "bytes": 521,
+      "sha256": "0714fdf283a643745a41a64af9ad6388b2370b45b4133256d485a72efe7397ba",
+      "originalBytes": 521,
+      "originalSha256": "0714fdf283a643745a41a64af9ad6388b2370b45b4133256d485a72efe7397ba",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/macos-pure.runtime.xml",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/linux-pure.json",
+      "bytes": 2370,
+      "sha256": "ce78fef2398a684edd344ae3ceb071379ab067a0261a1af6690c02b812e74b12",
+      "originalBytes": 2370,
+      "originalSha256": "ce78fef2398a684edd344ae3ceb071379ab067a0261a1af6690c02b812e74b12",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/linux-pure.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/linux-pure.log",
+      "bytes": 2113,
+      "sha256": "ddb9debac0e1de3223fc7d4cbd021dba5d8f1db99ab4079da18b08af59d72b71",
+      "originalBytes": 2113,
+      "originalSha256": "ddb9debac0e1de3223fc7d4cbd021dba5d8f1db99ab4079da18b08af59d72b71",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/linux-pure.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/linux-pure.runtime.xml",
+      "bytes": 503,
+      "sha256": "aa2f8b922ca7df6e31ecbd43ad6aeeccf20b6029de1d1bce70a9b7531ea28365",
+      "originalBytes": 503,
+      "originalSha256": "aa2f8b922ca7df6e31ecbd43ad6aeeccf20b6029de1d1bce70a9b7531ea28365",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/linux-pure.runtime.xml",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/minimum-host.runtime.xml",
+      "bytes": 575,
+      "sha256": "66afa117a854de662cb5f7673b2f38e7e5c8ea7a74e1bff15222f61136f6fa23",
+      "originalBytes": 575,
+      "originalSha256": "66afa117a854de662cb5f7673b2f38e7e5c8ea7a74e1bff15222f61136f6fa23",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/minimum-host-evidence/minimum-host.runtime.xml",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/minimum-host.json",
+      "bytes": 2336,
+      "sha256": "24c82dda567db5e1effe0fa2f9e27355b6ca46a015d4e9120a5ceaacbe8f4434",
+      "originalBytes": 2336,
+      "originalSha256": "24c82dda567db5e1effe0fa2f9e27355b6ca46a015d4e9120a5ceaacbe8f4434",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/minimum-host-evidence/minimum-host.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/consumers/minimum-host.log",
+      "bytes": 2983,
+      "sha256": "afab8b3c9af469448f46403b752cc2981e2a32e8f6c14dc958f018faa2baa069",
+      "originalBytes": 2983,
+      "originalSha256": "afab8b3c9af469448f46403b752cc2981e2a32e8f6c14dc958f018faa2baa069",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/minimum-host-evidence/minimum-host.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/root-check.log",
+      "bytes": 10438,
+      "sha256": "fac68d5cb178b19158c4bb934ffa71210650d677759a6be72e34bc265f57464b",
+      "originalBytes": 10438,
+      "originalSha256": "fac68d5cb178b19158c4bb934ffa71210650d677759a6be72e34bc265f57464b",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/root-check.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/buildsrc-check.log",
+      "bytes": 487,
+      "sha256": "2f40c682e4786ed7c824244ced8c786198249b4df2941edf8d759a0a8409d833",
+      "originalBytes": 487,
+      "originalSha256": "2f40c682e4786ed7c824244ced8c786198249b4df2941edf8d759a0a8409d833",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/buildsrc-check.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/release-selftest.log",
+      "bytes": 20074,
+      "sha256": "bf74fdfc1c586b65c10885428cda0230b4ce2ee9ac738bec42aba9c9f0dfc003",
+      "originalBytes": 20074,
+      "originalSha256": "bf74fdfc1c586b65c10885428cda0230b4ce2ee9ac738bec42aba9c9f0dfc003",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/release-selftest.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/dry-run.log",
+      "bytes": 5049,
+      "sha256": "10b727f8cfb48d991daa71b118df346bb43b801794f6e590407081a6caaa5f2b",
+      "originalBytes": 5123,
+      "originalSha256": "c84885241228197bd41037e88e102754d6628137b76ca066fbe543ee77234210",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/dry-run.log",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/bundle-only.log",
+      "bytes": 19286,
+      "sha256": "efb96e9900c341b56566e509dfcb9cb2b1a140b89b0edd65f738de63811d1b32",
+      "originalBytes": 19397,
+      "originalSha256": "e66c6498218a6845d1a4a9fcec72490d3bbe3f49b70ca84a72b57b8a0d0dc8ee",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/bundle-only.log",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/toolchain-preflight.json",
+      "bytes": 5340,
+      "sha256": "ea503c28528d5279df81e65ec664f897ed9ea4ec0a67f5550ce11ad62307a82a",
+      "originalBytes": 5474,
+      "originalSha256": "ff99e423e7113667739c5ef77f3c56fc797c19c87aee917b1fe8b1c172a93949",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/toolchain-preflight.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/toolchain-observation.init.gradle",
+      "bytes": 1564,
+      "sha256": "ef4e10805fbfbe6bf61bb72615f256aa145ff9e6b7a9796e277f48b294b58201",
+      "originalBytes": 1564,
+      "originalSha256": "ef4e10805fbfbe6bf61bb72615f256aa145ff9e6b7a9796e277f48b294b58201",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/toolchain-observation.init.gradle",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/signed-native-comparison.json",
+      "bytes": 4448,
+      "sha256": "82a12cc85e3b1429b959a6b7ff1376d3dad17a3c07ad56059149bdeb036b38c8",
+      "originalBytes": 4448,
+      "originalSha256": "82a12cc85e3b1429b959a6b7ff1376d3dad17a3c07ad56059149bdeb036b38c8",
+      "originalPath": "<REVIEW_FIXES>/signed-native-comparison-revised.json",
+      "representation": "exact original",
+      "producer": {
+        "commit": "2e83a1120cde2d06a63cd9e21bc713e51b5336c3",
+        "path": "req/plans/evidence/rc3-final-review-2026-11-23/compare-native.py",
+        "sha256": "ba0f8a57995f1f576a606979d2abdb2dfd39dac44e4c1f6a94215b65b6f242a5",
+        "note": "The retained comparison was generated with this comparator revision before the non-empty legal-text check was added. The current recipe is a later revision and did not produce this retained output."
+      }
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/native-pom.xml",
+      "bytes": 4149,
+      "sha256": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
+      "originalBytes": 4149,
+      "originalSha256": "0c812f6cfc7dae701540905f14fe71351b1461098492923f607c00b63c95c342",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/native-pom.xml",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/native-module.json",
+      "bytes": 3584,
+      "sha256": "e8c0cd6775c976fb3013a99df55154f11197c6c13e466dc2efbfd333c800a594",
+      "originalBytes": 3584,
+      "originalSha256": "e8c0cd6775c976fb3013a99df55154f11197c6c13e466dc2efbfd333c800a594",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/native-module.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/producer-input-backup.json",
+      "bytes": 24767,
+      "sha256": "1d1ea8ea43f3f307899d3c8f6dad58565a7b8f70cda518200f05edea261115e1",
+      "originalBytes": 24841,
+      "originalSha256": "ad518e18f52a4238914269d3b087cae7f0cce63ffa2859733ad8aff1088a4683",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/producer-input-backup.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/instrumentation-failure-jinja-pass-1.log",
+      "bytes": 1955,
+      "sha256": "e38cf9a71aa8319e3396360a1ace9e4938379885843f5285f9e804e598175896",
+      "originalBytes": 2008,
+      "originalSha256": "ed28ca5cc15d77d64b25fe3a11973e1869d87c587a379dd8c0936b794a49ddc4",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/instrumentation-failure-jinja-pass-1.log",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/instrumentation-failure-jinja-pass-1-invocation.json",
+      "bytes": 1738,
+      "sha256": "9731fd007287b577c26c451d422250b6e62f059b350814524015d07f7bc2755e",
+      "originalBytes": 1835,
+      "originalSha256": "695e5f102cde730a2a97676ae89a6fc5c622fa6fea173db074a26664b32c8c5a",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/instrumentation-failure-jinja-pass-1-invocation.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/candidate-driver.log",
+      "bytes": 136,
+      "sha256": "aa71b5aefeebacd950de96220519a52a7d582fd2ec033915d90dd841f8ba41d1",
+      "originalBytes": 136,
+      "originalSha256": "aa71b5aefeebacd950de96220519a52a7d582fd2ec033915d90dd841f8ba41d1",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/candidate-driver.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/instrumentation-failure-candidate-driver.log",
+      "bytes": 147,
+      "sha256": "679b2704bd5e9499864b27e18fbc140eedf2f33b9deab038e3cd0756a7cf2281",
+      "originalBytes": 147,
+      "originalSha256": "679b2704bd5e9499864b27e18fbc140eedf2f33b9deab038e3cd0756a7cf2281",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/instrumentation-failure-candidate-driver.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/buildsrc-check-invocation.json",
+      "bytes": 1641,
+      "sha256": "4df68f25d70f2d5d86c00a97f0236bc747b33684aa9561f39048f004424e8a23",
+      "originalBytes": 1701,
+      "originalSha256": "eed2144786c5cc22a8ba29113781a51a9b63dea86812829be49818b4dded7a9b",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/buildsrc-check-invocation.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/release-selftest-invocation.json",
+      "bytes": 1634,
+      "sha256": "86fdbeeb2edcfc4caa426d8a7b7caaf9bb4c5392a9c8c3ee45f3dc10890e140e",
+      "originalBytes": 1694,
+      "originalSha256": "bdf21994b47870e80724fe52282d618522772f0875c4f6f6435ae4c26771f0de",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/release-selftest-invocation.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/consumer-driver.log",
+      "bytes": 1496,
+      "sha256": "eac820885a27b5fc9ebf032b1de87915aa5904559b36c443f879caadcbd8e5cf",
+      "originalBytes": 1533,
+      "originalSha256": "1cefe177b88f9a66ae8dd0bfe99dc75c0eff168472165fc45ab820774a0c2e45",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumer-driver.log",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/linux-consumer-driver.log",
+      "bytes": 81,
+      "sha256": "5b6be10cbab92e10e0063ef64ab1bc8819b4816379fcc6901af45ef8ea033dab",
+      "originalBytes": 81,
+      "originalSha256": "5b6be10cbab92e10e0063ef64ab1bc8819b4816379fcc6901af45ef8ea033dab",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/linux-consumer-driver.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/run-audit.py",
+      "bytes": 3735,
+      "sha256": "7aec61b5d792be8f5d32c9682da595d2e6a53eb816f9837a5cfd770c313959a9",
+      "originalBytes": 3834,
+      "originalSha256": "337685d1850489a1bcb4a8f73c185835d13dc0ae4b2fab699f5c387b08693b64",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/run-audit.py",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/run-candidate.py",
+      "bytes": 2173,
+      "sha256": "6302f292b4b06f38b0b6b2baf3a6a57ff67e760d6cf88321fa9b30f82440c8b8",
+      "originalBytes": 2222,
+      "originalSha256": "5a1a0b5f9f4b88b7fc9e862fe2a8480524d95f35298d1f1cfde2739f274dafee",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/run-candidate.py",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/run-consumers.py",
+      "bytes": 3819,
+      "sha256": "7f6939d468b348e542b8ac01863108b823bad8c4c8d9f9db2f77bda6ac4c4d8a",
+      "originalBytes": 3875,
+      "originalSha256": "fe97ca43939f0ab2be69aae6c6ce148fc62bbd9cc0f578e97c5c9dfa8797cfce",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/run-consumers.py",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/resume-linux.py",
+      "bytes": 721,
+      "sha256": "0aa626c39c88b956c778ec4f623e4f403818228d6b396c28ccd818a0bb585cea",
+      "originalBytes": 773,
+      "originalSha256": "a98970b16fa83a575f46581b8a42ad3705e6dea53d2d0f5ba44000379adf97d8",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/resume-linux.py",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/preserve-inputs.py",
+      "bytes": 2876,
+      "sha256": "c619bdd5a6546750b9224dc4d8fef270590ef41f331dfbbcebd07010a2d9800b",
+      "originalBytes": 2950,
+      "originalSha256": "9876ca04ad4c70628876dc7d4e798d5c4e84155cb6bfb7013d93bc6adf979af4",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/preserve-inputs.py",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/verification.log",
+      "bytes": 56285,
+      "sha256": "7cb1d4a3ff6f220db6a74f3f9fd8b8f00dfb1be333706a9e2e598a36f10d18b0",
+      "originalBytes": 57603,
+      "originalSha256": "59c1366444c2dd1c3ec535392a4dd0a3fe5391647376978e2206db5100d898e1",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-1.log",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/invocation.json",
+      "bytes": 1738,
+      "sha256": "0a71c3bd4067840ea2fd0d07154b8f64f18d84e25e7344a0b2d0220d1ec3854a",
+      "originalBytes": 1835,
+      "originalSha256": "0c4173424cb1938d8b4ad60fa34fcdbf9be8392fc2be6fe34f2cd8b359b3b7ce",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-1-invocation.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification.json",
+      "bytes": 221,
+      "sha256": "f4bf4e4507dc4b7534986bbc757247d36e7af9ca4dd0737cc2128218ed702389",
+      "originalBytes": 264,
+      "originalSha256": "6cf89df847b1bb2e38de43997fc4c501d9167725663eb56a4508d52bde4ed018",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-1/reports/release-verification.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification.md",
+      "bytes": 1884,
+      "sha256": "2fe7ba7cda1b248b36d6dc82088c2d4c64bb3eb505ba9b751e5dd39e80542323",
+      "originalBytes": 1931,
+      "originalSha256": "bd187f25922eaad3eb7aeb2ca74c2e9b6af988b3fc5d449a0f85be68f5482f20",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-1/reports/release-verification.md",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification-evidence/archive-reproducibility.json",
+      "bytes": 654,
+      "sha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990",
+      "originalBytes": 654,
+      "originalSha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-1/reports/release-verification-evidence/archive-reproducibility.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification-evidence/corpus-coverage.md",
+      "bytes": 42762,
+      "sha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190",
+      "originalBytes": 42762,
+      "originalSha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-1/reports/release-verification-evidence/corpus-coverage.md",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification-evidence/dependency-review.md",
+      "bytes": 232,
+      "sha256": "70ca395e2e874a1b062c072926321f0dd2229974bcfe3c83a1d5f2d0ec713920",
+      "originalBytes": 275,
+      "originalSha256": "2848e71806093a8d4f6371a01de320d29dd42be54e7f6d40a04c8072dd1811ce",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-1/reports/release-verification-evidence/dependency-review.md",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification-evidence/pom-default.xml",
+      "bytes": 1415,
+      "sha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd",
+      "originalBytes": 1415,
+      "originalSha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-1/reports/release-verification-evidence/pom-default.xml",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/verification.log",
+      "bytes": 55718,
+      "sha256": "58f1b15c8f88b43d40d83bf22a3d380a42e3ff0a6011ed22538a31aa114db1a3",
+      "originalBytes": 57036,
+      "originalSha256": "28ef28f1663c7b1755e3b066a75f9b68eefe6538b10020487e3a2e9a406f6139",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-2.log",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/invocation.json",
+      "bytes": 1738,
+      "sha256": "a30396b3796beb57be998c8d2400825d078b989d8547f105f7099282977ebacd",
+      "originalBytes": 1835,
+      "originalSha256": "4ea83a855752293021f18b7467da23e269674062e9cc0b9a198c287e72376bd6",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-2-invocation.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification.json",
+      "bytes": 222,
+      "sha256": "c4b5ded358d03300a8e4075e31df6d909b9f3b8006c60a4de94b9906417f9256",
+      "originalBytes": 265,
+      "originalSha256": "96dbf71aea7af12b8440212a438f45828990100a36a0bf08792a034b5b0f4797",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-2/reports/release-verification.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification.md",
+      "bytes": 1885,
+      "sha256": "df385d27a5d62e91c72790c66b4eb505bac56ac4f6040f3e63f9467fedf3269f",
+      "originalBytes": 1932,
+      "originalSha256": "34586582a2d0100fa0a63c591716c99e990be9298a17d13a6ff62839ccf6c5d1",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-2/reports/release-verification.md",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification-evidence/archive-reproducibility.json",
+      "bytes": 654,
+      "sha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990",
+      "originalBytes": 654,
+      "originalSha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-2/reports/release-verification-evidence/archive-reproducibility.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification-evidence/corpus-coverage.md",
+      "bytes": 42762,
+      "sha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190",
+      "originalBytes": 42762,
+      "originalSha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-2/reports/release-verification-evidence/corpus-coverage.md",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification-evidence/dependency-review.md",
+      "bytes": 232,
+      "sha256": "3ac54b662dbd724662aab4ced467355490cf6669cae3c736bb4ff47a0a171d02",
+      "originalBytes": 275,
+      "originalSha256": "dd73bc97b142107b54e344d23822acee7c2fcea7f6105d6d8ce517475bf2b97f",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-2/reports/release-verification-evidence/dependency-review.md",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification-evidence/pom-default.xml",
+      "bytes": 1415,
+      "sha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd",
+      "originalBytes": 1415,
+      "originalSha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/jinja-pass-2/reports/release-verification-evidence/pom-default.xml",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/audit/build.log",
+      "bytes": 3756,
+      "sha256": "4fda18a610370f7b2666543ce41caa608a64bb3eda5c6aee9238cf6440fda404",
+      "originalBytes": 4052,
+      "originalSha256": "64b3aa507001714d8a36fc0cd469b87e2dde06f04ad0b6d6ac5b9b1bd0ca4577",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/audit/build.log",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/audit/comparison-version-overrides.patch",
+      "bytes": 1737,
+      "sha256": "8867eeab9723730d053e7eabe6a44d76c6a9044027b3b195594c4286e5d02ba9",
+      "originalBytes": 1737,
+      "originalSha256": "8867eeab9723730d053e7eabe6a44d76c6a9044027b3b195594c4286e5d02ba9",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/audit/comparison-version-overrides.patch",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/audit/comparison.json",
+      "bytes": 7494,
+      "sha256": "99ed1f70cfa2e5251559b7aa6b15b2f85b0818eaf3055df06e9334e8ed41e811",
+      "originalBytes": 7494,
+      "originalSha256": "99ed1f70cfa2e5251559b7aa6b15b2f85b0818eaf3055df06e9334e8ed41e811",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/audit/comparison.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/audit/invocation.json",
+      "bytes": 3135,
+      "sha256": "7943c63a4715d2d163ff49dee967ddf3ea854314c238153679e74c8929fc8135",
+      "originalBytes": 3462,
+      "originalSha256": "1485ac6c04c3d9c5743978e06f62fa2a91d1b4d7f15bd0bd906504543cf34088",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/audit/invocation.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/audit/toolchain-validation.json",
+      "bytes": 298,
+      "sha256": "e4a299a6c3dd53747dbe96d692b09043f3e1a85924a8b1a68ca41805c9172437",
+      "originalBytes": 298,
+      "originalSha256": "e4a299a6c3dd53747dbe96d692b09043f3e1a85924a8b1a68ca41805c9172437",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain-validation.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/audit/toolchains.init.gradle",
+      "bytes": 1166,
+      "sha256": "5a7e24e678402b61870d6aac88fa7757f8467e82b97d1cacbcdef0d578d34117",
+      "originalBytes": 1166,
+      "originalSha256": "5a7e24e678402b61870d6aac88fa7757f8467e82b97d1cacbcdef0d578d34117",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchains.init.gradle",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-bundle-measurement.json",
+      "bytes": 30321,
+      "sha256": "cfedf8edad8a6aa88e51d9dedf47e7f533f6f07ca410c00236676b5ebac159ea",
+      "originalBytes": 30321,
+      "originalSha256": "cfedf8edad8a6aa88e51d9dedf47e7f533f6f07ca410c00236676b5ebac159ea",
+      "originalPath": "<CANDIDATE>/build/releaseAll/portal-bundle-measurement.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/historical-native-approval.json",
+      "bytes": 7315,
+      "sha256": "ba210deade57f036aa52880ef066b1b21a32bd82bfc41ce7605d47ba544dc257",
+      "originalBytes": 7315,
+      "originalSha256": "ba210deade57f036aa52880ef066b1b21a32bd82bfc41ce7605d47ba544dc257",
+      "originalPath": "<REPOSITORY>/req/plans/evidence/native-distribution-review-2026-11-22/owner-acceptance.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/post-window-account-probe-20261123T153419.953676Z.json",
+      "bytes": 1849,
+      "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+      "originalBytes": 1849,
+      "originalSha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/post-window-account-probe-20261123T153419.953676Z.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/stop-window.sh",
+      "bytes": 146,
+      "sha256": "dec37a0f70dfb5a3037003189bcee11122e981820570f344064f4c4f1eb798a2",
+      "originalBytes": 146,
+      "originalSha256": "dec37a0f70dfb5a3037003189bcee11122e981820570f344064f4c4f1eb798a2",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/stop-window.sh",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/connected-sharing-20261123T153355.627639Z.txt",
+      "bytes": 208,
+      "sha256": "0dcb5e7cb6f38d8326c0e05d4e00a0d21534c24925466eba9f0c859230bc46c2",
+      "originalBytes": 212,
+      "originalSha256": "2725bcad5430876cf60d161adc1ac48e071fd6dfda9697e53c85a7a3fa7ebf14",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/connected-sharing-20261123T153355.627639Z.txt",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/watch-window.py",
+      "bytes": 596,
+      "sha256": "6bc76c4e254a438457b659906d9604c80473fabf5d49bd3d7258266ae98344ce",
+      "originalBytes": 596,
+      "originalSha256": "6bc76c4e254a438457b659906d9604c80473fabf5d49bd3d7258266ae98344ce",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/watch-window.py",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/pre-window-account-probe-20261123T153112.548993Z-method.json",
+      "bytes": 471,
+      "sha256": "a851031d2a007e8dce61027c6c454ef8ba0cd5e80c08953a5a5bdd6bd7752c57",
+      "originalBytes": 471,
+      "originalSha256": "a851031d2a007e8dce61027c6c454ef8ba0cd5e80c08953a5a5bdd6bd7752c57",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/pre-window-account-probe-20261123T153112.548993Z-method.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/start-service-20261123T153112.548993Z.json",
+      "bytes": 2105,
+      "sha256": "08b394ae4392b2c947a9fd94cebf582d0c6a32bc83ce18833006a94da5305e64",
+      "originalBytes": 2129,
+      "originalSha256": "d925cb6b2e50fba974a845dedc0c28da9841e243990d3e8d0082b7b436a4bcbf",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/start-service-20261123T153112.548993Z.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/connected-account-probe-20261123T153355.627639Z-source-commit.txt",
+      "bytes": 41,
+      "sha256": "e0bf7c4b6992770dd35f111ae8a084a26dd295c6b8f3b1581eab72d294faa82d",
+      "originalBytes": 41,
+      "originalSha256": "e0bf7c4b6992770dd35f111ae8a084a26dd295c6b8f3b1581eab72d294faa82d",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/connected-account-probe-20261123T153355.627639Z-source-commit.txt",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/stop-sharing-20261123T153419.953676Z.txt",
+      "bytes": 208,
+      "sha256": "0dcb5e7cb6f38d8326c0e05d4e00a0d21534c24925466eba9f0c859230bc46c2",
+      "originalBytes": 212,
+      "originalSha256": "2725bcad5430876cf60d161adc1ac48e071fd6dfda9697e53c85a7a3fa7ebf14",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/stop-sharing-20261123T153419.953676Z.txt",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/queue-check.py",
+      "bytes": 1700,
+      "sha256": "3460a0ddc5c136a668b1879668486ec5017776d744d266c35f40c886a05c65f4",
+      "originalBytes": 1700,
+      "originalSha256": "3460a0ddc5c136a668b1879668486ec5017776d744d266c35f40c886a05c65f4",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/queue-check.py",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/connected-account-probe-20261123T153355.627639Z.json",
+      "bytes": 1849,
+      "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+      "originalBytes": 1849,
+      "originalSha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/connected-account-probe-20261123T153355.627639Z.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/start-sharing-20261123T153112.548993Z.txt",
+      "bytes": 208,
+      "sha256": "0dcb5e7cb6f38d8326c0e05d4e00a0d21534c24925466eba9f0c859230bc46c2",
+      "originalBytes": 212,
+      "originalSha256": "2725bcad5430876cf60d161adc1ac48e071fd6dfda9697e53c85a7a3fa7ebf14",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/start-sharing-20261123T153112.548993Z.txt",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/job-setup-identity.txt",
+      "bytes": 1723,
+      "sha256": "337f886d8293ef9b878b6df059d8445c65444e5bb393a547a087d25fcb8d9e2c",
+      "originalBytes": 1723,
+      "originalSha256": "68db82dd83d669eb12028b2e0c862303280cd7fa31e2aa691001e7c1cdac901e",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/job-setup-identity.txt",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/start-window.sh",
+      "bytes": 202,
+      "sha256": "cc7011c8cb7ef3f89aec41ce01b7bae6cb663d8ce1615f57e306836a238e6f58",
+      "originalBytes": 202,
+      "originalSha256": "cc7011c8cb7ef3f89aec41ce01b7bae6cb663d8ce1615f57e306836a238e6f58",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/start-window.sh",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/queue-review.json",
+      "bytes": 278,
+      "sha256": "1185cd8fa834d6900c0eaf6bfd2a7e785472f16e31438360ee13074f527d1359",
+      "originalBytes": 278,
+      "originalSha256": "1185cd8fa834d6900c0eaf6bfd2a7e785472f16e31438360ee13074f527d1359",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/queue-review.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/dispatch.json",
+      "bytes": 641,
+      "sha256": "a00a4e2092cfbf9f893e3c05dd95f69006f61c54c27c6dca20600176940bcb14",
+      "originalBytes": 641,
+      "originalSha256": "a00a4e2092cfbf9f893e3c05dd95f69006f61c54c27c6dca20600176940bcb14",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/dispatch.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/pre-window-account-probe-20261123T153112.548993Z.json",
+      "bytes": 1849,
+      "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+      "originalBytes": 1849,
+      "originalSha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/pre-window-account-probe-20261123T153112.548993Z.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/final-receipt-invocation.json",
+      "bytes": 919,
+      "sha256": "d0c5db18c0af2f915635aff2524dbed34078f6acdeb7942bf05c7140e9883656",
+      "originalBytes": 1252,
+      "originalSha256": "6aff966cb25d1114fd20fd4ed23a695a6e845a94801991385e3054bee96210a9",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/final-receipt-invocation.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/connected-account-probe-20261123T153355.627639Z-method.json",
+      "bytes": 471,
+      "sha256": "c27932d06aa718e1193dc153a7e581af9841174d8933a7d04f8b4f072bdedf35",
+      "originalBytes": 471,
+      "originalSha256": "c27932d06aa718e1193dc153a7e581af9841174d8933a7d04f8b4f072bdedf35",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/connected-account-probe-20261123T153355.627639Z-method.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/workflow-dispatch-inputs.json",
+      "bytes": 378,
+      "sha256": "01973be60604c8a9994e617fb6a20b7cbeb8641112835cbb0136147b9534032b",
+      "originalBytes": 378,
+      "originalSha256": "01973be60604c8a9994e617fb6a20b7cbeb8641112835cbb0136147b9534032b",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/workflow-dispatch-inputs.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/bootout-20261123T153419.953676Z.json",
+      "bytes": 54,
+      "sha256": "6379c17d798191f995d43b0950ea7787779fe29c9af7354b25de37a514ff207d",
+      "originalBytes": 54,
+      "originalSha256": "6379c17d798191f995d43b0950ea7787779fe29c9af7354b25de37a514ff207d",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/bootout-20261123T153419.953676Z.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/service-before-20261123T153112.548993Z.txt",
+      "bytes": 1311,
+      "sha256": "a59d0acb90e712caa198454fa57a24346a093fae86c07079fd65753e275131d3",
+      "originalBytes": 1335,
+      "originalSha256": "ef08278739a688e796b9a6a3457bd949157ae20ba791031dce14d6727ec6f816",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/service-before-20261123T153112.548993Z.txt",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/connected-service-20261123T153355.627639Z.json",
+      "bytes": 2078,
+      "sha256": "989fe6cbd6eaa69999000ddf328ad3d0c05484f03187dcc986065e7cf49b1771",
+      "originalBytes": 2102,
+      "originalSha256": "68f673bec6ea0854becea517620f3ba524e94d756ae19c1d9bbe7e230a24905a",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/connected-service-20261123T153355.627639Z.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/minimum-host-identity-review.json",
+      "bytes": 1260,
+      "sha256": "7262173bd9e99f5d377fa51b80c7003780889b04c946a932e9a14ebbdc50f4ad",
+      "originalBytes": 1297,
+      "originalSha256": "3c050656c59468fea6bc9c6f36fbe13e2b0835bd6be2e80d5db945c4470cf447",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/minimum-host-identity-review.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/post-window-account-probe-20261123T153419.953676Z-source-commit.txt",
+      "bytes": 41,
+      "sha256": "e0bf7c4b6992770dd35f111ae8a084a26dd295c6b8f3b1581eab72d294faa82d",
+      "originalBytes": 41,
+      "originalSha256": "e0bf7c4b6992770dd35f111ae8a084a26dd295c6b8f3b1581eab72d294faa82d",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/post-window-account-probe-20261123T153419.953676Z-source-commit.txt",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/admin-window-backup-snapshot.py",
+      "bytes": 6181,
+      "sha256": "b2a813bb3070efceee414ade0c6302bfe0dc2bced7641f85809451fc5d1a5385",
+      "originalBytes": 6219,
+      "originalSha256": "e97a64eac7fb230d8776a75f333fa70d0c5b907cfbbe5594278ea8bb5a442861",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/admin-window.py",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/admin-window-original.py",
+      "bytes": 5606,
+      "sha256": "42dfa84dc2285767810959fb8fdd06fb949eb8c889bfef3f4680e4f3a9428ba1",
+      "originalBytes": 5643,
+      "originalSha256": "74dcaa74a3d6f88b5820738bfbe9b5e2e8b0b8521f98ba06f486fc8f96298494",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/admin-window-original.py",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/status.json",
+      "bytes": 701,
+      "sha256": "e55add53b3d254fe4138ad39a93208eda72cf5b5a9d15fac86b5b767232b7b41",
+      "originalBytes": 738,
+      "originalSha256": "c8f380d1d5c24f37874290c3d824e3fe808db808d76a787ad8b106a6f9333d87",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/status.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/pre-window-account-probe-20261123T153112.548993Z-source-commit.txt",
+      "bytes": 41,
+      "sha256": "e0bf7c4b6992770dd35f111ae8a084a26dd295c6b8f3b1581eab72d294faa82d",
+      "originalBytes": 41,
+      "originalSha256": "e0bf7c4b6992770dd35f111ae8a084a26dd295c6b8f3b1581eab72d294faa82d",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/pre-window-account-probe-20261123T153112.548993Z-source-commit.txt",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/stop-service-20261123T153419.953676Z.json",
+      "bytes": 2080,
+      "sha256": "6875e8840f454f437ff2186cb4b027c284e37ee779c457a502e0d73cd7c90992",
+      "originalBytes": 2104,
+      "originalSha256": "b6a59b5f92c724f0896c9ce0715e6a56179dad92255339beca877879f56070f9",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/stop-service-20261123T153419.953676Z.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/final-receipt.log",
+      "bytes": 428,
+      "sha256": "18c742c2c789a5ee4ad7ac969a31fe3b467f058d8155aabf6212b51f53188073",
+      "originalBytes": 428,
+      "originalSha256": "18c742c2c789a5ee4ad7ac969a31fe3b467f058d8155aabf6212b51f53188073",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/final-receipt.log",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/minimum-host-job.log",
+      "bytes": 46654,
+      "sha256": "8484da019d4a68475b8184fce051e31ec87f50ac841930f4e1e2d5550fd71265",
+      "originalBytes": 46826,
+      "originalSha256": "e3de586bbd4fd92d3de050d9a88986d76862ec851d66bcabadc10231b72a921d",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/minimum-host-job.log",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/post-window-account-probe-20261123T153419.953676Z-method.json",
+      "bytes": 471,
+      "sha256": "85bf190f665a020d4a9a3fa7619db526f6a0c3f077c95f5e28e5edf452958777",
+      "originalBytes": 471,
+      "originalSha256": "85bf190f665a020d4a9a3fa7619db526f6a0c3f077c95f5e28e5edf452958777",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/post-window-account-probe-20261123T153419.953676Z-method.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/backup-verification.json",
+      "bytes": 35409,
+      "sha256": "5605930145b310f9f54f7b11390ecd5c63ad078bad5009e45b64a51740f0cb0f",
+      "originalBytes": 35483,
+      "originalSha256": "3237827a204fb459c562449858b0c2d32f68d3af61ba6fb9c5bddec31b811199",
+      "originalPath": "<CANDIDATE>-backup-2026-11-23/final-receipt-backup-verification.json",
+      "representation": "normalized UTF-8 copy; replacements described in packet"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/linux-launch-failure-invocation.json",
+      "bytes": 924,
+      "sha256": "e28db094e93df79922c09c0a652c6f3708587ae2fb26619867bd7eb089ac21c1",
+      "originalBytes": 924,
+      "originalSha256": "e28db094e93df79922c09c0a652c6f3708587ae2fb26619867bd7eb089ac21c1",
+      "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/consumers/linux-launch-failure-invocation.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/window/admin-window.py",
+      "bytes": 7550,
+      "sha256": "a39ef058c65a955736a96c370d6d02763e007011a31e035e1d3ca1d33187b58f",
+      "originalBytes": 7576,
+      "originalSha256": "9ec7563715a43a84f33e16ef673300fe52b7c8d7b9dda8df2fd690b34429be22",
+      "originalPath": "<REVIEW_FIXES>/admin-window-revised.py",
+      "representation": "Post-review revision; originalBytes/originalSha256 identify the preceding retained review version, not these revised bytes."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/driver-history.json",
+      "bytes": 2966,
+      "sha256": "6959ecb9a6c27325fb9d14fb480bf8951f6af5c3cc4ba5b0d34025ab711c6a79",
+      "originalBytes": 2111,
+      "originalSha256": "98d63074dcc364166475d9a75f00cbb182deeac116ceca992f00ad8162977e40",
+      "originalPath": "<REVIEW_FIXES>/driver-history.json",
+      "representation": "Post-review revision; originalBytes/originalSha256 identify the preceding retained review version, not these revised bytes."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/preservation-repair.json",
+      "bytes": 651,
+      "sha256": "c357a81abf164a0eeff5f814b3b655310e90259ec19fdffc53c514e5c375cb4c",
+      "originalBytes": 651,
+      "originalSha256": "c357a81abf164a0eeff5f814b3b655310e90259ec19fdffc53c514e5c375cb4c",
+      "originalPath": "<REVIEW_FIXES>/preservation-repair.json",
+      "representation": "exact original"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/compare-native.py",
+      "bytes": 5028,
+      "sha256": "01be3169aafea0f20797075637bee8de21b39189c168cf9c5903916dc64439b3",
+      "representation": "Comparison recipe authored for this review; later revision adds the non-empty legal-text check. The retained signed-native-comparison.json was produced by the earlier revision identified in its producer record; no separate original of this current recipe."
+    }
+  ]
+}

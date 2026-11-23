@@ -1,0 +1,23 @@
+{
+  "createdAt": "2026-11-23T15:34:06.505393+00:00",
+  "argv": [
+    "/opt/homebrew/opt/python@3.15/bin/python3.15",
+    "<CANDIDATE>/tools/release-all/final_receipt.py",
+    "--root",
+    "<CANDIDATE>",
+    "--bundle",
+    "<CANDIDATE>/build/releaseAll/jmlx-mega-bundle.zip",
+    "--preliminary",
+    "<CANDIDATE>/build/releaseAll/preliminary-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
+    "--report",
+    "macos-full=<CANDIDATE>/build/releaseAll/rc3-verification/consumers/macos-full.json",
+    "--report",
+    "macos-pure=<CANDIDATE>/build/releaseAll/rc3-verification/consumers/macos-pure.json",
+    "--report",
+    "linux-pure=<CANDIDATE>/build/releaseAll/rc3-verification/consumers/linux-pure.json",
+    "--report",
+    "minimum-host=<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/minimum-host-evidence/minimum-host.json",
+    "--output",
+    "<CANDIDATE>/build/releaseAll/verified.json"
+  ]
+}

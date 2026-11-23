@@ -1,0 +1,18 @@
+{
+  "observedAt": "2026-11-23T15:35:16.957401+00:00",
+  "draftReleaseId": 455573517,
+  "bundleAssetId": 783354231,
+  "preliminaryAssetId": 783354232,
+  "uploadedBytesSha256Verified": true,
+  "draftPublished": false,
+  "workflowDispatched": true,
+  "runnerStarted": true,
+  "blocker": null,
+  "nextCommand": "bash <CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/start-window.sh",
+  "authorization": "User explicitly authorized temporary draft upload and dedicated minimum-host verification window; no publication authorized.",
+  "workflowRunId": 45206346138,
+  "workflowConclusion": "success",
+  "runnerStopped": true,
+  "runnerStatus": "offline",
+  "finalReceiptRevalidated": true
+}

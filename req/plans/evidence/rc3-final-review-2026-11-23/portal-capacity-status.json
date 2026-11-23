@@ -1,0 +1,14 @@
+{
+  "status": "pending owner-provided current Usage Center snapshot",
+  "usageCenterSnapshot": null,
+  "requestedFields": [
+    "observation time",
+    "organization/namespace scope",
+    "plan and account classification",
+    "monthly bytes/files/release events used and allowed",
+    "adjusted-limit expiry",
+    "grace/enforcement banner"
+  ],
+  "measurement": "portal-bundle-measurement.json",
+  "publicationCapacityConfirmed": false
+}

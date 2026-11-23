@@ -2,8 +2,8 @@
 
 Reviewed 2026-11-16 at PR #101 merge `102e03ea43e508042ec4d43a61802b448a525267`.
 Revised 2026-11-17 (review rounds 1 and 2).
-Status: RC2 historical bundle measurement complete; receipt revalidation blocked by missing
-candidate inputs. Current account capacity remains pending.
+Status: RC3 signed-bundle measurement and technical receipt revalidation complete.
+Current account capacity remains pending. RC2 measurements remain historical.
 This procedure does not authorize publication or close the native-license gate.
 
 ## Current official sources
@@ -100,6 +100,15 @@ coordinates with nine events. The cited pages do not establish rejected-upload a
 obtain clarification if retries affect available capacity. Retain the snapshot, measurement,
 candidate SHA/digest and accounting decision outside `build/` before running `clean`.
 Close the checklist gate only when the exact signed bundle and current account evidence agree.
+
+## RC3 measurement (2026-11-23)
+
+The [RC3 review](phase8-4-rc3-final-review.md) records the unchanged signed ZIP and
+revalidated final receipt. Its retained inventory measures 106,730,869 ZIP bytes,
+270 files and 107,448,758 entry bytes. Digest/CRC checks, filename uniqueness and the
+conservative upload-size check pass. The current Usage Center account snapshot is still
+pending; these measurements do not confirm available capacity or authorize publication.
+A replacement bundle must be measured again against its own digest.
 
 ## RC2 measurement (2026-11-22)
 

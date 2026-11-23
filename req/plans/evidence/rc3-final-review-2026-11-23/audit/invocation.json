@@ -1,0 +1,65 @@
+{
+  "checkedAt": "2026-11-23T14:39:59.973680+00:00",
+  "tag": "jmlx-phase8.4-rc.3",
+  "sourceCommit": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6",
+  "overrides": {
+    "jmlx-jinja": [
+      "0.6.2",
+      "0.6.1"
+    ],
+    "jmlx-tokenizer": [
+      "0.1.2",
+      "0.1.1"
+    ],
+    "jmlx-vision": [
+      "0.1.2",
+      "0.1.1"
+    ]
+  },
+  "argv": [
+    "<HOME>/.gradle/wrapper/dists/gradle-9.9.0-bin/k7t1gqg1ujh3kgq8oiu7hqi4/gradle-9.9.0/bin/gradle",
+    "-p",
+    "<AUDIT>",
+    "--gradle-user-home",
+    "<CANDIDATE>/build/releaseAll/rc3-verification/audit/gradle-home",
+    "--no-daemon",
+    "--no-configuration-cache",
+    "--no-build-cache",
+    "--console=plain",
+    ":jmlx-jinja:jar",
+    ":jmlx-jinja:sourcesJar",
+    ":jmlx-jinja:javadocJar",
+    ":jmlx-jinja:generatePomFileForMavenPublication",
+    ":jmlx-jinja:generateMetadataFileForMavenPublication",
+    ":jmlx-tokenizer:jar",
+    ":jmlx-tokenizer:sourcesJar",
+    ":jmlx-tokenizer:javadocJar",
+    ":jmlx-tokenizer:generatePomFileForMavenPublication",
+    ":jmlx-tokenizer:generateMetadataFileForMavenPublication",
+    ":jmlx-vision:jar",
+    ":jmlx-vision:sourcesJar",
+    ":jmlx-vision:javadocJar",
+    ":jmlx-vision:generatePomFileForMavenPublication",
+    ":jmlx-vision:generateMetadataFileForMavenPublication",
+    "-I",
+    "<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchains.init.gradle",
+    "auditToolchains",
+    "--rerun-tasks",
+    "-Dorg.gradle.java.installations.auto-detect=false",
+    "-Dorg.gradle.java.installations.auto-download=false",
+    "-Dorg.gradle.java.installations.fromEnv=",
+    "-Dorg.gradle.java.installations.paths=<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk"
+  ],
+  "environment": {
+    "HOME": "<HOME>",
+    "PATH": "<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/opt/X11/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:<HOME>/.codex/packages/app-server-daemon/releases/0.171.0-aarch64-apple-darwin/codex-path:<HOME>/.codex/tmp/arg0-macos/codex-arg0aUslm7:<HOME>/.codex/tmp/arg0-macos/codex-arg0jRi3hH:/opt/homebrew/Caskroom/codex/0.171.0/codex-path:<HOME>/.sdkman/candidates/maven/current/bin:<HOME>/.sdkman/candidates/java/current/bin:<HOME>/.sdkman/candidates/groovy/current/bin:<HOME>/.nvm/versions/node/v26.13.0/bin:<HOME>/programs/google-cloud-sdk/bin:<HOME>/.kimi-code/bin:<HOME>/bin:<HOME>/.local/bin:/opt/homebrew/sbin",
+    "TMPDIR": "<TMP>/",
+    "USER": "per",
+    "LC_ALL": "C",
+    "LANG": "C",
+    "LANGUAGE": "C",
+    "TZ": "UTC",
+    "JAVA_HOME": "<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk"
+  },
+  "jdkProvenance": "Existing installation copied to durable storage; identity verified from build log, archive origin not re-established"
+}

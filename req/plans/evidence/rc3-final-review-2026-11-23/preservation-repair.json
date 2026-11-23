@@ -1,0 +1,10 @@
+{
+  "restoredAt": "2026-11-23T16:58:42.242048+00:00",
+  "originalPath": "<CANDIDATE>/build/releaseAll/rc3-verification/minimum-host-window/admin-window.py",
+  "restoredBytes": 6219,
+  "restoredSha256": "e97a64eac7fb230d8776a75f333fa70d0c5b907cfbbe5594278ea8bb5a442861",
+  "method": "Copied the previously verified backup snapshot back to the original path; rechecked SHA-256 and size for every entry of final-receipt-backup-verification.json.",
+  "verifiedInputCount": 170,
+  "allOriginalPinsMatch": true,
+  "revisionPolicy": "Review-only helper revisions are now separate files; preserved candidate originals are not edited for public formatting."
+}

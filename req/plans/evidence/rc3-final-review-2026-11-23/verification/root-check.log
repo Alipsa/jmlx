@@ -1,0 +1,244 @@
+> Task :buildSrc:compileJava FROM-CACHE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar
+> Task :jmlx-core:processResources NO-SOURCE
+> Task :jmlx-examples:processResources NO-SOURCE
+> Task :jmlx-spring-ai:processResources NO-SOURCE
+> Task :jmlx-langchain4j:processResources NO-SOURCE
+> Task :jmlx-tokenizer:processResources NO-SOURCE
+> Task :jmlx-models:processResources NO-SOURCE
+> Task :jmlx-core:processTestResources NO-SOURCE
+> Task :jmlx-spring-ai:processTestResources NO-SOURCE
+> Task :jmlx-langchain4j:processTestResources NO-SOURCE
+> Task :jmlx-examples:processTestResources NO-SOURCE
+> Task :jmlx-core:processTestFixturesResources NO-SOURCE
+> Task :jmlx-benchmarks:processResources
+> Task :jmlx-benchmarks:processTestResources NO-SOURCE
+> Task :jmlx-native-macos-arm64:compileJava FROM-CACHE
+> Task :jmlx-native-macos-arm64:processResources NO-SOURCE
+> Task :jmlx-native-macos-arm64:classes UP-TO-DATE
+> Task :jmlx-models:processTestResources
+> Task :jmlx-models:processExactBitsResources NO-SOURCE
+> Task :jmlx-models:processTierBResources NO-SOURCE
+> Task :jmlx-core:sourcesJar
+> Task :jmlx-vision:compileJava FROM-CACHE
+> Task :jmlx-vision:processResources NO-SOURCE
+> Task :jmlx-vision:classes UP-TO-DATE
+> Task :jmlx-tokenizer:processTestResources
+> Task :jmlx-jinja:compileJava FROM-CACHE
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes UP-TO-DATE
+> Task :jmlx-vision:jar
+> Task :verifyDecodeBaselineManifest
+> Task :jmlx-jinja:jar
+> Task :jmlx-spring-ai:spotlessJava FROM-CACHE
+> Task :jmlx-langchain4j:spotlessJava FROM-CACHE
+> Task :jmlx-examples:spotlessJava FROM-CACHE
+> Task :jmlx-examples:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-langchain4j:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-spring-ai:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-spring-ai:spotlessCheck UP-TO-DATE
+> Task :jmlx-examples:spotlessCheck UP-TO-DATE
+> Task :jmlx-langchain4j:spotlessCheck UP-TO-DATE
+> Task :jmlx-benchmarks:spotlessJava FROM-CACHE
+> Task :jmlx-benchmarks:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-benchmarks:spotlessCheck UP-TO-DATE
+> Task :jmlx-tokenizer:spotlessJava FROM-CACHE
+> Task :jmlx-core:spotlessJava FROM-CACHE
+> Task :jmlx-core:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-core:spotlessCheck UP-TO-DATE
+> Task :jmlx-spring-ai:verifyReleaseScriptsMatch
+> Task :jmlx-langchain4j:verifyReleaseScriptsMatch
+> Task :jmlx-core:clearModuleMetadata
+> Task :jmlx-models:spotlessJava FROM-CACHE
+> Task :jmlx-models:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-models:spotlessCheck UP-TO-DATE
+> Task :jmlx-ffi:compileJava FROM-CACHE
+> Task :jmlx-ffi:processResources NO-SOURCE
+> Task :jmlx-ffi:classes UP-TO-DATE
+> Task :jmlx-tokenizer:compileJava FROM-CACHE
+> Task :jmlx-tokenizer:classes UP-TO-DATE
+> Task :verifyHfReferenceGoldens
+> Task :jmlx-tokenizer:jar
+> Task :verifyImageOracleDependencyPins
+> Task :verifyImageOracleFixtureDigests
+> Task :jmlx-ffi:jar
+> Task :jmlx-tokenizer:checkstyleMain FROM-CACHE
+> Task :jmlx-vision:checkstyleMain FROM-CACHE
+> Task :jmlx-jinja:checkstyleMain FROM-CACHE
+> Task :jmlx-vision:compileTestJava FROM-CACHE
+> Task :jmlx-vision:processTestResources
+> Task :jmlx-jinja:compileTestJava FROM-CACHE
+> Task :jmlx-vision:testClasses
+> Task :jmlx-tokenizer:compileTestJava FROM-CACHE
+> Task :jmlx-tokenizer:testClasses
+> Task :jmlx-tokenizer:checkstyleTest FROM-CACHE
+> Task :jmlx-vision:checkstyleTest FROM-CACHE
+> Task :jmlx-tokenizer:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-tokenizer:spotlessCheck UP-TO-DATE
+> Task :jmlx-vision:spotlessJava FROM-CACHE
+> Task :jmlx-vision:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-vision:spotlessCheck UP-TO-DATE
+> Task :jmlx-jinja:processTestResources
+> Task :jmlx-jinja:testClasses
+> Task :jmlx-jinja:checkstyleTest FROM-CACHE
+> Task :jmlx-ffi:compileTestFixturesJava FROM-CACHE
+> Task :jmlx-ffi:processTestFixturesResources NO-SOURCE
+> Task :jmlx-ffi:testFixturesClasses UP-TO-DATE
+> Task :jmlx-ffi:testFixturesJar
+> Task :jmlx-ffi:checkstyleMain FROM-CACHE
+> Task :jmlx-ffi:compileTestJava FROM-CACHE
+> Task :jmlx-ffi:processTestResources
+> Task :jmlx-ffi:testClasses
+> Task :jmlx-ffi:checkstyleTest FROM-CACHE
+> Task :jmlx-ffi:checkstyleTestFixtures FROM-CACHE
+> Task :jmlx-jinja:compileTokenizerConfigExample FROM-CACHE
+> Task :jmlx-models:generatePomFileForMavenPublication
+> Task :jmlx-jinja:spotlessJava FROM-CACHE
+> Task :jmlx-jinja:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-jinja:spotlessCheck UP-TO-DATE
+> Task :jmlx-models:verifyPublishedDependencies
+> Task :jmlx-models:verifyReleaseScriptsMatch
+> Task :jmlx-ffi:prepareLoaderGuardNativeDir
+> Task :jmlx-core:compileJava FROM-CACHE
+> Task :jmlx-core:classes UP-TO-DATE
+> Task :jmlx-core:jar
+> Task :jmlx-core:checkstyleMain FROM-CACHE
+> Task :jmlx-core:compileTestFixturesJava FROM-CACHE
+> Task :jmlx-models:compileJava FROM-CACHE
+> Task :jmlx-models:classes UP-TO-DATE
+> Task :jmlx-core:compileTestJava FROM-CACHE
+> Task :jmlx-core:testClasses UP-TO-DATE
+> Task :jmlx-models:jar
+> Task :jmlx-core:checkstyleTest FROM-CACHE
+> Task :jmlx-core:testFixturesClasses UP-TO-DATE
+> Task :jmlx-core:checkstyleTestFixtures FROM-CACHE
+> Task :jmlx-langchain4j:compileJava FROM-CACHE
+> Task :jmlx-langchain4j:classes UP-TO-DATE
+> Task :jmlx-examples:compileJava FROM-CACHE
+> Task :jmlx-examples:classes UP-TO-DATE
+> Task :jmlx-langchain4j:checkstyleMain FROM-CACHE
+> Task :jmlx-examples:checkstyleMain FROM-CACHE
+> Task :jmlx-langchain4j:compileTestJava FROM-CACHE
+> Task :jmlx-langchain4j:testClasses UP-TO-DATE
+> Task :jmlx-langchain4j:checkstyleTest FROM-CACHE
+> Task :jmlx-examples:compileTestJava FROM-CACHE
+> Task :jmlx-examples:testClasses UP-TO-DATE
+> Task :jmlx-benchmarks:compileJava FROM-CACHE
+> Task :jmlx-benchmarks:classes
+> Task :jmlx-examples:checkstyleTest FROM-CACHE
+> Task :jmlx-benchmarks:checkstyleMain FROM-CACHE
+> Task :jmlx-models:compileTestJava FROM-CACHE
+> Task :jmlx-models:testClasses
+> Task :jmlx-benchmarks:compileTestJava FROM-CACHE
+> Task :jmlx-benchmarks:testClasses UP-TO-DATE
+> Task :jmlx-benchmarks:checkstyleTest FROM-CACHE
+> Task :jmlx-models:compileExactBitsJava FROM-CACHE
+> Task :jmlx-models:exactBitsClasses UP-TO-DATE
+> Task :jmlx-models:checkstyleExactBits FROM-CACHE
+> Task :jmlx-models:checkstyleMain FROM-CACHE
+> Task :jmlx-models:checkstyleTest FROM-CACHE
+> Task :jmlx-models:compileTierBJava FROM-CACHE
+> Task :jmlx-models:tierBClasses UP-TO-DATE
+> Task :jmlx-models:checkstyleTierB FROM-CACHE
+> Task :jmlx-core:javadoc FROM-CACHE
+> Task :jmlx-spring-ai:compileJava FROM-CACHE
+> Task :jmlx-spring-ai:classes UP-TO-DATE
+> Task :jmlx-native-macos-arm64:stageNativeResources
+> Task :jmlx-spring-ai:checkstyleMain FROM-CACHE
+> Task :jmlx-spring-ai:compileTestJava FROM-CACHE
+> Task :jmlx-spring-ai:testClasses UP-TO-DATE
+> Task :jmlx-spring-ai:checkstyleTest FROM-CACHE
+> Task :jmlx-core:javadocJar
+> Task :jmlx-core:testFixturesJar
+> Task :jmlx-ffi:loaderGuardTest
+> Task :jmlx-ffi:spotlessJava FROM-CACHE
+> Task :jmlx-ffi:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-ffi:spotlessCheck UP-TO-DATE
+> Task :verifyMlxApiCallSites
+> Task :verifyMlxApiInventory
+> Task :jmlx-examples:test
+> Task :jmlx-examples:check
+> Task :jmlx-langchain4j:test
+> Task :jmlx-langchain4j:check
+> Task :verifyQwen35ReferenceGoldens
+> Task :verifyQwenVlReferenceProvenance
+> Task :verifyRc2ReviewEvidence
+> Task :verifyRc3PreTagEvidence
+> Task :check
+> Task :jmlx-spring-ai:test
+> Task :jmlx-spring-ai:check
+> Task :jmlx-jinja:test
+> Task :jmlx-jinja:upstreamVerify
+> Task :jmlx-jinja:verifyModuleDescriptor
+> Task :jmlx-jinja:generatePomFileForMavenPublication
+> Task :jmlx-jinja:verifyPublicationMetadata
+> Task :jmlx-jinja:verifyReleaseScriptsMatch
+> Task :jmlx-jinja:verifyTokenizerConfigExample
+> Task :jmlx-jinja:check
+> Task :jmlx-ffi:test
+> Task :jmlx-ffi:generatePomFileForMavenPublication
+> Task :jmlx-ffi:verifyPublishedDependencies
+> Task :jmlx-ffi:verifyReleaseScriptsMatch
+> Task :jmlx-vision:test
+> Task :jmlx-vision:verifyBytecodeLevel
+> Task :jmlx-vision:generatePomFileForMavenPublication
+> Task :jmlx-vision:verifyPublishedDependencies
+> Task :jmlx-vision:verifyReleaseScriptsMatch
+> Task :jmlx-vision:check
+> Task :jmlx-tokenizer:test
+> Task :jmlx-tokenizer:verifyBytecodeLevel
+> Task :jmlx-tokenizer:generatePomFileForMavenPublication
+> Task :jmlx-tokenizer:verifyPublishedDependencies
+> Task :jmlx-tokenizer:verifyReleaseScriptsMatch
+> Task :jmlx-tokenizer:check
+> Task :jmlx-native-macos-arm64:jar
+> Task :jmlx-native-macos-arm64:checkstyleMain FROM-CACHE
+> Task :jmlx-native-macos-arm64:compileTestJava NO-SOURCE
+> Task :jmlx-native-macos-arm64:processTestResources NO-SOURCE
+> Task :jmlx-native-macos-arm64:testClasses UP-TO-DATE
+> Task :jmlx-native-macos-arm64:checkstyleTest NO-SOURCE
+> Task :jmlx-native-macos-arm64:spotlessJava FROM-CACHE
+> Task :jmlx-native-macos-arm64:spotlessJavaCheck UP-TO-DATE
+> Task :jmlx-native-macos-arm64:spotlessCheck UP-TO-DATE
+> Task :jmlx-native-macos-arm64:javadoc FROM-CACHE
+> Task :jmlx-native-macos-arm64:javadocJar
+> Task :jmlx-native-macos-arm64:sourcesJar
+> Task :jmlx-native-macos-arm64:test NO-SOURCE
+> Task :jmlx-native-macos-arm64:verifyPackagedNativeResources
+> Task :jmlx-native-macos-arm64:verifyReleaseScriptsMatch
+> Task :jmlx-native-macos-arm64:check
+> Task :jmlx-native-macos-arm64:generatePomFileForMavenPublication
+
+> Task :jmlx-native-macos-arm64:verifyNativeReleaseLicenses
+{
+  "licenses": 6,
+  "noticePermalink": "https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES",
+  "noticeCommit": "551eebeeb66a80ef3af467a6c1b4995c2a7f7034",
+  "checkedJars": [
+    "jmlx-native-macos-arm64-0.1.0.jar",
+    "jmlx-native-macos-arm64-0.1.0-sources.jar",
+    "jmlx-native-macos-arm64-0.1.0-javadoc.jar"
+  ]
+}
+
+> Task :jmlx-core:test
+> Task :jmlx-ffi:extractionFallbackTest
+> Task :jmlx-ffi:check
+> Task :jmlx-core:float32GoldenTest
+> Task :jmlx-core:generateMetadataFileForMavenPublication
+> Task :jmlx-core:generatePomFileForMavenPublication
+> Task :jmlx-core:verifyPublishedDependencies
+> Task :jmlx-core:verifyReleaseScriptsMatch
+> Task :jmlx-core:check
+> Task :jmlx-benchmarks:test
+> Task :jmlx-benchmarks:check
+> Task :jmlx-models:test
+> Task :jmlx-models:float32GoldenTest
+> Task :jmlx-models:threadProbeTest
+> Task :jmlx-models:check
+
+BUILD SUCCESSFUL in 1m 47s
+154 actionable tasks: 78 executed, 65 from cache, 11 up-to-date

@@ -1,0 +1,57 @@
+
+Welcome to Gradle 9.9.0!
+
+Here are the highlights of this release:
+ - Performance improvements for Kotlin DSL compilation
+ - Test filtering for non-method JUnit Platform tests
+ - Wrapper settings preserved on upgrade
+ - Predefined groups in the Problems API
+
+For more details see https://docs.gradle.org/9.9.0/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.9.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+AUDIT_DAEMON={"home":"<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk","vendor":"BellSoft","runtimeVersion":"21.0.12.1+1-LTS","gradleVersion":"9.9.0"}
+AUDIT_DAEMON={"home":"<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk","vendor":"BellSoft","runtimeVersion":"21.0.12.1+1-LTS","gradleVersion":"9.9.0"}
+> Task :buildSrc:compileJava
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes
+> Task :buildSrc:jar
+
+> Task :auditToolchains
+AUDIT_TOOLCHAINS={"jmlx-jinja":{"compiler":{"home":"<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"},"javadoc":{"home":"<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"}},"jmlx-tokenizer":{"compiler":{"home":"<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"},"javadoc":{"home":"<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"}},"jmlx-vision":{"compiler":{"home":"<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"},"javadoc":{"home":"<CANDIDATE>/build/releaseAll/rc3-verification/audit/toolchain/jdk-21.0.12.1.jdk","vendor":"BellSoft Liberica","languageVersion":"21","runtimeVersion":"21.0.12.1+1-LTS","jvmVersion":"21.0.12.1+1-LTS"}}}
+
+> Task :jmlx-jinja:compileJava
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes
+> Task :jmlx-jinja:jar
+> Task :jmlx-jinja:sourcesJar
+> Task :jmlx-jinja:javadoc
+> Task :jmlx-jinja:javadocJar
+> Task :jmlx-jinja:generatePomFileForMavenPublication
+> Task :jmlx-jinja:clearModuleMetadata
+> Task :jmlx-jinja:generateMetadataFileForMavenPublication
+> Task :jmlx-tokenizer:compileJava
+> Task :jmlx-tokenizer:processResources NO-SOURCE
+> Task :jmlx-tokenizer:classes
+> Task :jmlx-tokenizer:jar
+> Task :jmlx-tokenizer:sourcesJar
+> Task :jmlx-tokenizer:javadoc
+> Task :jmlx-tokenizer:javadocJar
+> Task :jmlx-tokenizer:generatePomFileForMavenPublication
+> Task :jmlx-tokenizer:clearModuleMetadata
+> Task :jmlx-tokenizer:generateMetadataFileForMavenPublication
+> Task :jmlx-vision:compileJava
+> Task :jmlx-vision:processResources NO-SOURCE
+> Task :jmlx-vision:classes
+> Task :jmlx-vision:jar
+> Task :jmlx-vision:sourcesJar
+> Task :jmlx-vision:javadoc
+> Task :jmlx-vision:javadocJar
+> Task :jmlx-vision:generatePomFileForMavenPublication
+> Task :jmlx-vision:clearModuleMetadata
+> Task :jmlx-vision:generateMetadataFileForMavenPublication
+
+BUILD SUCCESSFUL in 28s
+27 actionable tasks: 27 executed

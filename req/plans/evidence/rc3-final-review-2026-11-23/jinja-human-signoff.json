@@ -1,0 +1,15 @@
+{
+  "status": "pending",
+  "candidateCommit": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6",
+  "reviewer": null,
+  "reviewedAt": null,
+  "items": {
+    "NOTICE": false,
+    "changelog": false,
+    "POM": false,
+    "Javadoc": false,
+    "dependency report": false,
+    "corpus evidence": false
+  },
+  "meaning": "No human sign-off has been granted; passing verifier reports leave this checklist unchecked."
+}

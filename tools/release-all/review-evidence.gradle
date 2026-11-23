@@ -1,0 +1,120 @@
+// Shared with the disposable Gradle fixtures in test_review_evidence.py.
+def sha256File = { File source ->
+    java.security.MessageDigest.getInstance('SHA-256').digest(source.bytes).encodeHex().toString()
+}
+
+// Packets use either a historical name-to-pin map or a recursive list of path/size/digest pins.
+ext.registerReviewEvidenceCheck = { String taskName, String packetPath, String label,
+        boolean requireReviewDocument, String manifestName = 'review.json',
+        boolean repositoryRelativePaths = false, String checklistPath = null,
+        String checklistSection = null ->
+    tasks.register(taskName) {
+        group = 'verification'
+        description = "Verifies the retained ${label} evidence inventory and pins."
+        def evidenceDir = file(packetPath)
+        def reviewFile = new File(evidenceDir, manifestName)
+        inputs.dir(evidenceDir)
+        if (checklistPath != null) inputs.file(checklistPath)
+        // A packet may pin its review document; living follow-up guides remain editable.
+        def configuredReview = new groovy.json.JsonSlurper().parse(reviewFile)
+        if (configuredReview.reviewDocument instanceof Map) {
+            inputs.file(configuredReview.reviewDocument.path)
+        }
+        doLast {
+            def review = new groovy.json.JsonSlurper().parse(reviewFile)
+            if (requireReviewDocument && !(review.reviewDocument instanceof Map)) {
+                throw new GradleException("${label} evidence requires its pinned reviewDocument")
+            }
+            def pins = review.retainedFiles
+            if (pins instanceof Map) {
+                pins = pins.collect { name, pin ->
+                    if (!(pin instanceof Map)) {
+                        throw new GradleException("${label} evidence pin must be an object: ${name}")
+                    }
+                    pin + [path: name]
+                }
+            }
+            if (!(pins instanceof List) || pins.isEmpty()) {
+                throw new GradleException("${label} evidence requires retainedFiles pins")
+            }
+            if (repositoryRelativePaths) {
+                def prefix = packetPath + '/'
+                pins = pins.collect { pin ->
+                    if (!(pin instanceof Map) || !(pin.path instanceof String)
+                            || !pin.path.startsWith(prefix)) {
+                        throw new GradleException(
+                                "${label} evidence path must be inside ${packetPath}: ${pin}")
+                    }
+                    pin + [path: pin.path.substring(prefix.length())]
+                }
+            }
+            def verifyPin = { File base, pin ->
+                if (!(pin instanceof Map) || !(pin.path instanceof String)
+                        || pin.path.isEmpty() || pin.path.contains('\\')
+                        || pin.path.startsWith('/')
+                        || pin.path.split('/', -1).any { it in ['', '.', '..'] }) {
+                    throw new GradleException("${label} evidence requires a relative file path: ${pin}")
+                }
+                if (!(pin.bytes instanceof Number)
+                        || !(pin.bytes.toString() ==~ /0|[1-9][0-9]*/)) {
+                    throw new GradleException(
+                            "${label} evidence requires a nonnegative integer size: ${pin.path}")
+                }
+                def target = new File(base, pin.path).canonicalFile
+                if (!target.toPath().startsWith(base.canonicalFile.toPath()) || !target.isFile()) {
+                    throw new GradleException(
+                            "${label} evidence missing or outside its root: ${pin.path}")
+                }
+                if (!(pin.sha256 instanceof String) || !(pin.sha256 ==~ /[0-9a-f]{64}/)
+                        || sha256File(target) != pin.sha256 || target.length() != pin.bytes) {
+                    throw new GradleException("${label} evidence digest/size differs: ${pin.path}")
+                }
+            }
+            pins.each { verifyPin(evidenceDir, it) }
+            def names = pins.collect { it.path }
+            if (names.toSet().size() != names.size() || manifestName in names) {
+                throw new GradleException("${label} evidence has duplicate or reserved paths")
+            }
+            def expectedNames = (names + [manifestName]) as Set
+            def actualNames = [] as Set
+            // Do not follow directory symlinks. Finder metadata is outside the packet inventory.
+            def paths = java.nio.file.Files.walk(evidenceDir.toPath())
+            try {
+                paths.filter { !java.nio.file.Files.isDirectory(it,
+                        java.nio.file.LinkOption.NOFOLLOW_LINKS) }
+                        .filter { it.fileName.toString() != '.DS_Store' }
+                        .forEach { actualNames.add(evidenceDir.toPath().relativize(it)
+                                .toString().replace(File.separator, '/')) }
+            } finally {
+                paths.close()
+            }
+            if (actualNames != expectedNames) {
+                throw new GradleException("${label} evidence inventory differs: "
+                        + "missing=${expectedNames - actualNames}, "
+                        + "unlisted=${actualNames - expectedNames}")
+            }
+            if (review.reviewDocument != null) {
+                verifyPin(rootDir, review.reviewDocument)
+            }
+            if (checklistPath != null) {
+                def expectedDigest = sha256File(reviewFile)
+                if (!checklistSection) {
+                    throw new GradleException("${label} checklist reference requires a section title")
+                }
+                def sectionPattern = /(?ms)^##[ \t]+/ +
+                        java.util.regex.Pattern.quote(checklistSection) +
+                        /[ \t]*\r?\n(.*?)(?=^##[ \t]+|\z)/
+                def sections = (file(checklistPath).getText('UTF-8') =~ sectionPattern)
+                if (sections.size() != 1) {
+                    throw new GradleException("${label} checklist section missing or duplicated")
+                }
+                def matches = (sections[0][1] =~
+                        /publication manifest\s+SHA-256 is `([0-9a-f]{64})`/)
+                if (matches.size() != 1 || matches[0][1] != expectedDigest) {
+                    throw new GradleException(
+                            "${label} manifest digest differs from the checklist reference")
+                }
+            }
+        }
+    }
+}

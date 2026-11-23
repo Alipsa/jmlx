@@ -33,6 +33,10 @@ class OwnerAcceptanceTest(unittest.TestCase):
                        "reviewDocument": self.write("review.md", "Reviewed differences and delivery"),
                        "retainedFiles": [self.write("jinja-signoff.md", "Human sign-off"),
                                          self.write("receipt.json", "{}")]}
+        self.packet["acceptanceEligibility"] = {"eligible": True}
+        self.packet["ownerDecisions"] = {key: "recorded" for key in (
+            "signedCandidateAndDifferences", "deliveryTerms", "licenseFindingDisposition",
+            "jinjaHumanSignOff", "portalCapacityConfirmed", "publicationAuthorized")}
         packet_pin = self.write("packet.json", json.dumps(self.packet))
         self.git("add", ".")
         self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@localhost",
@@ -128,6 +132,39 @@ class OwnerAcceptanceTest(unittest.TestCase):
         self.git("-c", "user.name=Fixture", "-c", "user.email=fixture@localhost",
                  "commit", "-qm", "updated packet")
         self.acceptance["reviewPacket"] = {**pin, "commit": self.git("rev-parse", "HEAD").strip()}
+
+    def test_ineligible_packet_rejected_despite_all_acceptance_decisions(self):
+        for eligibility in ({"eligible": False}, {}, None, {"eligible": 1}, {"eligible": "true"}):
+            self.packet["acceptanceEligibility"] = eligibility
+            self.commit_packet(json.dumps(self.packet))
+            with self.subTest(eligibility=eligibility), self.assertRaisesRegex(
+                    ValueError, "not eligible for acceptance"):
+                self.verify()
+        del self.packet["acceptanceEligibility"]
+        self.commit_packet(json.dumps(self.packet))
+        with self.assertRaisesRegex(ValueError, "not eligible for acceptance"):
+            self.verify()
+
+    def test_pending_missing_and_malformed_owner_records_rejected(self):
+        original = copy.deepcopy(self.packet)
+        cases = [None, [], {}]
+        for key in original["ownerDecisions"]:
+            for value in ("pending", True, None):
+                cases.append({**original["ownerDecisions"], key: value})
+            missing = dict(original["ownerDecisions"])
+            del missing[key]
+            cases.append(missing)
+        cases.append({**original["ownerDecisions"], "additionalReview": "pending"})
+        for records in cases:
+            self.packet["ownerDecisions"] = records
+            self.commit_packet(json.dumps(self.packet))
+            with self.subTest(records=records), self.assertRaisesRegex(
+                    ValueError, "ownerDecisions|pending owner records"):
+                self.verify()
+        del self.packet["ownerDecisions"]
+        self.commit_packet(json.dumps(self.packet))
+        with self.assertRaisesRegex(ValueError, "ownerDecisions"):
+            self.verify()
 
     def test_duplicate_decision_rejected_even_with_authorized_digest(self):
         data = json.dumps(self.acceptance).replace('"publicationAuthorized": true',

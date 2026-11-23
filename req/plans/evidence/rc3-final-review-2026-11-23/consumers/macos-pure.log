@@ -1,0 +1,49 @@
+
+Welcome to Gradle 9.9.0!
+
+Here are the highlights of this release:
+ - Performance improvements for Kotlin DSL compilation
+ - Test filtering for non-method JUnit Platform tests
+ - Wrapper settings preserved on upgrade
+ - Predefined groups in the Problems API
+
+For more details see https://docs.gradle.org/9.9.0/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.9.0/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :pure-java
+smoke version jmlx-jinja=0.6.2 (released-8.4.json)
+smoke version jmlx-tokenizer=0.1.2 (released-8.4.json)
+smoke version jmlx-vision=0.1.2 (released-8.4.json)
+
+> Task :pure-java:compileJava
+> Task :pure-java:processResources NO-SOURCE
+> Task :pure-java:classes
+> Task :pure-java:stageFixtures
+
+> Task :pom-check:writeRuntimeCoordinates
+POM-only resolution: 7 components
+
+> Task :pure-java:verifyResolution
+Resolved 7 runtime components, se.alipsa: [jmlx-tokenizer:0.1.2, jmlx-vision:0.1.2, jmlx-jinja:0.6.2]
+
+> Task :pure-java:verifyPomMatchesModuleMetadata
+POM-only and module-metadata runtime classpaths agree (7 components)
+
+> Task :pure-java:verifyPublishedArtifacts
+License, JPMS names, vision NOTICE, 3 javadoc and 3 sources jars verified
+
+> Task :pure-java:smoke
+Pure smoke passed: {jmlx-jinja=0.6.2, jmlx-tokenizer=0.1.2, jmlx-vision=0.1.2} (mode release)
+
+[Incubating] Problems report is available at: file:///Users/per/release-candidates/jmlx-phase8.4-rc.3/tools/release-smoke/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.9.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 6s
+7 actionable tasks: 7 executed

@@ -15,6 +15,15 @@ uses this JSON structure (angle-bracket values below are placeholders):
   "candidate": "<copy the entire preliminary record's tag object>",
   "bundleSha256": "<signed ZIP SHA-256>",
   "verifiedReceiptSha256": "<final technical receipt SHA-256>",
+  "acceptanceEligibility": {"eligible": true},
+  "ownerDecisions": {
+    "signedCandidateAndDifferences": "recorded",
+    "deliveryTerms": "recorded",
+    "licenseFindingDisposition": "recorded",
+    "jinjaHumanSignOff": "recorded",
+    "portalCapacityConfirmed": "recorded",
+    "publicationAuthorized": "recorded"
+  },
   "reviewDocument": {"path": "req/<replacement-review>.md", "sha256": "<SHA-256>"},
   "retainedFiles": [
     {"path": "req/plans/evidence/<replacement>/<file>", "sha256": "<SHA-256>"}
@@ -33,6 +42,19 @@ the candidate repository has fetched the reviewed packet commit before verificat
 The verifier requires that commit to descend from the candidate. It does not check a local
 `origin/main` ref, which may be stale; the separately authorized acceptance digest attests
 to the exact reviewed commit, and the operator must confirm its PR was reviewed and merged.
+
+A technical packet may be committed while owner decisions, jinja sign-off or the current
+Portal snapshot are explicitly pending. Such a packet cannot support acceptance. Before
+acceptance, retain those completed records in a superseding reviewed packet commit,
+update the review document and its digest, regenerate the manifest and update its
+checklist digest. Review and merge that superseding commit, then cite its new commit and
+manifest digest in the acceptance record. Setting acceptance decisions to `true` does
+not replace the missing records. The verifier requires literal `true` in
+`acceptanceEligibility.eligible` and all six required `ownerDecisions` entries to be
+`"recorded"`; missing fields and any additional pending entries also fail closed.
+Those packet fields must reflect completed retained records, not placeholders. The
+verifier checks these gates, pins and owner attestations; it does not independently
+determine whether the document's substantive review is complete.
 
 After the owner reviews that packet, retain their explicit decision in a separate JSON
 record. Its required fields are:

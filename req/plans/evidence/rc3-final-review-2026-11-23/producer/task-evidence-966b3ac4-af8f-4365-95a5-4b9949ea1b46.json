@@ -1,0 +1,63 @@
+{
+    "schema": "jmlx-task-evidence-1",
+    "invocationId": "966b3ac4-af8f-4365-95a5-4b9949ea1b46",
+    "start": 1795445067260,
+    "end": 1795445178983,
+    "passed": true,
+    "tasks": [
+        {
+            "path": ":jmlx-core:float32GoldenTest",
+            "start": 1795445073959,
+            "end": 1795445078528,
+            "outcome": "EXECUTED"
+        },
+        {
+            "path": ":jmlx-core:test",
+            "start": 1795445067272,
+            "end": 1795445073959,
+            "outcome": "EXECUTED"
+        },
+        {
+            "path": ":jmlx-ffi:extractionFallbackTest",
+            "start": 1795445068107,
+            "end": 1795445068938,
+            "outcome": "EXECUTED"
+        },
+        {
+            "path": ":jmlx-ffi:loaderGuardTest",
+            "start": 1795445068939,
+            "end": 1795445069688,
+            "outcome": "EXECUTED"
+        },
+        {
+            "path": ":jmlx-models:float32GoldenTest",
+            "start": 1795445169567,
+            "end": 1795445175907,
+            "outcome": "EXECUTED"
+        },
+        {
+            "path": ":jmlx-models:test",
+            "start": 1795445073299,
+            "end": 1795445169567,
+            "outcome": "EXECUTED"
+        },
+        {
+            "path": ":jmlx-models:threadProbeTest",
+            "start": 1795445175907,
+            "end": 1795445176444,
+            "outcome": "EXECUTED"
+        },
+        {
+            "path": ":jmlx-native-macos-arm64:verifyNativeReleaseLicenses",
+            "start": 1795445067270,
+            "end": 1795445067662,
+            "outcome": "EXECUTED"
+        },
+        {
+            "path": ":jmlx-native-macos-arm64:verifyNativeReleasePayload",
+            "start": 1795445067662,
+            "end": 1795445068493,
+            "outcome": "EXECUTED"
+        }
+    ]
+}

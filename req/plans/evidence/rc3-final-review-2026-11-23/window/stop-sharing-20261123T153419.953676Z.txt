@@ -1,0 +1,12 @@
+
+			List of Share Points
+name:		Per Nyfelt’s Public Folder
+path:		<HOME>/Public
+	smb:	{
+    		name:	Per Nyfelt’s Public Folder
+    		shared:	0
+    		guest access:	1
+    		read-only:	0
+    		sealed:	0
+	}
+

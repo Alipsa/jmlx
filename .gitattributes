@@ -51,3 +51,14 @@ req/plans/evidence/rc3-preparation-2026-11-23/** -text
 req/plans/evidence/rc3-pre-tag-2026-11-23/** -text
 # Generated corpus reports retain their original trailing blank line.
 req/plans/evidence/rc3-pre-tag-2026-11-23/**/corpus-coverage.md whitespace=-blank-at-eof
+
+# Preserve the final RC3 receipt, review packet and normalized evidence bytes.
+req/plans/evidence/rc3-final-review-2026-11-23/** -text
+req/plans/evidence/rc3-final-review-2026-11-23/**/corpus-coverage.md whitespace=-blank-at-eof
+# Retained Gradle stdout has daemon-message trailing spaces; diff context keeps its prefix.
+req/plans/evidence/rc3-final-review-2026-11-23/**/*.log whitespace=-blank-at-eol
+req/plans/evidence/rc3-final-review-2026-11-23/audit/comparison-version-overrides.patch -whitespace
+# Raw sharing output ends with a blank line.
+req/plans/evidence/rc3-final-review-2026-11-23/window/*-sharing-*.txt whitespace=-blank-at-eof,-space-before-tab
+# The digest-pinned plugin plan retains its original whitespace-only indentation lines.
+req/plans/evidence/rc3-final-review-2026-11-23/producer/manifest.json whitespace=-blank-at-eol

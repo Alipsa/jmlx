@@ -1,0 +1,690 @@
+{
+  "checkedAt": "2026-11-23T15:36:06.205993+00:00",
+  "passed": true,
+  "backupRoot": "<CANDIDATE>-backup-2026-11-23/jmlx-phase8.4-rc.3",
+  "originalCandidateRoot": "<CANDIDATE>",
+  "verifiedReceiptSha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
+  "pins": {
+    "build/releaseAll/bundle-receipt.json": {
+      "bytes": 176,
+      "sha256": "f49a5d26c15a2c11e8a1d249b8c65873bf98888505e7097ff096941f8d876f6e"
+    },
+    "build/releaseAll/gradle-argv-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json": {
+      "bytes": 1681,
+      "sha256": "7db86b92599ffdb5029bdd16ce3d2e59fb3cb4e874772fa35d4e667484e3a12f"
+    },
+    "build/releaseAll/jmlx-mega-bundle.zip": {
+      "bytes": 106730869,
+      "sha256": "139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c"
+    },
+    "build/releaseAll/manifest.json": {
+      "bytes": 26288,
+      "sha256": "0b56735c59f147375d89ce109eccda80e7d6d889c119e013d1fe9b4ffc6c9e1a"
+    },
+    "build/releaseAll/preliminary-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json": {
+      "bytes": 23005,
+      "sha256": "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926"
+    },
+    "build/releaseAll/rc3-verification/consumers/linux-pure.json": {
+      "bytes": 2370,
+      "sha256": "ce78fef2398a684edd344ae3ceb071379ab067a0261a1af6690c02b812e74b12"
+    },
+    "build/releaseAll/rc3-verification/consumers/linux-pure.log": {
+      "bytes": 2113,
+      "sha256": "ddb9debac0e1de3223fc7d4cbd021dba5d8f1db99ab4079da18b08af59d72b71"
+    },
+    "build/releaseAll/rc3-verification/consumers/linux-pure.runtime.xml": {
+      "bytes": 503,
+      "sha256": "aa2f8b922ca7df6e31ecbd43ad6aeeccf20b6029de1d1bce70a9b7531ea28365"
+    },
+    "build/releaseAll/rc3-verification/consumers/macos-full.json": {
+      "bytes": 1991,
+      "sha256": "4f48529783d23178de7112745cff815a6ff84a46674c85c57641d587223bb796"
+    },
+    "build/releaseAll/rc3-verification/consumers/macos-full.log": {
+      "bytes": 2983,
+      "sha256": "af5dbbefddc970b688a93cd9f1fe57b95fca66962f80454a0cb467599b658ef0"
+    },
+    "build/releaseAll/rc3-verification/consumers/macos-full.runtime.xml": {
+      "bytes": 503,
+      "sha256": "e8b147f2b912c98a03c6e33564c007e2b47549dd9c7d8c300093217a3d519d2b"
+    },
+    "build/releaseAll/rc3-verification/consumers/macos-pure.json": {
+      "bytes": 2015,
+      "sha256": "64c172a09f56fb5abc583861d497329b2f5014d9e01ce8229d93aece454c414b"
+    },
+    "build/releaseAll/rc3-verification/consumers/macos-pure.log": {
+      "bytes": 2118,
+      "sha256": "2778dc89614783996cc772fbf1d58be180565850a53fbd75b628a861f4c781a5"
+    },
+    "build/releaseAll/rc3-verification/consumers/macos-pure.runtime.xml": {
+      "bytes": 521,
+      "sha256": "0714fdf283a643745a41a64af9ad6388b2370b45b4133256d485a72efe7397ba"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/admin-window-original.py": {
+      "bytes": 5643,
+      "sha256": "74dcaa74a3d6f88b5820738bfbe9b5e2e8b0b8521f98ba06f486fc8f96298494"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/admin-window.py": {
+      "bytes": 6219,
+      "sha256": "e97a64eac7fb230d8776a75f333fa70d0c5b907cfbbe5594278ea8bb5a442861"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/bootout-20261123T153419.953676Z.json": {
+      "bytes": 54,
+      "sha256": "6379c17d798191f995d43b0950ea7787779fe29c9af7354b25de37a514ff207d"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/completed-jobs.json": {
+      "bytes": 7207,
+      "sha256": "9f3267823329de827bd1bced7428a10cdc81e7321eaaf1f8afc9d7e3a6a5f2b3"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/completed-run.json": {
+      "bytes": 12929,
+      "sha256": "e179019dd07c5a4f399965e4122c1d7b941012e77b2bfffe166196abda5567ec"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/connected-account-probe-20261123T153355.627639Z-method.json": {
+      "bytes": 471,
+      "sha256": "c27932d06aa718e1193dc153a7e581af9841174d8933a7d04f8b4f072bdedf35"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/connected-account-probe-20261123T153355.627639Z-source-commit.txt": {
+      "bytes": 41,
+      "sha256": "e0bf7c4b6992770dd35f111ae8a084a26dd295c6b8f3b1581eab72d294faa82d"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/connected-account-probe-20261123T153355.627639Z.json": {
+      "bytes": 1849,
+      "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/connected-service-20261123T153355.627639Z.json": {
+      "bytes": 2102,
+      "sha256": "68f673bec6ea0854becea517620f3ba524e94d756ae19c1d9bbe7e230a24905a"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/connected-sharing-20261123T153355.627639Z.txt": {
+      "bytes": 212,
+      "sha256": "2725bcad5430876cf60d161adc1ac48e071fd6dfda9697e53c85a7a3fa7ebf14"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/dispatch.json": {
+      "bytes": 641,
+      "sha256": "a00a4e2092cfbf9f893e3c05dd95f69006f61c54c27c6dca20600176940bcb14"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/draft-release-notes.md": {
+      "bytes": 407,
+      "sha256": "7985dbbbff25ef7946d0801d791b895663ea4bc2416d5bf585b0f1f4e3382720"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/draft-release.json": {
+      "bytes": 5959,
+      "sha256": "b1c40638db13ee073656b58c0b53918e9b47795c8d07c3d537556e042314b003"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/final-receipt-invocation.json": {
+      "bytes": 1252,
+      "sha256": "6aff966cb25d1114fd20fd4ed23a695a6e845a94801991385e3054bee96210a9"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/final-receipt.log": {
+      "bytes": 428,
+      "sha256": "18c742c2c789a5ee4ad7ac969a31fe3b467f058d8155aabf6212b51f53188073"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/finish-receipt.py": {
+      "bytes": 3459,
+      "sha256": "83fad800ad48387c4e9b8da672660db27a85c56be9ee8e8fa4ed267b8f65b462"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/job-setup-identity.txt": {
+      "bytes": 1723,
+      "sha256": "68db82dd83d669eb12028b2e0c862303280cd7fa31e2aa691001e7c1cdac901e"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/minimum-host-evidence/minimum-host.json": {
+      "bytes": 2336,
+      "sha256": "24c82dda567db5e1effe0fa2f9e27355b6ca46a015d4e9120a5ceaacbe8f4434"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/minimum-host-evidence/minimum-host.log": {
+      "bytes": 2983,
+      "sha256": "afab8b3c9af469448f46403b752cc2981e2a32e8f6c14dc958f018faa2baa069"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/minimum-host-evidence/minimum-host.runtime.xml": {
+      "bytes": 575,
+      "sha256": "66afa117a854de662cb5f7673b2f38e7e5c8ea7a74e1bff15222f61136f6fa23"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/minimum-host-identity-review.json": {
+      "bytes": 1297,
+      "sha256": "3c050656c59468fea6bc9c6f36fbe13e2b0835bd6be2e80d5db945c4470cf447"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/minimum-host-job.log": {
+      "bytes": 46826,
+      "sha256": "e3de586bbd4fd92d3de050d9a88986d76862ec851d66bcabadc10231b72a921d"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/post-window-account-probe-20261123T153419.953676Z-method.json": {
+      "bytes": 471,
+      "sha256": "85bf190f665a020d4a9a3fa7619db526f6a0c3f077c95f5e28e5edf452958777"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/post-window-account-probe-20261123T153419.953676Z-source-commit.txt": {
+      "bytes": 41,
+      "sha256": "e0bf7c4b6992770dd35f111ae8a084a26dd295c6b8f3b1581eab72d294faa82d"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/post-window-account-probe-20261123T153419.953676Z.json": {
+      "bytes": 1849,
+      "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/pre-window-account-probe-20261123T153112.548993Z-method.json": {
+      "bytes": 471,
+      "sha256": "a851031d2a007e8dce61027c6c454ef8ba0cd5e80c08953a5a5bdd6bd7752c57"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/pre-window-account-probe-20261123T153112.548993Z-source-commit.txt": {
+      "bytes": 41,
+      "sha256": "e0bf7c4b6992770dd35f111ae8a084a26dd295c6b8f3b1581eab72d294faa82d"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/pre-window-account-probe-20261123T153112.548993Z.json": {
+      "bytes": 1849,
+      "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/queue-check.py": {
+      "bytes": 1700,
+      "sha256": "3460a0ddc5c136a668b1879668486ec5017776d744d266c35f40c886a05c65f4"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/queue-review-20261123T153107.008676Z.json": {
+      "bytes": 278,
+      "sha256": "1185cd8fa834d6900c0eaf6bfd2a7e785472f16e31438360ee13074f527d1359"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/queue-review.json": {
+      "bytes": 278,
+      "sha256": "1185cd8fa834d6900c0eaf6bfd2a7e785472f16e31438360ee13074f527d1359"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/service-before-20261123T153112.548993Z.txt": {
+      "bytes": 1335,
+      "sha256": "ef08278739a688e796b9a6a3457bd949157ae20ba791031dce14d6727ec6f816"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/start-service-20261123T153112.548993Z.json": {
+      "bytes": 2129,
+      "sha256": "d925cb6b2e50fba974a845dedc0c28da9841e243990d3e8d0082b7b436a4bcbf"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/start-sharing-20261123T153112.548993Z.txt": {
+      "bytes": 212,
+      "sha256": "2725bcad5430876cf60d161adc1ac48e071fd6dfda9697e53c85a7a3fa7ebf14"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/start-window.sh": {
+      "bytes": 202,
+      "sha256": "cc7011c8cb7ef3f89aec41ce01b7bae6cb663d8ce1615f57e306836a238e6f58"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/status.json": {
+      "bytes": 738,
+      "sha256": "c8f380d1d5c24f37874290c3d824e3fe808db808d76a787ad8b106a6f9333d87"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/stop-requested": {
+      "bytes": 33,
+      "sha256": "c11bd5406c32e4b1d0bb82c402c0e15e4c80f8ab2bb0e3d48e4c5c8c5ae73adb"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/stop-service-20261123T153419.953676Z.json": {
+      "bytes": 2104,
+      "sha256": "b6a59b5f92c724f0896c9ce0715e6a56179dad92255339beca877879f56070f9"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/stop-sharing-20261123T153419.953676Z.txt": {
+      "bytes": 212,
+      "sha256": "2725bcad5430876cf60d161adc1ac48e071fd6dfda9697e53c85a7a3fa7ebf14"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/stop-window.sh": {
+      "bytes": 146,
+      "sha256": "dec37a0f70dfb5a3037003189bcee11122e981820570f344064f4c4f1eb798a2"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/transport-revalidation/jmlx-mega-bundle.zip": {
+      "bytes": 106730869,
+      "sha256": "139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/transport-revalidation/preliminary-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json": {
+      "bytes": 23005,
+      "sha256": "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/transport-revalidation.json": {
+      "bytes": 492,
+      "sha256": "353e94f2a8dca3e7c59d7ff2d01155f78b95a566cba77dd0f25ccb68a9c821ad"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/watch-window.py": {
+      "bytes": 596,
+      "sha256": "6bc76c4e254a438457b659906d9604c80473fabf5d49bd3d7258266ae98344ce"
+    },
+    "build/releaseAll/rc3-verification/minimum-host-window/workflow-dispatch-inputs.json": {
+      "bytes": 378,
+      "sha256": "01973be60604c8a9994e617fb6a20b7cbeb8641112835cbb0136147b9534032b"
+    },
+    "build/releaseAll/task-evidence-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json": {
+      "bytes": 1815,
+      "sha256": "4203eb55223b3495dc7bc144924b75853c9f9a57eed24babebc4f9aeaa3af032"
+    },
+    "build/releaseAll/verified.json": {
+      "bytes": 1523,
+      "sha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.DecoderAttentionTest.xml": {
+      "bytes": 726,
+      "sha256": "9b89f8c99146de364e4745a21cd294b97b6da93f596d60a2e5bdbbea83b176d6"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.DecoderRotationSeamTest.xml": {
+      "bytes": 986,
+      "sha256": "2d91a304162de981a6df16ef68cb7a6a1968ea2e4413f0f5ec09fc5609353a55"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.EncoderAttentionTest.xml": {
+      "bytes": 976,
+      "sha256": "5f726f9d86bd9119344ea33205eba2dfb4c51c461b9980c10d1ab152ab40ab10"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.GatedDeltaNetTest.xml": {
+      "bytes": 747,
+      "sha256": "65c50a48e94fb88ca92efdca6a792f7b2ec65cd443e733cc07998eb89e0106aa"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.GatedDeltaRuleTest.xml": {
+      "bytes": 874,
+      "sha256": "2e203470e29995fc9b67be0632360978686072fc900c738ff6bb745f3a5e5b56"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.HybridDecoderBlockTest.xml": {
+      "bytes": 1065,
+      "sha256": "1c513501609ab27e49dcd3ee56510b154fa2df576603dbb6f39d9a3090cfd9cb"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.MoeMlpTest.xml": {
+      "bytes": 900,
+      "sha256": "90dd499df41f92d0d1dc199bbb8524b11e0adfcf78f6ae9f679eed420b811078"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.MultiAxisRopeTest.xml": {
+      "bytes": 1080,
+      "sha256": "dad4567fb82d840937c9c7f89b4045a7d71798383b5b206ac4c0d8e240cf13c0"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.MultiHeadAttentionTest.xml": {
+      "bytes": 485,
+      "sha256": "e35426cbe64351d5228d5306662c5610cf74533b4f38e454d78939df4b322324"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.Phase71OracleTest.xml": {
+      "bytes": 5507,
+      "sha256": "fc2f87974db9e09a341b6a7a6662c4aecfc822deb97fe4a1cf004dfb0c9ffd3b"
+    },
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.SwitchGluTest.xml": {
+      "bytes": 793,
+      "sha256": "f3a748f7d9bcb97d6ae5f5e765e6a910764f8b771f32436f7bd39ae61253b21c"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.core.MLXMemoryLeakTest.xml": {
+      "bytes": 1166,
+      "sha256": "a89c9cf90a4564f8e9511114d0f814e5db3015ae5500bb70ed4e87678d6d23c0"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.core.RopeFreqsProbeTest.xml": {
+      "bytes": 726,
+      "sha256": "024a0e0da88471583001daa1a2317d852f7e6643498dcdcc62d2f67409c7ab92"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.core.StridedViewSafetyTest.xml": {
+      "bytes": 715,
+      "sha256": "4b1e2df440acf026f9a1b23ff81c95e709cef3aa97e536cb44cd0794ee345753"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.memory.CategoricalTempScopeTest.xml": {
+      "bytes": 470,
+      "sha256": "db8b549e1d41c25588ed81f4458657761574dad20df5345c713390cd9165cee2"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.memory.GatedDeltaMemoryTest.xml": {
+      "bytes": 492,
+      "sha256": "efa2db864b08fa69f2634bc7ff2ad770f51c6897878a0453199e9d81bdfa61a0"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.memory.MLXIOSelectionScopeTest.xml": {
+      "bytes": 491,
+      "sha256": "f53a818b28f2cd453e3c2fabd2805d2615cb085d06b74f81e4331582c1fe7b65"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.AttentionMaskTest.xml": {
+      "bytes": 556,
+      "sha256": "bc80ba3e6d5092733ebc4ea3a8da2f145e7de85096c585a188de3cabda465577"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.BatchAttentionMaskTest.xml": {
+      "bytes": 591,
+      "sha256": "560de92df9b40cd332e55ec28eeaa2f45a027f4561cb15ccfb4105cf2a18ff9a"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.BatchRopeProbeTest.xml": {
+      "bytes": 927,
+      "sha256": "089dfcbd7c5a6e41f05415558ffa045148be36b3737e3012af81474d79f53a2e"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.DecoderAttentionTest.xml": {
+      "bytes": 1402,
+      "sha256": "facb7346695610c411905ed7983420322e283e60c77d7732e7cb176e6e1d8f5a"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.DecoderRotationSeamTest.xml": {
+      "bytes": 600,
+      "sha256": "3ed34c8f3fdbe8f5ece837c3f93498fb58cd0b795ed66954f6403de2cdb927a0"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.GroupedQueryAttentionTest.xml": {
+      "bytes": 741,
+      "sha256": "74a0b654eb5e044457a28baf600483816b847eca226de6602b56ed2381475728"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.KVCacheMemoryPlateauTest.xml": {
+      "bytes": 463,
+      "sha256": "f6b1dcad5945d4a00666d7e280e9f2801495d498b2fe61472d00e4777e0d0a2d"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.KVCacheQuantizationProbeTest.xml": {
+      "bytes": 5280,
+      "sha256": "ac2c6b78763fc164b5c608a1e2b464901f54528ab186a346072afa56d1492f2c"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.KVCacheTest.xml": {
+      "bytes": 2432,
+      "sha256": "270793192ba0d40ff72208f36f7df55f7cc0bf3714a45b03739cfa23ee2609aa"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.MoeMlpTest.xml": {
+      "bytes": 880,
+      "sha256": "d32494694be491a1093c2d2c0ecc9c2501c7c98270a13bae9a70fdd67cdb8aba"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.MoeRoutingProbeTest.xml": {
+      "bytes": 587,
+      "sha256": "e6fdfc3c6e8816f63a292b052e58fc8524970e62097f1f0bf88c54afa192c7a0"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.MultiAxisRopeTest.xml": {
+      "bytes": 1072,
+      "sha256": "aa9c906057645f044a5a499b0a49aff6667a789ee470ddf0c5e5baffd903add3"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.MultiHeadAttentionTest.xml": {
+      "bytes": 1030,
+      "sha256": "7ac3900ce1bf01be95c1554ee76786e6140790cc51a20fcb5aa3980684d5b8fc"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.PackedAttentionProbeTest.xml": {
+      "bytes": 13887,
+      "sha256": "168cb6fb10e94d6bbb210fba6924a16f50bb14bfe3132e946701782fe5e5e753"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.Phase71ContractsTest.xml": {
+      "bytes": 1652,
+      "sha256": "a7b20b8b6383dbb839e53cdb9c6e5885beaceb5a6d28b97d44b87ca827d7fdc2"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.Phase71DefaultModeTest.xml": {
+      "bytes": 5531,
+      "sha256": "b0d70eaa12840813997e6892ea96481f7e62bb56d7ab58823641630f297f78fe"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.RecurrentCacheTest.xml": {
+      "bytes": 863,
+      "sha256": "f1d3985c7bdb780e8369b26c995618014dfb40a836d4945d5d0de2b181d0c566"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.SingleRowDecodeEquivalenceTest.xml": {
+      "bytes": 626,
+      "sha256": "94c70607f2f9dc9b816e44af388c7ed5852524990b649bde5f53cb3fdf2e4a4d"
+    },
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.SwitchGluTest.xml": {
+      "bytes": 1210,
+      "sha256": "0e417c3d5a34f4382fa9ba71c9084fcb1629738950f8a20ed4527517bd01afe2"
+    },
+    "jmlx-ffi/build/test-results/extractionFallbackTest/TEST-se.alipsa.jmlx.ffi.NativeLoaderExtractionFallbackTest.xml": {
+      "bytes": 485,
+      "sha256": "3ac05cbf7ddd1636deaa95abb559ab02f7652e7a79109940de5812bad488e4a5"
+    },
+    "jmlx-ffi/build/test-results/loaderGuardTest/TEST-se.alipsa.jmlx.ffi.NativeLoaderMissingMetallibTest.xml": {
+      "bytes": 628,
+      "sha256": "692a98f8cb14d791bab224c4679ef43aad58ebe3bc789cab3b236768440dff63"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.BatchStepEquivalenceTest.xml": {
+      "bytes": 1518,
+      "sha256": "1665b070f9bb7e271421134ae21258af055f85f69fa788f2c081e56a5dc26dfe"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.BertGoldenTest.xml": {
+      "bytes": 823,
+      "sha256": "697d94297ed2000441113afcd9dc998875349d1e330f72225e1926218099c9a6"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.DecoderRefactorGoldenTest.xml": {
+      "bytes": 683,
+      "sha256": "afe0ee0205437c018f57f106038cd78d741e8f9d06fe6d4a78fb0663482872a9"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.DecoderSeamTest.xml": {
+      "bytes": 1153,
+      "sha256": "e8f55aab545fa0cefe4a2d991e488106496c4d78227290cb7b4d265843d03129"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.DecoderSlidingWindowTest.xml": {
+      "bytes": 932,
+      "sha256": "04fa8915f17d4693adcc57ba4f247b7147dcc0e3c8d7cd94464682f09ad9a35f"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.GemmaModelTest.xml": {
+      "bytes": 442,
+      "sha256": "f04e795b7e00be6e32f537a74426211a30a476c7dfd1706152ac2f79382a8304"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Llama31ModelTest.xml": {
+      "bytes": 446,
+      "sha256": "3e16a3ef6e88e8c52994534b9e2308ae7470dc7138aa64354e5b9eb4b5476320"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.MistralModelTest.xml": {
+      "bytes": 703,
+      "sha256": "d7462d00b9258a394c7ba1daa7c13479094996aeb0f6d270ff9cb005324990de"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.MixtralModelTest.xml": {
+      "bytes": 572,
+      "sha256": "8058da3339aae41a9fa812e98ef7e147e0951f9adc68fbb4fc48078c5007f9a0"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Phi3ModelTest.xml": {
+      "bytes": 693,
+      "sha256": "000e7e39595401adc15448c0404f4a2007989e27e27a983f8144c00958f965c0"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Phi3VGoldenTest.xml": {
+      "bytes": 500,
+      "sha256": "bca2d9d7f511945dbd53dead6de3345a7c419b9170c673b0b1ae9dcb2e0b280d"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen35PackedGoldenTest.xml": {
+      "bytes": 659,
+      "sha256": "ddb79a7c487795bc9d85060d627a7f9c54ea947796a5b374c610f18554da887a"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen35TextGoldenTest.xml": {
+      "bytes": 815,
+      "sha256": "67644f46211e92283b9a750c5eae5d425a3c35a7307cc200da21115ca3228dac"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen35VisionGoldenTest.xml": {
+      "bytes": 810,
+      "sha256": "4416c85aac883fcb7ecefe882b114e8bf2ac7567ff249efaf286edbc1862f348"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen35WeightsTest.xml": {
+      "bytes": 632,
+      "sha256": "171698b3e8e2d59f1852a904635a4291063f71c0acde74a6d5f1eb6138dc9a18"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlCacheEquivalenceTest.xml": {
+      "bytes": 569,
+      "sha256": "f584d76eed8fcb169ba578a4e0f9c55e0b8cfce19d872427129a92eb47946e31"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlGoldenTest.xml": {
+      "bytes": 515,
+      "sha256": "570b64e30c1b207bf902ecf7a7a512438abad79c047b12054b596081384870ab"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlVisionTowerGoldenTest.xml": {
+      "bytes": 727,
+      "sha256": "1dd99ed5a423252fb7302803d6010ede3609157e55e3a1c35743c6b615ecdc88"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.SmolVlmGoldenTest.xml": {
+      "bytes": 457,
+      "sha256": "30fcd8aa7514b3d7c90a7e2fb88047c31f51cda344b68a03419ef114db57441c"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.T5GoldenTest.xml": {
+      "bytes": 584,
+      "sha256": "d4468a9869fc19f7cb5c7649fc937c95851585c6b7144850b5558006a5bcc102"
+    },
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.VisualFeatureInjectionTest.xml": {
+      "bytes": 1602,
+      "sha256": "ac427834b15894998907cf0abd6971a6c47c08b82b316e9626b9c15ea5d21699"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BaselineAdaptersTest.xml": {
+      "bytes": 1639,
+      "sha256": "3c77162c34c5f98b34a05f1284b033ffa139ce6ed3308206eca3d41afaa0d075"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BaselineWorkerProcessTest.xml": {
+      "bytes": 1546,
+      "sha256": "1482a600d98582e406cecbb8929693f60741331a1775d4b0091c972cc29c8cb5"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BaselineWorkerProtocolTest.xml": {
+      "bytes": 4142,
+      "sha256": "e0ad3aa64b685ddb6c269e7491f69d948bf4df66fd06fd8be28cad22c72ab324"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchGenerationSchedulerTest.xml": {
+      "bytes": 4806,
+      "sha256": "bf4697c7bcab7ceb12568edd63f5f23db66f698836021edc4b80ffb506bc911c"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchSchedulerFailureTest.xml": {
+      "bytes": 2495,
+      "sha256": "05964a4e04f83a74bd5fcf8e78581684d5458e1709a60dbe38d0b70bb6cb90e9"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchSchedulerLifecycleTest.xml": {
+      "bytes": 2015,
+      "sha256": "529a690e3ab253d97188bf161cf9aa625dbff9c0897194360182b2743be67d74"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchSchedulerMemoryTest.xml": {
+      "bytes": 600,
+      "sha256": "372228283878895897745c36fd11c760d38c230701f974680490380e4407ce8e"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchStepEquivalenceTest.xml": {
+      "bytes": 1517,
+      "sha256": "e8002496517c96c0211107b6cdebb3ef346d2e890be6e1c903890fed11e370db"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderCacheCapacityTest.xml": {
+      "bytes": 1352,
+      "sha256": "5e8933d176011fadcac8a8d66665fd10b7e114cc03cff87a74f2dec9aa6f6037"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderCacheLifecycleTest.xml": {
+      "bytes": 633,
+      "sha256": "23d65de655785d0a40f97102a853a587653b23d28d34a5031e920518ba8d337c"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderForwardPoisoningTest.xml": {
+      "bytes": 773,
+      "sha256": "32e618c6676801bef697bebd28234b7dbcfe19cb95d0f14d50ed002936d59aee"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderSeamTest.xml": {
+      "bytes": 617,
+      "sha256": "1c7cfddd125fbb00cec9712d43a425e9fbbf0b922d0e53340becc388d2c14bb1"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderStackContractTest.xml": {
+      "bytes": 2034,
+      "sha256": "1e56204cac0a96275dee1a932d5ba91ed7977ea233c2cd0bb9bc235f63602791"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.EncoderDefaultPrecisionTest.xml": {
+      "bytes": 892,
+      "sha256": "d0cbc8224f896207cc8e53aa2f7043262ca45a03e6b7c9a9d54603fcd2d1e837"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Idefics3VisionTowerSmokeTest.xml": {
+      "bytes": 611,
+      "sha256": "ffbafbc1c14bab91fddead854d7ea3f4727eb15599d09b5e9c61db2f741d93bf"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.ModalityRejectionTest.xml": {
+      "bytes": 742,
+      "sha256": "ec29c21380a3a204a8d32c49d37a2a81f69d1da397cea78b2b9abeb828809d54"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VDefaultPrecisionTest.xml": {
+      "bytes": 547,
+      "sha256": "1f87eb4b6a4722908f10bd2377ede73a4de9756f35568e7ef85e282ca7c6b3b9"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VGenerationTest.xml": {
+      "bytes": 1031,
+      "sha256": "fe32760210aedff35f9722cee705d52ee163f7b7213f1bf5adee0f66dfa3ff84"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VMemoryTest.xml": {
+      "bytes": 872,
+      "sha256": "def60c969e5b80f73ffad7d242215699eaee84d0633d429dd78df9337b4b4902"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VModelTest.xml": {
+      "bytes": 2231,
+      "sha256": "b2ea72c87487b85e2cf52f15afe56c29c49f1ed0bf42979981ba97ff29658c78"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VRopeReferenceTest.xml": {
+      "bytes": 604,
+      "sha256": "23b5cee9a895677fe4d5f2ea8a7729f33c112cf6656da923b41126b380efe60a"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.QuantizedCheckpointProbeTest.xml": {
+      "bytes": 486,
+      "sha256": "d928a0cf1e0eacd06b5e59b57d49a48b203393e57d7a32a5e107a771c935603e"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.QuantizedDecoderTest.xml": {
+      "bytes": 4359,
+      "sha256": "4afec04aabc851b1e1ccc0931e23e13ca4d968f81059eeac89eb299ef0bf50a6"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.QuantizedKvFeasibilityProbeTest.xml": {
+      "bytes": 5809,
+      "sha256": "b496874aacb57aedef65172d93a845eeb509bd7404da619c7840e47b0bcd6d9e"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen35DefaultPrecisionTest.xml": {
+      "bytes": 567,
+      "sha256": "3b086d65bdc90487a866622f96e962be21c8171208f86c601d970c1f217c0ff3"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen35GenerationTest.xml": {
+      "bytes": 974,
+      "sha256": "59c0e6623b4bef6edb0afc158e1066e52ecaeabde01ec01da479a8cb75469ae7"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen35MemoryTest.xml": {
+      "bytes": 645,
+      "sha256": "6bd5e49054aa9071e1d9f9b5061967aaf148d6a1fc8d06d8d1d329b54735a8b5"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3ModelTest.xml": {
+      "bytes": 1351,
+      "sha256": "a823036571ad75ae773c6af598092e3b105d9f7425c7dde212f01bc03fb268bb"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlCacheEquivalenceTest.xml": {
+      "bytes": 567,
+      "sha256": "84a92e0aa2c2be06d445e61c285d3aabf93c128b98e6dea156794a6208854729"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlDefaultPrecisionTest.xml": {
+      "bytes": 554,
+      "sha256": "c8a5142efa49fa26a3131adb67508a1b27368bdd838b41f62c9d15f63c85fa37"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlGenerationTest.xml": {
+      "bytes": 789,
+      "sha256": "89bd6ca832a0332531bbc1e1c0b6860ac411f5fcc85b198a8e52ba0f66b67e47"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlMemoryTest.xml": {
+      "bytes": 838,
+      "sha256": "dfbd0afcfeb42158734c38e4e79f23cb7b8bac25a1d980abf980351105ffdbf2"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlModelAffineLoadTest.xml": {
+      "bytes": 1658,
+      "sha256": "7254d6bdc1d25794430b4cd5d1e9537dc8ab4fe3852e751f91a15b017a12fd9b"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlModelLoadTest.xml": {
+      "bytes": 2398,
+      "sha256": "2988afca9e1f133f5221fc1bc80385f901b4146549b57501a72354ad54a93fce"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlVisionPeakTest.xml": {
+      "bytes": 951,
+      "sha256": "d14ea685155b9c122b5a241ecb09f23fc606022a97a1b368a5d1c27a80bb6ff9"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlVisionTowerValidationTest.xml": {
+      "bytes": 13419,
+      "sha256": "158ed391d5a7c065c5691d56b67ea867c4af3afcef8489beb2bbf9c0cb8f62f4"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SchedulerInferenceClientTest.xml": {
+      "bytes": 2325,
+      "sha256": "5f0e9e688fd82e69da27f1afbdd7c92b1054895d6e635d74e28c1235045b52d7"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SchedulerOperationTest.xml": {
+      "bytes": 1084,
+      "sha256": "d12e91266ff73eb3db9de856991758c30fa6f38fd95f3717bcdc49c4ddca455a"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Seq2SeqGenerationTest.xml": {
+      "bytes": 11539,
+      "sha256": "8c11f507238d41d47f92a57581058437b8c68ee8519d3e7ffcf8cb79b26e241b"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Seq2SeqMemoryTest.xml": {
+      "bytes": 953,
+      "sha256": "09db8a4396f0e60e87675f24e4f1d6cfcab3cfd0d493a20a00971b7861ade49c"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SmolVlmDefaultPrecisionTest.xml": {
+      "bytes": 560,
+      "sha256": "98d976138a69baf4e7c0c55921dd1764338ce6e36b47ef253b070e7c4e73840e"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SmolVlmGenerationTest.xml": {
+      "bytes": 1850,
+      "sha256": "b88c35cc830ffb2f8f9d45ea650071cdbf1f7e125aa14e81959acaa4eb1c92a2"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.VisionLanguageMemoryTest.xml": {
+      "bytes": 980,
+      "sha256": "76e406fbcb2832f4cb8abee3d526b6306e96e7a08ae10c10a99ae740365a162c"
+    },
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.VisualFeatureInjectionTest.xml": {
+      "bytes": 775,
+      "sha256": "ac390f10a6450ef6f3dda7e3d3d39469612f8178794dc1aeffab817f4052d436"
+    },
+    "jmlx-models/build/test-results/threadProbeTest/TEST-se.alipsa.jmlx.models.WorkerStreamProbeTest.xml": {
+      "bytes": 623,
+      "sha256": "402a984ba783b5509f8334133437933f03a89615fd36b91ce67e2c1952d4e4d1"
+    },
+    "native/install/lib/libjaccl.dylib": {
+      "bytes": 2131168,
+      "sha256": "7890e84a96e3121c8c1c2f351e41e46ba4d92e7b7bc6275fc2b38c2773891032"
+    },
+    "native/install/lib/libmlx.dylib": {
+      "bytes": 21720704,
+      "sha256": "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6"
+    },
+    "native/install/lib/libmlxc.dylib": {
+      "bytes": 2364080,
+      "sha256": "15a08b85d40333093a38043d0545f9ff6d12ab532e58e7c1af067a23c93a238d"
+    },
+    "native/install/lib/mlx.metallib": {
+      "bytes": 214156448,
+      "sha256": "c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893"
+    },
+    "native/install/lib/native-pin.properties": {
+      "bytes": 75,
+      "sha256": "9fbdc2f67202c57a6e86adbae8f3ab318c89cbbc222df34c197aedf14f5739b7"
+    }
+  },
+  "limits": "Complete durable copy on same Mac; restores original paths, not a relocatable verifier or off-machine backup."
+}

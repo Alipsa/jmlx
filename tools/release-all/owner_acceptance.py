@@ -47,8 +47,10 @@ def verify(root, receipt_path, record, acceptance_path, expected):
     decisions = acceptance.get("decisions", {})
     if not isinstance(decisions, dict):
         raise ValueError("owner acceptance decisions must be an object")
-    for key in ("signedCandidateAndDifferences", "deliveryTerms", "licenseFindingDisposition",
-                "jinjaHumanSignOff", "portalCapacityConfirmed", "publicationAuthorized"):
+    required_decisions = ("signedCandidateAndDifferences", "deliveryTerms",
+                          "licenseFindingDisposition", "jinjaHumanSignOff",
+                          "portalCapacityConfirmed", "publicationAuthorized")
+    for key in required_decisions:
         if decisions.get(key) is not True:
             raise ValueError(f"owner acceptance decision required: {key}")
     identity = {"candidate": record["tag"], "bundleSha256": record["bundleSha256"],
@@ -90,6 +92,16 @@ def verify(root, receipt_path, record, acceptance_path, expected):
     for key, value in identity.items():
         if packet.get(key) != value:
             raise ValueError(f"review packet identity differs: {key}")
+    eligibility = packet.get("acceptanceEligibility")
+    if not isinstance(eligibility, dict) or eligibility.get("eligible") is not True:
+        raise ValueError("review packet is not eligible for acceptance")
+    owner_records = packet.get("ownerDecisions")
+    if not isinstance(owner_records, dict):
+        raise ValueError("review packet ownerDecisions must be an object")
+    pending = sorted(key for key in set(required_decisions) | owner_records.keys()
+                     if owner_records.get(key) != "recorded")
+    if pending:
+        raise ValueError(f"review packet has pending owner records: {pending}")
     blob(packet.get("reviewDocument"))
     files = packet.get("retainedFiles")
     if not isinstance(files, list) or not files:

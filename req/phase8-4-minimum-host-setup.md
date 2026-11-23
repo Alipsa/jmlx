@@ -1,7 +1,9 @@
 # Phase 8.4 minimum-host runner setup
 
-Provisioned and connectivity checked: 2026-11-16. Account revalidated: 2026-11-22.
-No candidate has been executed.
+Provisioned and connectivity checked: 2026-11-16. Account revalidated: 2026-11-23.
+RC3 exact-ZIP execution passed; its worker was stopped and service unloaded after the window.
+See the [RC3 review](phase8-4-rc3-final-review.md) for timestamped probes, actual job
+identity, runtime evidence and the post-window state observation.
 This implements the runner prerequisites in
 [the plan](plans/phase8-4-plan.md) and
 [release workflow](../.github/workflows/release-candidate.yml).

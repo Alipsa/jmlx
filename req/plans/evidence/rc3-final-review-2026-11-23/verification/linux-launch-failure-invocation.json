@@ -1,0 +1,23 @@
+{
+  "startedAt": "2026-11-23T14:47:08.161298+00:00",
+  "argv": [
+    "linux-exec",
+    "env",
+    "GRADLE_USER_HOME=/root/release-candidates/jmlx-phase8.4-rc.3-gradle-home",
+    "JMLX_LINUX_CONTAINER_IMAGE_ID=sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944",
+    "python3",
+    "/root/release-candidates/jmlx-phase8.4-rc.3/tools/release-all/bundle_smoke.py",
+    "--root",
+    "/root/release-candidates/jmlx-phase8.4-rc.3",
+    "--bundle",
+    "/projects/jmlx/build/releaseAll/candidates/rc.3/transport/jmlx-mega-bundle.zip",
+    "--preliminary",
+    "/projects/jmlx/build/releaseAll/candidates/rc.3/transport/preliminary-966b3ac4-af8f-4365-95a5-4b9949ea1b46.json",
+    "--preliminary-sha256",
+    "929018af3b4e237576f48c1c75215bde6716f98efbfb98149deebde01fd42926",
+    "--kind",
+    "linux-pure",
+    "--output",
+    "/projects/jmlx/build/releaseAll/candidates/rc.3/transport/linux-pure.json"
+  ]
+}

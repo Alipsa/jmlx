@@ -1,0 +1,18 @@
+{
+  "sourceCommit": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6",
+  "workingTreeStatus": "",
+  "startedAt": "2026-11-23T14:40:46.052576+00:00",
+  "argv": [
+    "bash",
+    "tools/release-all/selftest.sh"
+  ],
+  "environment": {
+    "JAVA_HOME": "<HOME>/.sdkman/candidates/java/25.0.5.0+11-librca",
+    "JMLX_RELEASE_JAVA_HOME": "<HOME>/.sdkman/candidates/java/25.0.5.0+11-librca",
+    "JMLX_RELEASE_JAVA21_HOME": "/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home",
+    "JMLX_RELEASE_CANDIDATE_TAG": "jmlx-phase8.4-rc.3",
+    "PATH": "<HOME>/.nvm/versions/node/v26.7.0/bin:<HOME>/.sdkman/candidates/java/25.0.5.0+11-librca/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/pkg/env/global/bin:/opt/X11/bin:/Library/Apple/usr/bin:/opt/homebrew/bin:<HOME>/.codex/packages/app-server-daemon/releases/0.171.0-aarch64-apple-darwin/codex-path:<HOME>/.codex/tmp/arg0-macos/codex-arg0aUslm7:<HOME>/.codex/tmp/arg0-macos/codex-arg0jRi3hH:/opt/homebrew/Caskroom/codex/0.171.0/codex-path:<HOME>/.sdkman/candidates/maven/current/bin:<HOME>/.sdkman/candidates/java/current/bin:<HOME>/.sdkman/candidates/groovy/current/bin:<HOME>/.nvm/versions/node/v26.13.0/bin:<HOME>/programs/google-cloud-sdk/bin:<HOME>/.kimi-code/bin:<HOME>/bin:<HOME>/.local/bin:/opt/homebrew/sbin"
+  },
+  "finishedAt": "2026-11-23T14:42:00.182399+00:00",
+  "returncode": 0
+}

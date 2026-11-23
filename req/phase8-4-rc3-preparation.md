@@ -11,7 +11,9 @@ All 104 pinned JUnit paths exist; none matches the recorded per-path SHA-256.
 Time Machine has no configured destination or local snapshots, and no backup volume is
 mounted. APFS lists one OS update snapshot; it does not establish recovery of candidate
 data. Offline backups were not searched. The retained probe records command results,
-source identity, working-tree state and the exact forbidden-path arguments. Reproduce it
+source identity, working-tree state and the exact forbidden-path arguments. The probe uses
+its own repository's helper code and checks its reviewed SHA-256 before execution; it never
+loads helper code from the inspected tree. Reproduce it
 from the repository root with:
 
 ```sh

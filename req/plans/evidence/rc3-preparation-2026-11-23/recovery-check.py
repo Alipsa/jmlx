@@ -8,10 +8,14 @@ Native/JUnit outputs and backup configuration may change between invocations.
 
 import argparse
 from datetime import datetime, timezone
+import hashlib
 import json
 from pathlib import Path
 import subprocess
-import sys
+import types
+
+
+EXPECTED_RELEASE_INPUTS = "85b4f940f67faf916a9263a3920a69763837176af6685cb8c8db131e4ca4e849"
 
 
 def command(*argv):
@@ -25,10 +29,26 @@ def main():
     parser.add_argument("--root", type=Path, required=True)
     args = parser.parse_args()
     root = args.root.resolve()
-    sys.path.insert(0, str(root / "tools/release-all"))
-    from release_inputs import native_report, sha256
-
     preliminary = root / "req/plans/evidence/rc2-final-review-2026-11-22/preliminary.json"
+    if not preliminary.is_file():
+        parser.error(f"--root must contain the retained RC2 preliminary record: {preliminary}")
+
+    # Use the probe repository's reviewed implementation, never code from --root.
+    tools = Path(__file__).resolve().parents[4] / "tools/release-all"
+    implementation = tools / "release_inputs.py"
+    try:
+        source = implementation.read_bytes()
+    except OSError as error:
+        parser.error(f"cannot read the probe's release_inputs.py: {error}")
+    implementation_digest = hashlib.sha256(source).hexdigest()
+    if implementation_digest != EXPECTED_RELEASE_INPUTS:
+        parser.error("probe release_inputs.py differs from the reviewed SHA-256")
+    # Execute the checked bytes directly to avoid importing stale bytecode or rereading.
+    helper = types.ModuleType("rc3_reviewed_release_inputs")
+    helper.__file__ = str(implementation)
+    exec(compile(source, str(implementation), "exec"), helper.__dict__)
+    native_report, sha256 = helper.native_report, helper.sha256
+
     record = json.loads(preliminary.read_text())
     forbidden = [str(Path.home()), str(root)]
     actual = json.loads(json.dumps(native_report(
@@ -47,7 +67,8 @@ def main():
                             "JUnit inputs are ignored outputs. See workingTreeStatus.",
         "workingTreeStatus": status["stdout"].splitlines(),
         "probeSha256": sha256(Path(__file__)),
-        "nativeReportImplementationSha256": sha256(root / "tools/release-all/release_inputs.py"),
+        "nativeReportImplementationSha256": implementation_digest,
+        "nativeReportImplementationSource": "probe repository, SHA-256 checked before execution",
         "bootstrapSha256": sha256(root / "scripts/bootstrap-native.sh"),
         "preliminarySha256": sha256(preliminary),
         "nativeReportArguments": {

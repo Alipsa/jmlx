@@ -144,12 +144,13 @@ The report records these contract input SHA-256 values:
 - `req/release-checklist.md` (jinja):
   `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`
 
-The verified commit is historical, not the current HEAD. Initial RC3 preparation changed
-the changelog date and superseded the digest above with
-`5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`, making PR #116
-verification stale for that input. Preparation now restores the RC2 date and original digest
-to defer date alignment to the final pre-tag PR. That later change will again invalidate the
-contract input; repeat both verification passes for the replacement after its final changes.
+At this PR's head the changelog digest is again
+`9bc0162e0158403e06dd6b9068edec5ec655e77189b23c95092d8c5bcbf539e0`.
+The `5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26` digest existed
+only in PR #118's initial commit, before its date edit was reverted. PR #116 verification
+remains historical because it did not run at the replacement candidate commit. Final pre-tag
+date alignment will change this contract input; repeat both verification passes for the
+replacement after its final changes.
 
 The isolated online/offline matrix, reproducible archives and independent consumer resolution
 passed with BellSoft JDK 25.0.5, Temurin 21.0.13+9 and pinned Node v26.7.0. The published and

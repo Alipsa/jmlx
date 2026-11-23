@@ -1,15 +1,27 @@
 {
-  "status": "pending",
+  "status": "approved",
   "candidateCommit": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6",
-  "reviewer": null,
-  "reviewedAt": null,
+  "reviewer": "Per Nyfelt",
+  "reviewedAt": "2026-11-23",
   "items": {
-    "NOTICE": false,
-    "changelog": false,
-    "POM": false,
-    "Javadoc": false,
-    "dependency report": false,
-    "corpus evidence": false
+    "NOTICE": true,
+    "changelog": true,
+    "POM": true,
+    "Javadoc": true,
+    "dependency report": true,
+    "corpus evidence": true
   },
-  "meaning": "No human sign-off has been granted; passing verifier reports leave this checklist unchecked."
+  "meaning": "Owner approved the jinja review after the concrete preparation results were presented. Historical verifier reports retain their unchecked human-sign-off fields; this separate record supplies the human decision. Publication is not authorized.",
+  "recordedAt": "2026-11-23T20:58:54.268579+00:00",
+  "approvalSource": {
+    "channel": "owner conversation",
+    "response": "approved",
+    "approvedProposal": "I approve the jinja review, accept the exact RC3 signed candidate and documented evidence limits, accept its validation as satisfying both native-license findings under my previously recorded interpretations, and approve the proposed delivery terms."
+  },
+  "fixturePolicyReviewed": true,
+  "preparation": {
+    "path": "req/plans/evidence/rc3-final-review-2026-11-23/owner-review-preparation.json",
+    "bytes": 7616,
+    "sha256": "9636b9eba83999824bc50bbd5366aac51a2319cf9cf330d858640fdfeb94b69f"
+  }
 }

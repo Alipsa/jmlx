@@ -1,0 +1,89 @@
+{
+  "schema": "jmlx-rc3-owner-review-1",
+  "status": "owner review approved; Portal capacity and publication authorization pending",
+  "reviewer": "Per Nyfelt",
+  "role": "project creator and maintainer; owner approving release decisions",
+  "recordedAt": "2026-11-23T20:58:54.268579+00:00",
+  "decisionDate": "2026-11-23",
+  "approvalSource": {
+    "channel": "owner conversation",
+    "response": "approved",
+    "approvedProposal": "I approve the jinja review, accept the exact RC3 signed candidate and documented evidence limits, accept its validation as satisfying both native-license findings under my previously recorded interpretations, and approve the proposed delivery terms.",
+    "timestampMeaning": "recordedAt is the recording time; no independently timestamped approval message is asserted."
+  },
+  "candidate": {
+    "name": "jmlx-phase8.4-rc.3",
+    "object": "146f7cf1b8b4557f20d732436dcdba6c45d20a55",
+    "sha": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6"
+  },
+  "bundleSha256": "139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c",
+  "verifiedReceiptSha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
+  "reviewedPacket": {
+    "commit": "9879d1aaa7f11733a1a77d0712e1d96b1880cd2b",
+    "path": "req/plans/evidence/rc3-final-review-2026-11-23/publication-review.json",
+    "bytes": 27159,
+    "sha256": "6e7ad651d2ef5eb07ce83ac6f6afc4e797423d1305216844ea156627f8ef7afc"
+  },
+  "decisions": {
+    "signedCandidateAndDifferences": {
+      "status": "recorded",
+      "decision": "approved",
+      "scope": "The exact unchanged RC3 signed ZIP and final receipt identified above, including the differences and evidence limits in the reviewed packet. Cached native Javadoc producer provenance remains unestablished; no window-time digest establishes the admin helper bytes that ran."
+    },
+    "deliveryTerms": {
+      "status": "recorded",
+      "decision": "approved",
+      "scope": "One combined Central deployment of the unchanged saved ZIP, retaining original grants, full notices, attribution and modification indications, without additional recipient restrictions or technological measures. Keep the temporary transport Release unpublished. Actual upload remains separately gated."
+    },
+    "licenseFindingDisposition": {
+      "status": "recorded",
+      "decision": "RC3 validation accepted as satisfying both findings under previously recorded owner interpretations",
+      "findings": [
+        "NATIVE-LICENSE-1",
+        "NATIVE-LICENSE-2"
+      ],
+      "scope": "Resolved by owner decision for this exact signed candidate and approved delivery terms only, under the previously approved interpretations and material scope. The adapter-license counterargument and provenance limits are retained; this creates no new grant, establishes no MIT-only grant for Juffa material, and accepts no unspecified future artifact or changed terms."
+    },
+    "jinjaHumanSignOff": {
+      "status": "recorded",
+      "decision": "approved",
+      "record": {
+        "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-human-signoff.json",
+        "bytes": 1235,
+        "sha256": "e88f513cf7036b5da945b3ccb86748fe0c38b09a7a3a73447eb93b08aea17332"
+      }
+    },
+    "portalCapacityConfirmed": {
+      "status": "pending",
+      "reason": "No current Usage Center account snapshot supplied."
+    },
+    "publicationAuthorized": {
+      "status": "pending",
+      "reason": "The approved proposal did not authorize upload. Final acceptance must identify an eligible reviewed and merged packet, and its exact acceptance-file digest must be separately authorized."
+    }
+  },
+  "evidence": [
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/owner-review-preparation.json",
+      "bytes": 7616,
+      "sha256": "9636b9eba83999824bc50bbd5366aac51a2319cf9cf330d858640fdfeb94b69f"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/owner-review-native-comparison.json",
+      "bytes": 4448,
+      "sha256": "bc22c1822241ab5bf3b43c2da024d8fd83ddb671742266ff17e7292a1085a759"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/verified.json",
+      "bytes": 1523,
+      "sha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6"
+    },
+    {
+      "path": "req/phase8-4-owner-license-decision.md",
+      "bytes": 18693,
+      "sha256": "2900c978e191197ee649322f08b9172e85b9ba4e87656a19677e954230d67646",
+      "commit": "9879d1aaa7f11733a1a77d0712e1d96b1880cd2b"
+    }
+  ],
+  "publicationAuthorization": false
+}

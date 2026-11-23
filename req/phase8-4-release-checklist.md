@@ -3,8 +3,9 @@
 RC3 technical verification passed on 2026-11-23, including all four exact-ZIP consumers
 and final-receipt revalidation before and after its minimum-host window. The current
 candidate is `jmlx-phase8.4-rc.3` at `33fd8d36aa7468a51f3e6ecc57bb581bf83731d6`.
-See the [RC3 review](phase8-4-rc3-final-review.md). Owner signed-candidate/delivery review,
-license-finding disposition, jinja human sign-off and current Portal capacity remain open.
+See the [RC3 review](phase8-4-rc3-final-review.md). The owner approved the signed candidate,
+delivery terms, license-finding disposition and jinja human sign-off on 2026-11-23.
+Current Portal capacity and final publication authorization remain open.
 RC2 remains historical and blocked by its lost candidate checkout/producer inputs.
 No publication authorized or performed.
 Plan: [phase8-4-plan.md](plans/phase8-4-plan.md).
@@ -66,7 +67,10 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   RC3 repeated the checks on 2026-11-23, retaining timestamped probes and source sidecars.
   The [RC3 review](phase8-4-rc3-final-review.md) records the post-window service removal,
   offline runner and disabled SMB observation; guest read-write settings remain configured.
-- [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
+- [x] Complete native transitive-license audit, including compiled-in MLX dependencies.
+  The 2026-11-23 [RC3 owner decision](phase8-4-owner-license-decision.md#rc3-signed-candidate-owner-decision-2026-11-23)
+  accepts both findings for the exact signed candidate and approved delivery scope. The
+  earlier dated steps below are historical; their pending statuses are superseded for RC3.
   The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
   inventory to 26 entries. Two provenance findings (Juffa `erf`/`erfinv` and Cephes)
   still prevent closing this gate; successful notice checks do not resolve them.
@@ -126,6 +130,10 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   reports. All four exact-ZIP consumers and final-receipt revalidation passed. The
   [RC3 review](phase8-4-rc3-final-review.md) records 170 verified receipt/window backup pins.
   This does not restore RC2 or close owner acceptance. A replacement needs fresh evidence.
+- [x] Owner approves RC3 jinja review, signed candidate, documented evidence limits, both
+  license-finding dispositions under the recorded interpretations, and delivery terms.
+  The [owner review](plans/evidence/rc3-final-review-2026-11-23/owner-review.json) retains
+  the proposal and approval; final receipt revalidation and archive checks passed.
 - [ ] Review concrete verified-bundle receipt, then explicitly authorize Central publication.
 - [ ] Verify all nine exact Central coordinates and selected Java 21 subset on both platforms.
 - [ ] Merge development-bump PR only after Central verification.
@@ -135,12 +143,13 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 
 The [final review](phase8-4-rc3-final-review.md) pins the technically verified candidate,
 all exact-tag verification reports and the saved signed ZIP. Its publication manifest
-SHA-256 is `6e7ad651d2ef5eb07ce83ac6f6afc4e797423d1305216844ea156627f8ef7afc`.
+SHA-256 is `a85ccb2c45de0dca55af3e93d98c580308271e3ab6ca54129497c05671d2de33`.
 Root `check` verifies its recursive evidence inventory, sizes, digests and review document.
-Jinja human sign-off, signed-candidate/delivery acceptance, license disposition and current
-Portal account capacity remain pending. A superseding reviewed packet with the completed
-records and new document/manifest/checklist digests is required before acceptance. No
-publication is authorized.
+Jinja human sign-off, signed-candidate/delivery acceptance and both license-finding
+dispositions are recorded in the [owner review](plans/evidence/rc3-final-review-2026-11-23/owner-review.json).
+Current Portal account capacity and final publication authorization remain pending. A
+superseding reviewed and merged packet with those completed records and refreshed pins
+is required before final acceptance. No publication is authorized.
 
 ## Historical RC3 pre-tag verification (2026-11-23)
 

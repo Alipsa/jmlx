@@ -1,7 +1,7 @@
 {
   "schema": "jmlx-publication-review-1",
   "preparedOn": "2026-11-23",
-  "status": "technical verification passed; owner decisions, jinja human sign-off and current Portal account capacity pending",
+  "status": "technical verification and four owner review decisions recorded; current Portal capacity and final publication authorization pending",
   "candidate": {
     "name": "jmlx-phase8.4-rc.3",
     "object": "146f7cf1b8b4557f20d732436dcdba6c45d20a55",
@@ -11,8 +11,8 @@
   "verifiedReceiptSha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
   "reviewDocument": {
     "path": "req/phase8-4-rc3-final-review.md",
-    "bytes": 14232,
-    "sha256": "dd0e20a351480239b9be21e17a356029a713605ba1fb7a0125aa1182dc3b51bf"
+    "bytes": 15411,
+    "sha256": "e4acfd4150855d6f19db9742aed1ded1aa0d8433df0bb208f3237c0bf60dd3b0"
   },
   "technicalVerification": {
     "rootCheck": "passed",
@@ -39,10 +39,10 @@
     "cleanup": "archive evidence and delete draft/assets within 30 days of publication or abandonment; preserve immutable tag"
   },
   "ownerDecisions": {
-    "signedCandidateAndDifferences": "pending",
-    "deliveryTerms": "pending",
-    "licenseFindingDisposition": "pending",
-    "jinjaHumanSignOff": "pending",
+    "signedCandidateAndDifferences": "recorded",
+    "deliveryTerms": "recorded",
+    "licenseFindingDisposition": "recorded",
+    "jinjaHumanSignOff": "recorded",
     "portalCapacityConfirmed": "pending",
     "publicationAuthorized": "pending"
   },
@@ -51,7 +51,7 @@
     "Original candidate paths and complete native/build output must survive; the verifier is not relocatable.",
     "Durable backups are on this Mac; minimum-host execution uses the same physical Mac under a separate account.",
     "Historical approved/native cached Javadoc producer JVM is unestablished; exact archive bytes match.",
-    "Pending human/Portal records are explicit placeholders, not approval.",
+    "The owner approved the jinja/signed-candidate/license/delivery review. Pending Portal capacity and publication records are placeholders, not approval.",
     "No window-time digest pins the admin helper. The retained original is believed to be the executed helper; its raw digest was recorded at 15:36:06Z, after the 15:34:19Z stop observation. Method records pin only the probe script.",
     "Historical helper snapshots retain assert gates disabled by optimization and the runner-owned-directory staging race. The new review-only admin helper fixes the race and uses explicit checks; it was not executed in the window. See driver-history.json before any reuse."
   ],
@@ -163,8 +163,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/evidence-provenance.json",
-      "bytes": 54554,
-      "sha256": "7c2c76e58413d181b59a856c74a8579b141300e0e87289d7cce1f384e5f0f22f"
+      "bytes": 56622,
+      "sha256": "777c0c598b86f3d9239709b5d8fe86b62328e20ac6b2a777b08280aa57660b32"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/historical-native-approval.json",
@@ -173,8 +173,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-human-signoff.json",
-      "bytes": 406,
-      "sha256": "51b251590997192ca77ffd047230d811c6502931a281b61f5e5fadb569ebef74"
+      "bytes": 1235,
+      "sha256": "e88f513cf7036b5da945b3ccb86748fe0c38b09a7a3a73447eb93b08aea17332"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/invocation.json",
@@ -255,6 +255,21 @@
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/verification.log",
       "bytes": 55718,
       "sha256": "58f1b15c8f88b43d40d83bf22a3d380a42e3ff0a6011ed22538a31aa114db1a3"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/owner-review-native-comparison.json",
+      "bytes": 4448,
+      "sha256": "bc22c1822241ab5bf3b43c2da024d8fd83ddb671742266ff17e7292a1085a759"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/owner-review-preparation.json",
+      "bytes": 7616,
+      "sha256": "9636b9eba83999824bc50bbd5366aac51a2319cf9cf330d858640fdfeb94b69f"
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/owner-review.json",
+      "bytes": 4554,
+      "sha256": "54959c9dd8aae093e68d2c738d4eebe66ed52e4f2b38ae0bca944d9d13a8e852"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-bundle-measurement.json",
@@ -594,7 +609,7 @@
   ],
   "acceptanceEligibility": {
     "eligible": false,
-    "reason": "Required owner decisions, jinja human sign-off and current Portal snapshot remain pending.",
+    "reason": "Current Portal account capacity and final publication authorization remain pending.",
     "requiredNextStep": "A superseding reviewed and merged packet commit must retain completed records, revise the review document, regenerate its pin and publication manifest, and update the checklist manifest digest. Acceptance must identify that superseding commit and digest, not this incomplete packet."
   }
 }

@@ -1,0 +1,163 @@
+{
+  "schema": "jmlx-rc3-owner-review-preparation-1",
+  "preparedAt": "2026-11-23T20:50:29.412875+00:00",
+  "status": "technical preparation complete; owner decisions and current Portal snapshot pending",
+  "reviewCommit": "9879d1aaa7f11733a1a77d0712e1d96b1880cd2b",
+  "candidateCommit": "33fd8d36aa7468a51f3e6ecc57bb581bf83731d6",
+  "bundle": {
+    "path": "<CANDIDATE>/build/releaseAll/jmlx-mega-bundle.zip",
+    "bytes": 106730869,
+    "sha256": "139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c"
+  },
+  "verifiedReceipt": {
+    "path": "<CANDIDATE>/build/releaseAll/verified.json",
+    "bytes": 1523,
+    "sha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6"
+  },
+  "technicalChecks": {
+    "currentFinalReceiptVerifierExitCode": 0,
+    "currentNativeComparatorExitCode": 0,
+    "nativeComparisonIdenticalExceptTimestamp": true
+  },
+  "currentNativeComparison": {
+    "path": "owner-review-native-comparison.json",
+    "bytes": 4448,
+    "sha256": "bc22c1822241ab5bf3b43c2da024d8fd83ddb671742266ff17e7292a1085a759"
+  },
+  "jinjaArchiveChecks": [
+    {
+      "pass": 1,
+      "name": "jmlx-jinja-0.6.2.jar",
+      "sha256": "8048f73b7480d8bab56d8def5ef73fd9501e5d91329f644f701c00d8d5d083c1",
+      "matchesBothCleanBuilds": true
+    },
+    {
+      "pass": 1,
+      "name": "jmlx-jinja-0.6.2-sources.jar",
+      "sha256": "ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5",
+      "matchesBothCleanBuilds": true
+    },
+    {
+      "pass": 1,
+      "name": "jmlx-jinja-0.6.2-javadoc.jar",
+      "sha256": "c9602ee3f5971d5ffa802ded99c10c5d4750b3829ad6df623d610047f380e8e8",
+      "matchesBothCleanBuilds": true
+    },
+    {
+      "pass": 2,
+      "name": "jmlx-jinja-0.6.2.jar",
+      "sha256": "8048f73b7480d8bab56d8def5ef73fd9501e5d91329f644f701c00d8d5d083c1",
+      "matchesBothCleanBuilds": true
+    },
+    {
+      "pass": 2,
+      "name": "jmlx-jinja-0.6.2-sources.jar",
+      "sha256": "ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5",
+      "matchesBothCleanBuilds": true
+    },
+    {
+      "pass": 2,
+      "name": "jmlx-jinja-0.6.2-javadoc.jar",
+      "sha256": "c9602ee3f5971d5ffa802ded99c10c5d4750b3829ad6df623d610047f380e8e8",
+      "matchesBothCleanBuilds": true
+    }
+  ],
+  "reviewedSources": [
+    {
+      "path": "<REPOSITORY>/jmlx-jinja/NOTICE",
+      "bytes": 2703,
+      "sha256": "b6513154d93c23d60dc5a7bdfb7e8e828ccfa08f1c93134f5f751f7ed02d3219"
+    },
+    {
+      "path": "<REPOSITORY>/jmlx-jinja/CHANGELOG.md",
+      "bytes": 4722,
+      "sha256": "5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26"
+    },
+    {
+      "path": "<REPOSITORY>/jmlx-jinja/req/model-fixture-policy.md",
+      "bytes": 6792,
+      "sha256": "5523a8bf62a6eb79289711520c21d163b94f0380e46fbdd474f2ac85bec410d7"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification-evidence/pom-default.xml",
+      "bytes": 1415,
+      "sha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification-evidence/dependency-review.md",
+      "bytes": 232,
+      "sha256": "70ca395e2e874a1b062c072926321f0dd2229974bcfe3c83a1d5f2d0ec713920"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification-evidence/corpus-coverage.md",
+      "bytes": 42762,
+      "sha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification-evidence/archive-reproducibility.json",
+      "bytes": 654,
+      "sha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-1/release-verification.md",
+      "bytes": 1884,
+      "sha256": "2fe7ba7cda1b248b36d6dc82088c2d4c64bb3eb505ba9b751e5dd39e80542323"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification-evidence/pom-default.xml",
+      "bytes": 1415,
+      "sha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification-evidence/dependency-review.md",
+      "bytes": 232,
+      "sha256": "3ac54b662dbd724662aab4ced467355490cf6669cae3c736bb4ff47a0a171d02"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification-evidence/corpus-coverage.md",
+      "bytes": 42762,
+      "sha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification-evidence/archive-reproducibility.json",
+      "bytes": 654,
+      "sha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990"
+    },
+    {
+      "path": "<REPOSITORY>/req/plans/evidence/rc3-final-review-2026-11-23/jinja-pass-2/release-verification.md",
+      "bytes": 1885,
+      "sha256": "df385d27a5d62e91c72790c66b4eb505bac56ac4f6040f3e63f9467fedf3269f"
+    }
+  ],
+  "ownerDecisionProposal": {
+    "jinjaHumanSignOff": "Approve NOTICE, fixture policy, changelog, POM, Javadoc, dependency summary and corpus evidence for jmlx-jinja 0.6.2 at RC3, after reviewing both passing exact-tag reports.",
+    "signedCandidateAndDifferences": "Accept the exact RC3 ZIP and final receipt identified above, with the differences and evidence limits in req/phase8-4-rc3-final-review.md, including the unestablished cached native Javadoc producer and lack of a window-time admin helper digest.",
+    "licenseFindingDisposition": "Accept the RC3 signed-candidate validation as satisfying the recorded conditions for NATIVE-LICENSE-1 and NATIVE-LICENSE-2 for this exact distribution, under the previously approved owner interpretations and scope, retaining the adapter-license counterargument and provenance limits; this establishes no new grant.",
+    "deliveryTerms": "Approve one combined Central deployment of the unchanged saved ZIP, preserving original grants, full notices, attribution and modification indications, without additional recipient restrictions or technological measures. Keep the temporary transport Release unpublished.",
+    "portalCapacityConfirmed": null,
+    "publicationAuthorized": null
+  },
+  "ownerDecisionStatus": "All proposals await explicit owner approval; this preparation record is neither human sign-off nor publication authorization.",
+  "requiredPortalSnapshot": [
+    "observation time",
+    "organization/namespace",
+    "plan/account classification",
+    "monthly bytes used and allowed",
+    "monthly files used and allowed",
+    "monthly release events used and allowed",
+    "adjusted-limit expiry",
+    "grace/enforcement banner"
+  ],
+  "candidateUsageToAssess": {
+    "zipBytes": 106730869,
+    "publishedEntryBytes": 107448758,
+    "files": 270,
+    "plannedPublishOperations": 1
+  },
+  "remainingSteps": [
+    "Retain actual owner decisions and current Portal capacity evidence in a superseding packet PR with refreshed pins.",
+    "Review and merge that packet.",
+    "Create the explicit acceptance record bound to its reviewed commit and digest; obtain authorization of the exact acceptance-file SHA-256.",
+    "Revalidate the final receipt and capacity immediately before the separately authorized upload."
+  ]
+}

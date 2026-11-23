@@ -6,7 +6,8 @@ def sha256File = { File source ->
 // Packets use either a historical name-to-pin map or a recursive list of path/size/digest pins.
 ext.registerReviewEvidenceCheck = { String taskName, String packetPath, String label,
         boolean requireReviewDocument, String manifestName = 'review.json',
-        boolean repositoryRelativePaths = false, String checklistPath = null ->
+        boolean repositoryRelativePaths = false, String checklistPath = null,
+        String checklistSection = null ->
     tasks.register(taskName) {
         group = 'verification'
         description = "Verifies the retained ${label} evidence inventory and pins."
@@ -97,9 +98,19 @@ ext.registerReviewEvidenceCheck = { String taskName, String packetPath, String l
             }
             if (checklistPath != null) {
                 def expectedDigest = sha256File(reviewFile)
-                def reference = /publication manifest\s+SHA-256 is `/ + expectedDigest + /`/
-                def matches = (file(checklistPath).getText('UTF-8') =~ reference)
-                if (matches.size() != 1) {
+                if (!checklistSection) {
+                    throw new GradleException("${label} checklist reference requires a section title")
+                }
+                def sectionPattern = /(?ms)^##[ \t]+/ +
+                        java.util.regex.Pattern.quote(checklistSection) +
+                        /[ \t]*\r?\n(.*?)(?=^##[ \t]+|\z)/
+                def sections = (file(checklistPath).getText('UTF-8') =~ sectionPattern)
+                if (sections.size() != 1) {
+                    throw new GradleException("${label} checklist section missing or duplicated")
+                }
+                def matches = (sections[0][1] =~
+                        /publication manifest\s+SHA-256 is `([0-9a-f]{64})`/)
+                if (matches.size() != 1 || matches[0][1] != expectedDigest) {
                     throw new GradleException(
                             "${label} manifest digest differs from the checklist reference")
                 }

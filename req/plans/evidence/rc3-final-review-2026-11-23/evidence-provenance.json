@@ -238,7 +238,13 @@
       "originalBytes": 4448,
       "originalSha256": "82a12cc85e3b1429b959a6b7ff1376d3dad17a3c07ad56059149bdeb036b38c8",
       "originalPath": "<REVIEW_FIXES>/signed-native-comparison-revised.json",
-      "representation": "exact original"
+      "representation": "exact original",
+      "producer": {
+        "commit": "2e83a1120cde2d06a63cd9e21bc713e51b5336c3",
+        "path": "req/plans/evidence/rc3-final-review-2026-11-23/compare-native.py",
+        "sha256": "ba0f8a57995f1f576a606979d2abdb2dfd39dac44e4c1f6a94215b65b6f242a5",
+        "note": "The retained comparison was generated with this comparator revision before the non-empty legal-text check was added. The current recipe is a later revision and did not produce this retained output."
+      }
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/verification/native-pom.xml",
@@ -937,7 +943,7 @@
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/compare-native.py",
       "bytes": 5028,
       "sha256": "01be3169aafea0f20797075637bee8de21b39189c168cf9c5903916dc64439b3",
-      "representation": "comparison recipe authored for this review; no separate original"
+      "representation": "Comparison recipe authored for this review; later revision adds the non-empty legal-text check. The retained signed-native-comparison.json was produced by the earlier revision identified in its producer record; no separate original of this current recipe."
     }
   ]
 }

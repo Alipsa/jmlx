@@ -135,7 +135,7 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 
 The [final review](phase8-4-rc3-final-review.md) pins the technically verified candidate,
 all exact-tag verification reports and the saved signed ZIP. Its publication manifest
-SHA-256 is `39a784ed1cfae57fb81a5115dc1ed6ae6864ce5f27c8c8cfa8886d6ae73c30ab`.
+SHA-256 is `6e7ad651d2ef5eb07ce83ac6f6afc4e797423d1305216844ea156627f8ef7afc`.
 Root `check` verifies its recursive evidence inventory, sizes, digests and review document.
 Jinja human sign-off, signed-candidate/delivery acceptance, license disposition and current
 Portal account capacity remain pending. A superseding reviewed packet with the completed

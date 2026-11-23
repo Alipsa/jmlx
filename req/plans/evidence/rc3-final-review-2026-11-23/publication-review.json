@@ -163,8 +163,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/evidence-provenance.json",
-      "bytes": 53886,
-      "sha256": "f9819f8bb571232843fec6fdd1b9946f58573ad1ac385e7dda73fad13b81cd2d"
+      "bytes": 54554,
+      "sha256": "7c2c76e58413d181b59a856c74a8579b141300e0e87289d7cce1f384e5f0f22f"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/historical-native-approval.json",

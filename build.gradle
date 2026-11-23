@@ -1088,7 +1088,8 @@ registerReviewEvidenceCheck('verifyRc3PreTagEvidence',
         'req/plans/evidence/rc3-pre-tag-2026-11-23', 'RC3 pre-tag', false)
 registerReviewEvidenceCheck('verifyRc3ReviewEvidence',
         'req/plans/evidence/rc3-final-review-2026-11-23', 'RC3 review', true,
-        'publication-review.json', true, 'req/phase8-4-release-checklist.md')
+        'publication-review.json', true, 'req/phase8-4-release-checklist.md',
+        'RC3 exact-candidate review (2026-11-23)')
 
 tasks.register('verifyHfReferenceGoldens') {
     group = 'verification'

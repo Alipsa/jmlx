@@ -28,7 +28,7 @@ class ReviewEvidenceTest(unittest.TestCase):
 apply plugin: 'base'
 apply from: 'review-evidence.gradle'
 registerReviewEvidenceCheck('verifyPacket', 'evidence/packet', 'Fixture', true,
-        'publication-review.json', true, 'checklist.md')
+        'publication-review.json', true, 'checklist.md', 'Fixture packet review')
 check.dependsOn tasks.named('verifyPacket')
 """)
             payload = packet / "nested/payload.json"
@@ -52,7 +52,7 @@ check.dependsOn tasks.named('verifyPacket')
                 payload.write_bytes(b'{"fixture":true}\n')
                 manifest.write_text(json.dumps(record or original, indent=2) + "\n")
                 if refresh_reference:
-                    checklist.write_text("publication manifest\nSHA-256 is `" +
+                    checklist.write_text("## Fixture packet review\n\npublication manifest\nSHA-256 is `" +
                                          hashlib.sha256(manifest.read_bytes()).hexdigest() + "`.\n")
 
             def run(passed, diagnostic=None):
@@ -67,8 +67,28 @@ check.dependsOn tasks.named('verifyPacket')
             run(True)
             # Another packet's digest must not invalidate this packet's reference.
             with checklist.open("a") as stream:
-                stream.write("Later packet publication manifest SHA-256 is `" + "0" * 64 + "`.\n")
+                stream.write("\n## Later packet review\n\npublication manifest SHA-256 is `" +
+                             "0" * 64 + "`.\n")
             run(True)
+            # A stale digest in this packet's own section is ambiguous and must fail.
+            checklist.write_text(checklist.read_text().replace(
+                "\n## Later packet review", "\npublication manifest SHA-256 is `" +
+                "1" * 64 + "`.\n\n## Later packet review"))
+            run(False, "manifest digest differs from the checklist reference")
+            prepare()
+            checklist.write_text(checklist.read_text().replace(
+                "## Fixture packet review", "## Other packet review"))
+            run(False, "checklist section missing or duplicated")
+            prepare()
+            checklist.write_text(checklist.read_text() + "\n## Fixture packet review\n")
+            run(False, "checklist section missing or duplicated")
+            prepare()
+            # The correct digest in another section cannot fill a missing reference.
+            checklist.write_text("## Fixture packet review\n\nPending.\n\n## Other packet review\n" +
+                                 "publication manifest SHA-256 is `" +
+                                 hashlib.sha256(manifest.read_bytes()).hexdigest() + "`.\n")
+            run(False, "manifest digest differs from the checklist reference")
+            prepare()
             finder = payload.parent / ".DS_Store"
             finder.write_bytes(b"Finder")
             run(True)

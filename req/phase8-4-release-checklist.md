@@ -112,16 +112,17 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   passed Java and native checks, both release-smoke profiles and required-native-suite verification.
 - [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
   changelog version-cut dates with the final candidate cut date.
-  RC2 used 2026-11-22. Replacement preparation sets these dates to 2026-11-23; this
-  gate is reopened. Review and recheck against the actual cut date immediately before
-  creating the replacement tag, then rerun the affected verification.
+  RC2 used 2026-11-22; those dates are retained during preparation. This gate is
+  reopened. Align and review the actual cut date in the final pre-tag PR, then rerun
+  the affected verification after that change.
 - [ ] Restore revalidatable candidate provenance before acceptance or publication.
   RC2 tag/SHA, signed bundle and all consumer runs were historically verified, but the
   original candidate checkout is missing, including four pinned producer JSON files and all
   104 digest-pinned JUnit XML reports. Recovery also needs matching staged `native/install/lib`
   and the preliminary record restored at its original path (an identical copy survives).
-  The [replacement recovery check](phase8-4-rc3-preparation.md) establishes that the main
-  checkout's native report matches RC2, but none of its 104 JUnit reports matches.
+  The [replacement recovery check](plans/evidence/rc3-preparation-2026-11-23/recovery-check.json)
+  establishes that the main checkout's native report matches RC2, but none of its 104
+  JUnit reports matches.
   Recovering only the four JSON files is insufficient; see the RC2 review.
   [RC2 final review](phase8-4-rc2-final-review.md) retains the receipt, exact reports, artifact
   comparison and ZIP inventory. All four consumer reports pass. Owner acceptance of this
@@ -143,8 +144,12 @@ The report records these contract input SHA-256 values:
 - `req/release-checklist.md` (jinja):
   `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`
 
-The verified commit precedes this documentation update; it is not the current HEAD.
-This update changes no jinja verification contract inputs.
+The verified commit is historical, not the current HEAD. Initial RC3 preparation changed
+the changelog date and superseded the digest above with
+`5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`, making PR #116
+verification stale for that input. Preparation now restores the RC2 date and original digest
+to defer date alignment to the final pre-tag PR. That later change will again invalidate the
+contract input; repeat both verification passes for the replacement after its final changes.
 
 The isolated online/offline matrix, reproducible archives and independent consumer resolution
 passed with BellSoft JDK 25.0.5, Temurin 21.0.13+9 and pinned Node v26.7.0. The published and

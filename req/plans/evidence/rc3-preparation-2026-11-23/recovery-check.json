@@ -1,8 +1,31 @@
 {
   "schema": 1,
-  "checkedAt": "2026-11-23T11:54:25.931246+00:00",
-  "sourceCommit": "7df269d7d82b2526cdd61d733eba087f6f8ce183",
+  "checkedAt": "2026-11-23T12:03:35.007427+00:00",
+  "sourceCommit": "05e926abfec80803001e62f0da2e049a32d5f423",
+  "sourceCommitNote": "HEAD at check time, not necessarily a clean tree; native and JUnit inputs are ignored outputs. See workingTreeStatus.",
+  "workingTreeStatus": [
+    " M .gitattributes",
+    " M jmlx-core/CHANGELOG.md",
+    " M jmlx-jinja/CHANGELOG.md",
+    " M jmlx-models/CHANGELOG.md",
+    " M jmlx-tokenizer/CHANGELOG.md",
+    " M jmlx-vision/CHANGELOG.md",
+    " M req/phase8-4-rc3-preparation.md",
+    " M req/phase8-4-release-checklist.md",
+    "?? req/plans/evidence/rc3-preparation-2026-11-23/recovery-check.py"
+  ],
+  "probeSha256": "859c4e203bf6d75f0b1282dcd4f1aad6b72ec59fd186b340162d7d9b719a715e",
+  "nativeReportImplementationSha256": "85b4f940f67faf916a9263a3920a69763837176af6685cb8c8db131e4ca4e849",
+  "bootstrapSha256": "ef82a354631b255f0db42abcc3a83bf8cbf130cd7236d79482b51c2c7b54200b",
   "preliminarySha256": "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af",
+  "nativeReportArguments": {
+    "directory": "/Users/per/project/jmlx/native/install/lib",
+    "bootstrap": "/Users/per/project/jmlx/scripts/bootstrap-native.sh",
+    "forbidden": [
+      "/Users/per",
+      "/Users/per/project/jmlx"
+    ]
+  },
   "nativeReportMatchesRc2": true,
   "nativeReport": {
     "pins": {
@@ -77,15 +100,46 @@
   },
   "junit": {
     "required": 104,
-    "matchingInMainCheckout": 0
+    "presentInMainCheckout": 104,
+    "matchingInMainCheckout": 0,
+    "method": "sha256 of <root>/<relative path> from preliminary.json junit map"
   },
   "backupRecovery": {
-    "timeMachineDestinations": "none configured (tmutil destinationinfo)",
+    "timeMachineDestinations": {
+      "argv": [
+        "tmutil",
+        "destinationinfo"
+      ],
+      "returncode": 0,
+      "stdout": "tmutil: No destinations configured.\n",
+      "stderr": ""
+    },
+    "localSnapshots": {
+      "argv": [
+        "tmutil",
+        "listlocalsnapshots",
+        "/"
+      ],
+      "returncode": 0,
+      "stdout": "Snapshots for disk /:\n",
+      "stderr": ""
+    },
+    "apfsSnapshots": {
+      "argv": [
+        "diskutil",
+        "apfs",
+        "listSnapshots",
+        "/"
+      ],
+      "returncode": 0,
+      "stdout": "Snapshot for disk3s1s1 (1 found)\n|\n+-- 808236D9-F176-4EEE-B085-33EEA9DF251A\n    Name:        com.apple.os.update-5EAEB3CC027918533FF72C50AB959F1FB19B7F17D4D1B9C09329E5C04E193F54\n    XID:         2892750\n    Purgeable:   No\n    NOTE:        This snapshot limits the minimum size of APFS Container disk3\n",
+      "stderr": ""
+    },
     "mountedVolumes": [
       "Macintosh HD",
       "Recovery"
     ],
-    "limit": "No local Time Machine recovery source found; external/offline backups were not searched."
+    "limit": "Local observations only; nonzero command results do not establish absence. External/offline backups were not searched. An OS update snapshot alone does not establish recovery of candidate data."
   },
-  "conclusion": "Native staging is reusable byte-for-byte, but the original producer JSON and JUnit reports remain missing. This does not restore RC2 revalidation."
+  "conclusion": "This probe reports native equivalence and JUnit matches only. It does not recover missing producer inputs or restore RC2 revalidation."
 }

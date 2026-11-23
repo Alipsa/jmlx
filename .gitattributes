@@ -43,3 +43,6 @@ req/plans/evidence/native-distribution-review-2026-11-22/** -text
 req/plans/evidence/rc2-final-review-2026-11-22/** -text
 # Exact Gradle stdout contains a trailing space in its daemon shutdown message.
 req/plans/evidence/rc2-final-review-2026-11-22/*.log whitespace=-blank-at-eol
+
+# Preserve RC3 preparation recovery evidence bytes.
+req/plans/evidence/rc3-preparation-2026-11-23/** -text

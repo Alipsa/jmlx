@@ -49,9 +49,10 @@ Replacement evidence must identify its own source commit and ZIP digest througho
 
 Before cutting the replacement:
 
-1. Implement and review the digest-pinned final owner-acceptance upload gate identified
-   in the RC2 review. It must bind acceptance to the actual replacement bundle and
-   reviewed packet, including the jinja human sign-off. Do not manufacture acceptance.
+1. Review and merge the
+   [final owner-acceptance upload gate](../tools/release-all/owner-acceptance.md).
+   It binds acceptance to the actual replacement bundle, final receipt and committed review
+   packet, including explicit jinja human sign-off. Implementation does not grant acceptance.
 2. Merge the reviewed preparation and gate changes, then align and review the cut dates
    in the final pre-tag PR. Repeat jinja verification after changing its policy inputs.
    Create an immutable annotated `jmlx-phase8.4-rc.3` tag at the reviewed source commit.

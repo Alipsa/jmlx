@@ -107,9 +107,14 @@ class FinalReceiptTest(unittest.TestCase):
         with patch("release_inputs.check_bundle", return_value=self.record), \
                 patch("release_inputs.native_report", return_value=self.record["native"]), \
                 patch.object(sys, "argv", [str(Path(F.__file__)), "--root", str(self.root),
-                                          "--verify", str(self.path), "--plugin-digests"]), \
+                                          "--verify", str(self.path), "--plugin-digests",
+                                          "--acceptance", str(self.root / "acceptance.json"),
+                                          "--acceptance-sha256", "a" * 64]), \
+                patch("owner_acceptance.verify") as acceptance, \
                 redirect_stdout(stdout):
             runpy.run_path(F.__file__, run_name="__main__")
+        acceptance.assert_called_once_with(self.root.resolve(), self.path, self.record,
+                                           self.root / "acceptance.json", "a" * 64)
         self.assertRegex(stdout.getvalue(), r"\A[0-9a-f]{64}\t[0-9a-f]{64}\n\Z")
         self.assertEqual(stdout.getvalue(),
                          self.record["bundleSha256"] + "\t" +

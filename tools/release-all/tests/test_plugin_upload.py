@@ -147,8 +147,11 @@ p.write_text(json.dumps(sys.argv[1:]))
                 verifier.write_text('''import argparse, hashlib, json
 from pathlib import Path
 p = argparse.ArgumentParser()
+p.add_argument('--acceptance'); p.add_argument('--acceptance-sha256')
 p.add_argument('--root'); p.add_argument('--verify'); p.add_argument('--plugin-digests', action='store_true')
 a = p.parse_args()
+if not a.acceptance or hashlib.sha256(Path(a.acceptance).read_bytes()).hexdigest() != a.acceptance_sha256:
+    raise SystemExit('fixture owner acceptance rejected')
 r = json.loads(Path(a.verify).read_text())
 if not r['testEvidencePassed']: raise SystemExit('fixture required test evidence rejected')
 for name, expected in r['files'].items():
@@ -197,7 +200,10 @@ if a.plugin_digests:
                     "build/releaseAll/jmlx-mega-bundle.zip": bundle_hash,
                     "build/releaseAll/manifest.json": plan_hash}}
                 final.write_text(json.dumps(evidence))
-                shell = subprocess.run(["bash", str(project / "releaseAll.sh"), "--publish-verified", str(final)],
+                acceptance = build / "owner acceptance.json"
+                acceptance.write_text('{"fixtureApproval":true}')
+                acceptance_args = ["--acceptance", str(acceptance), "--acceptance-sha256", digest(acceptance)]
+                shell = subprocess.run(["bash", str(project / "releaseAll.sh"), "--publish-verified", str(final), *acceptance_args],
                                        env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
                 self.assertEqual(shell.returncode, 0, shell.stdout)
                 wrapper_args = json.loads((project / "build/wrapper-argv.json").read_text())
@@ -206,7 +212,16 @@ if a.plugin_digests:
                 self.assertIn("-PreleaseAllVerifiedReceipt=" + str(final), wrapper_args)
                 upload = ["releaseAll", "-PreleaseAllUseExistingBundle=true", "-PreleaseAllVerifiedReceipt=" + str(final),
                           "-PreleaseAllExpectedBundleSha256=" + bundle_hash,
-                          "-PreleaseAllExpectedManifestSha256=" + plan_hash]
+                          "-PreleaseAllExpectedManifestSha256=" + plan_hash,
+                          "-PreleaseAllOwnerAcceptance=" + str(acceptance),
+                          "-PreleaseAllOwnerAcceptanceSha256=" + digest(acceptance)]
+                self.assertIn("-PreleaseAllOwnerAcceptance=" + str(acceptance), wrapper_args)
+                self.assertIn("-PreleaseAllOwnerAcceptanceSha256=" + digest(acceptance), wrapper_args)
+                missing_acceptance = [arg for arg in upload if not arg.startswith("-PreleaseAllOwnerAcceptance")]
+                self.assertIn("Use releaseAll.sh --publish-verified", run(*missing_acceptance, success=False))
+                acceptance.write_text("tampered")
+                self.assertIn("fixture owner acceptance rejected", run(*upload, success=False))
+                acceptance.write_text('{"fixtureApproval":true}')
                 # Direct Gradle inputs must be bound to the receipt, not checked at separate times.
                 wrong_anchors = ["-PreleaseAllExpectedBundleSha256=" + "0" * 64
                                  if arg.startswith("-PreleaseAllExpectedBundleSha256=") else arg for arg in upload]
@@ -218,7 +233,7 @@ if a.plugin_digests:
                 for malformed in ("garbage\t" + plan_hash, bundle_hash + "\t" + plan_hash + "\nextra"):
                     evidence["digestOutput"] = malformed
                     final.write_text(json.dumps(evidence))
-                    invalid_shell = subprocess.run(["bash", str(project / "releaseAll.sh"), "--publish-verified", str(final)],
+                    invalid_shell = subprocess.run(["bash", str(project / "releaseAll.sh"), "--publish-verified", str(final), *acceptance_args],
                                                    env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
                     self.assertNotEqual(invalid_shell.returncode, 0)
                     self.assertIn("Receipt verifier returned malformed digests", invalid_shell.stdout)
@@ -230,7 +245,7 @@ if a.plugin_digests:
                 self.assertFalse([path for path in requests if "/publisher/upload" in path])
                 evidence["testEvidencePassed"] = False
                 final.write_text(json.dumps(evidence))
-                rejected_shell = subprocess.run(["bash", str(project / "releaseAll.sh"), "--publish-verified", str(final)],
+                rejected_shell = subprocess.run(["bash", str(project / "releaseAll.sh"), "--publish-verified", str(final), *acceptance_args],
                                                 env=env, text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180)
                 self.assertNotEqual(rejected_shell.returncode, 0)
                 self.assertFalse((project / "build/wrapper-argv.json").exists())

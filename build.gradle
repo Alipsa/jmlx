@@ -92,9 +92,12 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
     }
     def existingBundle = providers.gradleProperty('releaseAllUseExistingBundle').getOrElse('false') == 'true'
     def verifiedReceipt = providers.gradleProperty('releaseAllVerifiedReceipt').getOrElse('')
+    def ownerAcceptance = providers.gradleProperty('releaseAllOwnerAcceptance').getOrElse('')
+    def ownerAcceptanceSha = providers.gradleProperty('releaseAllOwnerAcceptanceSha256').getOrElse('')
     def resumeRequested = !providers.gradleProperty('releaseAllResume').getOrElse('').isEmpty()
     gradle.taskGraph.whenReady { graph ->
-        if (graph.hasTask(':releaseAll') && !resumeRequested && (!existingBundle || verifiedReceipt.isEmpty())) {
+        if (graph.hasTask(':releaseAll') && !resumeRequested && (!existingBundle || verifiedReceipt.isEmpty() ||
+                ownerAcceptance.isEmpty() || !(ownerAcceptanceSha ==~ /[0-9a-f]{64}/))) {
             throw new GradleException('Use releaseAll.sh --publish-verified with a final receipt; ' +
                     'refusing the upload graph before checking, signing or bundling.')
         }
@@ -120,14 +123,16 @@ if (providers.gradleProperty('releaseAllMode').isPresent()) {
         }
         doFirst {
             if (!resumeId.getOrElse('')) {
-                if (!existingBundle || verifiedReceipt.isEmpty()) {
+                if (!existingBundle || verifiedReceipt.isEmpty() ||
+                        ownerAcceptance.isEmpty() || ownerAcceptanceSha.isEmpty()) {
                     throw new GradleException('Use releaseAll.sh --publish-verified with a final receipt; ' +
                             'ordinary releaseAll must not rebuild and upload unchecked bytes.')
                 }
                 def digestOutput = new ByteArrayOutputStream()
                 releaseExec.exec {
                     commandLine 'python3', receiptVerifier, '--root', releaseRoot,
-                            '--verify', verifiedReceipt, '--plugin-digests'
+                            '--verify', verifiedReceipt, '--plugin-digests',
+                            '--acceptance', ownerAcceptance, '--acceptance-sha256', ownerAcceptanceSha
                     standardOutput = digestOutput
                 }
                 def reviewedAnchors = digestOutput.toString('UTF-8').trim().split('\t', -1).toList()

@@ -1084,7 +1084,9 @@ tasks.register('verifyRc2ReviewEvidence') {
     inputs.file(review.reviewDocument.path)
     doLast {
         def expectedNames = (review.retainedFiles.keySet() + ['review.json']) as Set
-        def actualNames = evidenceDir.listFiles().collect { it.name } as Set
+        // Finder metadata is ignored by Git and is not part of the evidence packet.
+        def actualNames = evidenceDir.listFiles().findAll { it.name != '.DS_Store' }
+                .collect { it.name } as Set
         if (actualNames != expectedNames) {
             throw new GradleException('RC2 review evidence inventory differs: '
                     + "missing=${expectedNames - actualNames}, unlisted=${actualNames - expectedNames}")

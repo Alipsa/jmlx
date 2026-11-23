@@ -37,8 +37,11 @@ The original JUnit XML bytes cannot be regenerated: timestamps and durations are
 digests. The main checkout's bundle receipt has different bytes; whether its native staging
 matches has not been established. The preliminary record survives byte-for-byte under
 `transport/` and in this packet, but must also be restored at its recorded original path. The
-signed ZIP and consumer reports/sidecars must remain available at the paths required by the
-receipt. Recovering only the four producer JSON files is insufficient.
+surviving signed ZIP must be restored from `transport/jmlx-mega-bundle.zip` to
+`/private/tmp/jmlx-phase8.4-rc.2/build/releaseAll/jmlx-mega-bundle.zip`; the verifier requires
+that exact candidate-root bundle path. Consumer reports/sidecars must also be restored to
+their original absolute paths under the main checkout if those files are removed. Recovering
+only the four producer JSON files is insufficient.
 
 The saved final receipt cannot currently be revalidated. Do not accept or publish RC2 in this
 state. Recover the original inputs from backup and pass the unchanged verifier, or cut and fully
@@ -46,7 +49,19 @@ verify a new candidate in a durable checkout. A relocatable verifier would requi
 review; it is not supplied here. Rebuilding missing inputs cannot restore this receipt's
 provenance.
 
-The ZIP and complete prerequisite logs remain under ignored `build/releaseAll/candidates/rc.2/`.
+On 2026-11-23, the complete surviving `build/releaseAll/candidates/rc.2/` tree and all three
+`window-2026-11-22.*` trees were copied to durable local storage outside the checkout:
+`/Users/per/release-candidates/jmlx-phase8.4-rc.2-survivors-2026-11-23/`.
+This includes the signed ZIP, transport preliminary record, four consumer reports and their
+sidecars, prerequisite logs and window records. The copy preserves repository-relative paths.
+The [backup record][backup] pins its local `backup-inventory.json`: all 3,438 file/symlink
+entries were compared with the source before and after copying; the ZIP and four consumer
+report hashes also match the receipt. `./gradlew clean` can delete the working copies under
+`build/` but cannot delete this separate archive. This is a local preservation copy, not an
+independent-device backup or recovery of the missing candidate inputs. Restore files to the
+receipt's original absolute paths before attempting unchanged verification; the backup location
+does not make the receipt relocatable.
+
 The temporary draft Release contains only the verified ZIP and preliminary record; it stays
 draft.
 
@@ -162,3 +177,4 @@ Markdown file and the review manifest. Keep the approved snapshot unchanged afte
 [review]: plans/evidence/rc2-final-review-2026-11-22/review.json
 [comparison]: plans/evidence/rc2-final-review-2026-11-22/signed-native-comparison.json
 [javadoc-diff]: plans/evidence/rc2-final-review-2026-11-22/javadoc-content.diff
+[backup]: plans/evidence/rc2-final-review-2026-11-22/survivor-backup.json

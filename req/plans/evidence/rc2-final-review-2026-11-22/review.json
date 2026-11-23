@@ -243,12 +243,16 @@
     "connected-source-commit.txt": {
       "sha256": "fe31a086844cc22a9f258e0810829faa7c8eccdad3ae69f77a35258593068619",
       "bytes": 41
+    },
+    "survivor-backup.json": {
+      "sha256": "87879531ddbd5bf20c71d4d18d24c04ee8c35337b8d893e430dad5efaf7bce5c",
+      "bytes": 1095
     }
   },
   "evidenceLimits": [
-    "RC2 original candidate and audit checkouts are missing as of 2026-11-23. Recovery needs four pinned producer JSON files, all 104 digest-pinned JUnit XML reports, staged native/install/lib matching the full recorded native report, and the preliminary record restored at its original path (identical retained copies survive). Signed ZIP and consumer report/sidecar paths must also satisfy the receipt. Main-checkout native equivalence is unestablished. Recovering only the four JSON files is insufficient; do not regenerate original JUnit XML or recreate producer inputs from summaries.",
+    "RC2 original candidate and audit checkouts are missing as of 2026-11-23. Recovery needs four pinned producer JSON files, all 104 digest-pinned JUnit XML reports, staged native/install/lib matching the full recorded native report, and the preliminary record restored at its original path (identical retained copies survive). The surviving signed ZIP must be restored to /private/tmp/jmlx-phase8.4-rc.2/build/releaseAll/jmlx-mega-bundle.zip; consumer report/sidecar paths under the main checkout must also be restored if cleaned. Main-checkout native equivalence is unestablished. Recovering only the four JSON files is insufficient; do not regenerate original JUnit XML or recreate producer inputs from summaries.",
     "Consumer JSON/log/runtime sidecars and actual job setup identity excerpt are retained here; full job log remains downloadable from the GitHub job, with its hash in the identity review.",
-    "Local prerequisite logs and audit report survive under ignored build/releaseAll/candidates/rc.2; the audit checkout does not. Both jinja verification logs and surviving account source-commit sidecars are now retained here.",
+    "The complete surviving RC2 tree (including ZIP, reports, sidecars and prerequisite logs) and three window trees were copied outside the checkout to /Users/per/release-candidates/jmlx-phase8.4-rc.2-survivors-2026-11-23 and hash-verified against source before/after copying. survivor-backup.json pins the full local inventory. Gradle clean can delete working copies but not this archive. Missing candidate inputs remain missing; original receipt paths must be restored before revalidation.",
     "No ZIP, signing key, Portal credential or runner authentication file is committed.",
     "This follow-up records the immutable RC2 result; its documentation commit is outside the tagged candidate.",
     "Local paths, host identity and the audit PATH remain in historical raw records to preserve byte pins; future public summaries should normalize incidental personal details.",
@@ -257,8 +261,8 @@
   ],
   "reviewDocument": {
     "path": "req/phase8-4-rc2-final-review.md",
-    "sha256": "f740d223e7f1bb00a26a9a59bde5bc4dc08047ad78a9b8d0163c7f0f34f1c80a",
-    "bytes": 11180
+    "sha256": "1802c4625ca08c057f03636b73efe5163f8bbd402e728a00660247dd7423d3dc",
+    "bytes": 12435
   },
   "followupSurfaceSha256": {
     "req/phase8-4-release-notes.md": "e2bca16946052a2f1d9cb04b5f8465e6f7b395c8414d4f5dcbd09aff584b4792",
@@ -269,5 +273,6 @@
   },
   "followupSurfaceSha256Meaning": "Historical hashes of follow-up documents at followupSurfaceCommit, outside the tagged candidate. These living documents are not frozen by root check; owner acceptance must cite the reviewed packet commit and current review document/manifest digests.",
   "updatedOn": "2026-11-23",
-  "followupSurfaceCommit": "12aa85311b157776cfd58166b1bc6e679147216a"
+  "followupSurfaceCommit": "12aa85311b157776cfd58166b1bc6e679147216a",
+  "survivorBackup": "survivor-backup.json"
 }

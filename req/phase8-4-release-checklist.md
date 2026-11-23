@@ -109,7 +109,9 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   exceeds the 100 MB size allowance; projected counts of 492 files and 9 release events
   fit the displayed count limits. Obtain sufficient increased size allowance or an
   applicable exemption, confirm plan/classification, and retain grant/expiry and
-  grace/enforcement details before closing this gate. No upload has been attempted.
+  grace/enforcement details before closing this gate. The owner reported the increase/
+  exemption request sent to Central Support on 2026-11-23; its response is pending.
+  No upload has been attempted.
 - [x] Integrate released upstream plugin 2.6.0 and verify the clean historical 8.1 fixture.
   [Compatibility evidence](phase8-4-plugin-2.6.0-compatibility.md) records the unpushed scratch
   commit, expected published-tuple refusal, eligible-three dry-run and HTTPS upload fixture.
@@ -148,7 +150,7 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 
 The [final review](phase8-4-rc3-final-review.md) pins the technically verified candidate,
 all exact-tag verification reports and the saved signed ZIP. Its publication manifest
-SHA-256 is `b2769483d6b510f7baccc50cfdfff8e98302fe1aaea05b9c340f4075300bc32d`.
+SHA-256 is `8fee4e670570a15b5541d2585b35805a7cf3a6399c82bfaf09123ec76006bec1`.
 Root `check` verifies its recursive evidence inventory, sizes, digests and review document.
 Jinja human sign-off, signed-candidate/delivery acceptance and both license-finding
 dispositions are recorded in the [owner review](plans/evidence/rc3-final-review-2026-11-23/owner-review.json).

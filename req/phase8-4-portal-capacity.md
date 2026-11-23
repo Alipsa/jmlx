@@ -156,6 +156,14 @@ The owner's plan/account classification is still unconfirmed. Click the Increase
 for grant/expiry details and retain any grace/enforcement banner. Refresh usage immediately
 before publishing; a replacement bundle must be measured against its own digest.
 
+On 2026-11-23 the owner reported "message sent" after the drafted Central Support
+increase/exemption request for Alipsa / `se.alipsa`. The structured capacity status records
+that owner confirmation and the proposed recipient, subject and requested scope. The
+final sent message, exact send time, delivery receipt and support ticket identifier were
+not supplied. **Awaiting Sonatype's response.** Sending the request does not increase the
+allowance or close the capacity gate. Retain the response and its scope, grant/expiry and
+conditions, then refresh the Usage Center snapshot before reassessing capacity.
+
 ## RC2 measurement (2026-11-22)
 
 The [RC2 review](phase8-4-rc2-final-review.md) identifies the historically verified signed ZIP

@@ -11,8 +11,8 @@
   "verifiedReceiptSha256": "db666ab8141dc08ca24e2e6384e0f714162d0acff9f6d12caaf4ce9b104120b6",
   "reviewDocument": {
     "path": "req/phase8-4-rc3-final-review.md",
-    "bytes": 16314,
-    "sha256": "03bf973f888afd58238a9479044499c6b69ad97e16c355672e79008c2717f3f0"
+    "bytes": 16534,
+    "sha256": "b16418462f8f2abab8088f0b2fb223a65bfcfacc53ecd7ef9f527f6317730cbc"
   },
   "technicalVerification": {
     "rootCheck": "passed",
@@ -163,8 +163,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/evidence-provenance.json",
-      "bytes": 57881,
-      "sha256": "673f97df603f76878fe0890606955f657ddb063f062eaf668722a0fdb7483eed"
+      "bytes": 57907,
+      "sha256": "cc1abe15ce14122bbbbabce37cb31bdb815af8938614de19773b263f6b6ceee6"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/historical-native-approval.json",
@@ -278,8 +278,8 @@
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-capacity-status.json",
-      "bytes": 6287,
-      "sha256": "a03677ae4c757b353eb366e7cbed36be5268cdb1d948431e1717042438a88757"
+      "bytes": 7233,
+      "sha256": "bb248b5084d7851a4a84cbb3f3db658be5af91f465f672fe6247749aa4766f5f"
     },
     {
       "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-namespace-usage.csv",

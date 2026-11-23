@@ -202,7 +202,9 @@ decimal or binary interpretation; with current usage, projected counts are 492 f
 an expected 9 events. The capacity gate is blocked by size. Sufficient increased size
 allowance or an applicable exemption is needed, with plan/classification, grant/expiry,
 actual observation time and grace/enforcement details still outstanding. No upload
-rejection or current enforcement state is inferred.
+rejection or current enforcement state is inferred. The owner reported the Central Support
+increase/exemption request sent on 2026-11-23; the capacity status records that attestation.
+Sonatype's response remains outstanding, and the request alone closes no capacity gate.
 
 Temporary draft Release 455573517 retains only the exact ZIP and preliminary record;
 downloaded asset bytes matched both expected digests. Keep it unpublished. Archive the

@@ -1,5 +1,5 @@
 {
-  "status": "capacity gate blocked: exact RC3 candidate exceeds displayed se.alipsa increased monthly release-size allowance",
+  "status": "capacity gate blocked by namespace release-size allowance; owner reports increase/exemption request sent; awaiting Sonatype response",
   "usageCenterSnapshot": {
     "source": "Owner-provided CSV row in the release preparation conversation; no authenticated account query was performed.",
     "recordedAt": "2026-11-23T21:30:20.552026+00:00",
@@ -124,5 +124,18 @@
     "enforcementOutcome": "Not established: actual account grace/enforcement state is unknown; no upload was attempted.",
     "assumptions": "No intervening releases; the planned combined deployment adds one namespace release event."
   },
-  "requiredNextStep": "Obtain sufficient increased namespace release-size allowance or an applicable exemption and retain scope, grant/expiry and enforcement evidence; confirm plan/account classification and refresh usage before publication."
+  "requiredNextStep": "Await Sonatype response, retain its scope and grant/expiry or other applicable capacity conditions, confirm plan/account classification, and refresh Usage Center data before final capacity assessment or publication.",
+  "supportRequest": {
+    "status": "owner reports sent; awaiting Sonatype response",
+    "reportedBy": "Per Nyfelt",
+    "recordedAt": "2026-11-23T21:49:56.567000+00:00",
+    "sentAt": null,
+    "ownerStatement": "message sent",
+    "proposedRecipient": "central-support@sonatype.com",
+    "proposedSubject": "Increased publishing-size allowance for Alipsa / se.alipsa",
+    "requestScope": "Higher monthly release-size allowance or exemption for Alipsa / se.alipsa sufficient for the unchanged 107,448,758-byte RC3 published-file inventory plus existing usage, and review of an ongoing allowance appropriate for native-runtime releases.",
+    "supportCaseId": null,
+    "response": null,
+    "sourceLimit": "Owner confirmation in conversation after the drafted request; final sent headers/body, delivery receipt and ticket identifier have not been supplied. recordedAt is recording time, not an asserted send timestamp."
+  }
 }

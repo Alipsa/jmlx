@@ -51,3 +51,5 @@ req/plans/evidence/rc3-preparation-2026-11-23/** -text
 req/plans/evidence/rc3-pre-tag-2026-11-23/** -text
 req/plans/evidence/rc3-pre-tag-2026-11-23/**/*.log whitespace=-blank-at-eol
 req/plans/evidence/rc3-pre-tag-2026-11-23/*.log whitespace=-blank-at-eol
+# Generated corpus reports retain their original trailing blank line.
+req/plans/evidence/rc3-pre-tag-2026-11-23/**/corpus-coverage.md whitespace=-blank-at-eol

@@ -1,0 +1,262 @@
+{
+  "schema": "jmlx-preliminary-bundle-1",
+  "tag": {
+    "name": "jmlx-phase8.4-rc.2",
+    "object": "400b90e1a0b062a57b70a1007e68a4f6313f3976",
+    "sha": "33676837f66993b5a809644dbbdc6e6550417334"
+  },
+  "bundleSha256": "0dbb1451f8015843dfd77aeff5ae5e7f1afdbb80bb01f489ee06dfd92f1ba35e",
+  "bundleBytes": 106730874,
+  "pluginReceiptSha256": "8fa4b70cc7c0621496ac0ad8cb964948c253052bcef60b63f0b4f00c3929d95b",
+  "pluginReceipt": {
+    "bundleHash": "0dbb1451f8015843dfd77aeff5ae5e7f1afdbb80bb01f489ee06dfd92f1ba35e",
+    "manifestHash": "83c5924d3bf31257f73458cc8ddf8209fad466bfe730f0622f963c24d79d3d2f"
+  },
+  "releaseManifestSha256": "3b336b7f71b0fa9263c5def955d96c0857a605155214027e2ef36f1d735d7ad3",
+  "native": {
+    "pins": {
+      "mlxMetalVersion": "0.32.4",
+      "mlxcCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a"
+    },
+    "supportedMinimum": [
+      27,
+      2,
+      0
+    ],
+    "deploymentTarget": [
+      26,
+      2,
+      0
+    ],
+    "files": {
+      "libmlxc.dylib": {
+        "sha256": "15a08b85d40333093a38043d0545f9ff6d12ab532e58e7c1af067a23c93a238d",
+        "size": 2364080,
+        "minos": [
+          26,
+          2,
+          0
+        ],
+        "sdk": [
+          27,
+          2,
+          0
+        ]
+      },
+      "libmlx.dylib": {
+        "sha256": "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6",
+        "size": 21720704,
+        "minos": [
+          26,
+          2,
+          0
+        ],
+        "sdk": [
+          26,
+          5,
+          0
+        ],
+        "upstreamPathAllowlist": [
+          "/Users/runner/work/mlx/mlx/build/temp.macosx-11.0-arm64-cpython-310/mlx.core/mlx/backend/metal/kernels//mlx.metallib"
+        ]
+      },
+      "libjaccl.dylib": {
+        "sha256": "7890e84a96e3121c8c1c2f351e41e46ba4d92e7b7bc6275fc2b38c2773891032",
+        "size": 2131168,
+        "minos": [
+          26,
+          2,
+          0
+        ],
+        "sdk": [
+          26,
+          5,
+          0
+        ]
+      },
+      "mlx.metallib": {
+        "sha256": "c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893",
+        "size": 214156448
+      },
+      "native-pin.properties": {
+        "sha256": "9fbdc2f67202c57a6e86adbae8f3ab318c89cbbc222df34c197aedf14f5739b7",
+        "size": 75
+      }
+    }
+  },
+  "toolchain": {
+    "cc": "Apple clang version 21.0.0 (clang-2100.4.1.1)\nTarget: arm64-apple-darwin27.2.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin",
+    "cmake": "cmake version 4.5.1\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).",
+    "sdk": "27.2",
+    "developerDirectory": "/Applications/Xcode.app/Contents/Developer",
+    "xcode": "Xcode 27.2\nBuild version 27B52"
+  },
+  "invocationId": "c24fccff-bf4f-4594-b2bc-f6011c19c87f",
+  "releaseJdk": {
+    "java.version": "25.0.5",
+    "java.runtime.version": "25.0.5+11-LTS",
+    "java.vendor": "BellSoft",
+    "java.home": "/Users/per/.sdkman/candidates/java/25.0.5.0+11-librca",
+    "java.vm.name": "OpenJDK 64-Bit Server VM",
+    "java.feature": "25"
+  },
+  "pureJavaJdk": {
+    "java.version": "21.0.13",
+    "java.runtime.version": "21.0.13+9-LTS",
+    "java.vendor": "Eclipse Adoptium",
+    "java.home": "/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home",
+    "java.vm.name": "OpenJDK 64-Bit Server VM",
+    "java.feature": "21"
+  },
+  "gradleArgv": [
+    "env",
+    "JAVA_HOME=/Users/per/.sdkman/candidates/java/25.0.5.0+11-librca",
+    "/private/tmp/jmlx-phase8.4-rc.2/gradlew",
+    "-p",
+    "/private/tmp/jmlx-phase8.4-rc.2",
+    "-PreleaseAllMode=true",
+    "-Dorg.gradle.java.installations.paths=/Users/per/.sdkman/candidates/java/25.0.5.0+11-librca,/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home",
+    "-Dorg.gradle.java.installations.auto-detect=false",
+    "-Dorg.gradle.java.installations.auto-download=false",
+    "-Dorg.gradle.java.installations.fromEnv=",
+    ":jmlx-core:float32GoldenTest",
+    "--rerun",
+    ":jmlx-core:test",
+    "--rerun",
+    ":jmlx-ffi:extractionFallbackTest",
+    "--rerun",
+    ":jmlx-ffi:loaderGuardTest",
+    "--rerun",
+    ":jmlx-models:float32GoldenTest",
+    "--rerun",
+    ":jmlx-models:test",
+    "--rerun",
+    ":jmlx-models:threadProbeTest",
+    "--rerun",
+    ":jmlx-native-macos-arm64:verifyNativeReleaseLicenses",
+    "--rerun",
+    ":jmlx-native-macos-arm64:verifyNativeReleasePayload",
+    "--rerun",
+    "bundleAll",
+    "--no-build-cache",
+    "--init-script",
+    "/private/tmp/jmlx-phase8.4-rc.2/tools/release-all/task-evidence.init.gradle",
+    "-PreleaseRequiredTasks=:jmlx-core:float32GoldenTest,:jmlx-core:test,:jmlx-ffi:extractionFallbackTest,:jmlx-ffi:loaderGuardTest,:jmlx-models:float32GoldenTest,:jmlx-models:test,:jmlx-models:threadProbeTest,:jmlx-native-macos-arm64:verifyNativeReleaseLicenses,:jmlx-native-macos-arm64:verifyNativeReleasePayload",
+    "-PreleaseInvocationId=c24fccff-bf4f-4594-b2bc-f6011c19c87f",
+    "-PreleaseEvidenceFile=/private/tmp/jmlx-phase8.4-rc.2/build/releaseAll/task-evidence-c24fccff-bf4f-4594-b2bc-f6011c19c87f.json"
+  ],
+  "gradleArgvFile": {
+    "path": "/private/tmp/jmlx-phase8.4-rc.2/build/releaseAll/gradle-argv-c24fccff-bf4f-4594-b2bc-f6011c19c87f.json",
+    "sha256": "c9c1fb38444dc1f38b4a44ee74bba2ff6b99b0388eb309b41af16740f2134395"
+  },
+  "taskEvidence": {
+    "path": "/private/tmp/jmlx-phase8.4-rc.2/build/releaseAll/task-evidence-c24fccff-bf4f-4594-b2bc-f6011c19c87f.json",
+    "sha256": "c9e9b9f5101eeaccf5703d4c460ec1eefc64869b4790458549d2f97b0b7ab2c1"
+  },
+  "junit": {
+    "jmlx-ffi/build/test-results/loaderGuardTest/TEST-se.alipsa.jmlx.ffi.NativeLoaderMissingMetallibTest.xml": "3eeb97ad6865ff9e5bf923cae13f4be52a1f51617fc887542b1de152d73cec19",
+    "jmlx-ffi/build/test-results/extractionFallbackTest/TEST-se.alipsa.jmlx.ffi.NativeLoaderExtractionFallbackTest.xml": "664a1a61040ee55a1e405c59dd21d2d18f928ea9e0ae15bdfa686162499a210b",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.DecoderAttentionTest.xml": "db02f33dac4c0d074ddf11fdaaaa8b8e000b4107e5eca551bf149620241f6044",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.DecoderAttentionTest.xml": "c9012ef4099184d10868c8b7fec5cb05a818fdc57f9026182ff0a759f12691bf",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.MoeMlpTest.xml": "b47edc3d42bcc31daf839e492da0fbcc9bbfcdfaeeacf50c0b662aca4329e241",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.MoeMlpTest.xml": "4469f868ab0fd5cdb456f3d31cec7edf61a98e4bfd6b5bc50d2dc70493ee0e19",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.SwitchGluTest.xml": "92f20c3cd72c0fe2d16d6a6137c2c369b834530511ced595069130fc9af63749",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.SwitchGluTest.xml": "7554ab63cce75b9033713370cc7d7f9e9e539658e17e982d82bad89ddc0fca64",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.MoeRoutingProbeTest.xml": "d3314348617086364c64bccc62a187eeb9d7fb5c31f715545ded89ea4674bf04",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.core.RopeFreqsProbeTest.xml": "cf3176e7542fd2f825a081fef1c51d61ed97b4b71b35a1411ff76c2f50368627",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.KVCacheTest.xml": "a4b36e0b7cbe7c5dfc7ce4663a7810ae76945f318351f6be45ba2a45f540f358",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.KVCacheMemoryPlateauTest.xml": "4fc00d47e54377733b6d4315df5be7a1e766cf370fb5ba49dea13528b64c458e",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.RecurrentCacheTest.xml": "204f5e45f6f1ba51670c020fd3e0e12ece4a4018f7a71b465e945e4475347ddd",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.GatedDeltaRuleTest.xml": "6a2cdaf1cc25ba9e1a1474cdcc13f945d2a443af6518ea4970654529d20e79c8",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.GatedDeltaNetTest.xml": "833c1d42dcff52fcf2d08489d73ffafef60a220b08f6162099de6aa2b5f45c1f",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.memory.GatedDeltaMemoryTest.xml": "5d1ca4b2503913beb9e655b896551975fb3d25e0613e09f9f06585eb3a751aa2",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.HybridDecoderBlockTest.xml": "06022999e01aec2fb10f952c1da5037a3bb9a59edb8c7524a174fc988c49d908",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.KVCacheQuantizationProbeTest.xml": "6d4d8952593d0b629e72d7d0c92125a6ade1ce931d0155a552b79976a526b9cf",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.PackedAttentionProbeTest.xml": "698105a776f7b7b9b164b9b1f3761a9dc9a4e16c34bd63e90064671a8d1ac291",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.AttentionMaskTest.xml": "3cc970b562e5e1e72a3ccd245babd0da8462ce86da113c08e52dc713cc71f33a",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.GroupedQueryAttentionTest.xml": "8e011483285af800b7d51df1a678c667987f5db61430a4e7e1a5362744a502bc",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.MultiHeadAttentionTest.xml": "5fefa9d436aac2a94cd8490d7e420b2e5f410608bb68bc01e58b173dd2baeb75",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.MultiHeadAttentionTest.xml": "84c90e95e0e51e9131a932937c5f507681c9bd61c70564c8a568f2f8e43f9b8b",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.BatchAttentionMaskTest.xml": "6d6f35de35c405cb96c0a653d62c6f0d092f6bf8136871b426f5f83bfc6790cf",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.BatchRopeProbeTest.xml": "50e5011e6e9bc6831ba43fe2f78e0b48dffbf1d849f4ebd4b50ebf315229300c",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.core.StridedViewSafetyTest.xml": "cd86ac4dbf27c99a651c46b7126164d227980c58554f7364922d53a878b77dbc",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.Phase71OracleTest.xml": "4f20d162294f9280042850a588397c590235dc200a6464998f6d9ebf35a3ef50",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.Phase71DefaultModeTest.xml": "a0464be1182c52338daf3fde9d06f7082e67cf23d83a00af8bf70767ed5ef990",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.Phase71ContractsTest.xml": "8f71ae449c6dd5df3dee2288fdfcf6acb0a3fcab7d52f3ac11f6c84f4aad4b69",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.EncoderAttentionTest.xml": "2c1e513ef68eb0ac7fe819cc7c92623186a789d48910749c8bcc560dd52c99dd",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.core.MLXMemoryLeakTest.xml": "d8536d0a204847c84ce755fc467e4e996a30b9fc3328612025482e3b26da6bd9",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.memory.MLXIOSelectionScopeTest.xml": "53ee411561812ce0b58f572938258858a4a6b798e115243acc7bf5a5166fdbb2",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.memory.CategoricalTempScopeTest.xml": "5d22d1eb887560beb2e4ab3155312ee11bd7746aa78d1d62e68c886810a825b1",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.MultiAxisRopeTest.xml": "8f6b16263a63d77a6bae258f4e53cbf825c9031db2ccca28b9ad408fce505aa0",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.MultiAxisRopeTest.xml": "3cb9e83eb55efb80758c3fe9ea9d12a3216ed2b01f4bd519b99f9fd85efd518f",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.DecoderRotationSeamTest.xml": "c7f48f5bbdd936dcd8e898d16fddb90206e0b672637400a0f8b9c8a1a0dd33c0",
+    "jmlx-core/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.nn.DecoderRotationSeamTest.xml": "00b1126a95d8a04dd4316cac806e48edd18b2f125d483c6c718299f6c3e520cb",
+    "jmlx-core/build/test-results/test/TEST-se.alipsa.jmlx.nn.SingleRowDecodeEquivalenceTest.xml": "ad64431b48815765b714fefbaad28a8b6dafa7917b0c454995d6e5703eb39ef2",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.DecoderRefactorGoldenTest.xml": "dcfc568f0c0f4d81b3dcde4fc50182d5c16804303793758a9ebf692de1a85376",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.MistralModelTest.xml": "c115c5291ab0c3c38e5ab8efb49edfcb9e14cadc26c1dab3362b91f8dbe7b50b",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.GemmaModelTest.xml": "12f5bd8702ea6e0b97ac7d5a4d9696ff54a5b7a9b27f424a5ececd2c38417cda",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Phi3ModelTest.xml": "d42e3f598500cec8091a8e8d148548bdf353c820ff095f845c7d16e82d1a6eab",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.MixtralModelTest.xml": "004f07ef955b12e2abaeeac82b03c389b5888e50958dba65fe3ca3348e6895d9",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Llama31ModelTest.xml": "e6e73ed848336f290f2522c96649c2b703f225466eb596dfb239cc8b2426ffe9",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3ModelTest.xml": "1e411755d41124aedd4b84ea5f7b6ff9d0c4003421a8721c48ec9bd1a5f3a36f",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.QuantizedCheckpointProbeTest.xml": "0566f3bc65b26834faa34e927b12ed251de576cc98780e257c2fb7cf7d4da70d",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.QuantizedDecoderTest.xml": "76f662b17316b66c948a97be8c2125ffc3f7fbd9b69d18956346a1961b54efbc",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderCacheLifecycleTest.xml": "eea2abc1a14b7056cfc61f64faeec848c88a64c4c0e31be23c2b2332252b63f2",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen35WeightsTest.xml": "6b25691855f7a74db84433a10ac5beb32eec197044eb401bb3665238ff7baad3",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen35TextGoldenTest.xml": "26a2ff0d5d5eceee9648d10b705e4da3f86f757cbf31b5b0c37ab8bc4b3fc4d2",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen35PackedGoldenTest.xml": "bb4311a1c507a6ee4f8f044bf23b819a17c5e6101139ce84c0436c62dc5d35aa",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen35VisionGoldenTest.xml": "78c0735a326111f0784ee3d05bce5a2de040a97cb814ed5d490907dc693d868e",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen35GenerationTest.xml": "26183ad808fb05234f77afd2a61247fff43da0d06474f4ee01750031c8e71025",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen35MemoryTest.xml": "1a5c5b5467531606e3c75919e82356ae7b5b86eb134e94cb4140d8e7878340ae",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen35DefaultPrecisionTest.xml": "5beb29e557aa9b750ab9c2c04aa3b15b5815ad2d1f3317a300808290dad5d7fb",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderCacheCapacityTest.xml": "7452b3fe921c15e170ff1170c690ddd37cd3772ec7bb55ab82bafd7055e269e0",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.DecoderSlidingWindowTest.xml": "e00d0238fab0fa3f261ce74d1402e578c76efae2913069a14e2de12ae6e65c3a",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderStackContractTest.xml": "22d3aeb07120d1da8e0932c22c1639efc83a98975c3157dc9f3a83cfc9f09d21",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderForwardPoisoningTest.xml": "7f524c8b07d572bacd53b18eeb49f0c07aa7aaa373bbe6a32d7e0dab35f23a24",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.QuantizedKvFeasibilityProbeTest.xml": "a6dce57da684fe3656f3632c6b434e2f05bafa9abf2a077d74f7509a117559b4",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchGenerationSchedulerTest.xml": "3e58e596ba82bde8e3e4603a1a30263846e9766a4c567d96df4a668ca63d4cf5",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchSchedulerFailureTest.xml": "7cb2408a9e38e1fb270013dccdda45b774dd3fa1ba86c54e49acc847e85264bc",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchSchedulerLifecycleTest.xml": "a9d4afce3ef860705fc1992530c7c2071c147251cb9051dba821ca32b35673e4",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchSchedulerMemoryTest.xml": "2454654aa9f8d8fcb103e3e57413d14a17e5005170bbb177415c5823de15675e",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SchedulerOperationTest.xml": "e2c67457b67215d096f5855a41f1e59e30c80d4eea77d6f8f903b91961881c0c",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SchedulerInferenceClientTest.xml": "34ed0a3ba50b4ba8a1d47333bd53fb9429a20c1476de6b7f5e411c5cd6b15627",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BatchStepEquivalenceTest.xml": "6f3c47d3f1f5212eb8fc389ca26f0d492ff8d46f71364ecde557c2d67b88cb71",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.BatchStepEquivalenceTest.xml": "0c911ec1660b6ec5a56904b396cf230450bf3627daf2f4dc041c5172fc35fcfd",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.BertGoldenTest.xml": "b893ddf2ec32bba92c99ad0897d819d8e404539f9a0a115c35c8fc8c4ab02e49",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.T5GoldenTest.xml": "de80f221f2e429d2212ee2b6ff6fda2766f88a2f6bf6325a9d59c397be3e1231",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Seq2SeqMemoryTest.xml": "db360b549f518fedf79e513d4940bdd4c611be6f6040f3cb8a6d6a5d5143cbbc",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Seq2SeqGenerationTest.xml": "b1dafb3c76ed617d869cbe8f383e0c540bf62d3623df39330f83fdf094ef2999",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.EncoderDefaultPrecisionTest.xml": "300156540e3cb50dbf245158629fb308a55e07a9da5ad26fc6a91dabba81ed5d",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.ModalityRejectionTest.xml": "c66eb8dfc6829ae17d5a9e08ca265184dfec8ad281887da3678329e4f83e7373",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Idefics3VisionTowerSmokeTest.xml": "2c3f945797b672abc11cc505ca0a70bef9cc051c6fe2faba7e762d795f3f3d04",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.SmolVlmGoldenTest.xml": "adf2ce5d0012a1eef08a8fe491f3f7d80d8160b660eaa37a647c6f460cd32e08",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SmolVlmGenerationTest.xml": "696097e94713d0a30de79d97560b51d8b58c8730df5ae6254ebcb26e7a7ae7f4",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.SmolVlmDefaultPrecisionTest.xml": "01ab08fbc2f86b85006a9f4b841ed805435648f0488b85b916676e894ca05e8a",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.VisionLanguageMemoryTest.xml": "4f1d8dcafbb2de95c68b05c5aed51c31071e464a9bd2741a37be8a219967d08c",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.DecoderSeamTest.xml": "05ba1e1b5811745cd2ff95fe45443144cecbd9c5e272447bd97e6b21339ae00b",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.DecoderSeamTest.xml": "de1b9ab1c1b77c83614c9017ab99a610fb33d3fe22eb32883a990998b20a01a9",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.VisualFeatureInjectionTest.xml": "9029913f1913866e6b3b7ead35e909b19229d6331d0c4201189598ac457f7c1c",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.VisualFeatureInjectionTest.xml": "1be2634019a9a8faf12a4aaf3175c3bb9a13afe8623b5f74660699ff08f17fc5",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlVisionTowerGoldenTest.xml": "84817571b350e16a563e1ccac57fffc25da7344a3a203729d1cea07a94142631",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlVisionPeakTest.xml": "801c45d786956eb60030cc9650257eed54aeadc057408e538722bf31d060cb11",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlVisionTowerValidationTest.xml": "f859a4ae06ad4d75e50cd5c2cfd130d51a826890d46747943ab62db31551370e",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlModelLoadTest.xml": "e89d88b6919ea4865fc2b6bbc38966e2fd5e545635885d91f54326e9b8727163",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlModelAffineLoadTest.xml": "7376255887f2b8d6885ecb7dba605c6d20ea0e262ac9804d864b7de0041da5fa",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlGenerationTest.xml": "f8223057b1422f4430e2d2bee47b4048497fe40ea3312d55ea086766150df414",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlMemoryTest.xml": "2dbf9a11061fcb4bdfce96dfeb63637772f0198c8e0fd97eab1b9af889e9b613",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlCacheEquivalenceTest.xml": "ce163c99029817fd20ef9bf18a255c990d571fe83415c464a6c54b3030380aec",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlCacheEquivalenceTest.xml": "187760d3186e01639efe32113cffcab1015354c4e7b30e89d1c955e2bee98ae0",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Qwen3VlGoldenTest.xml": "152bc310f2d06f00d179958ad1a0f7f1c685fcc987129b5e40c9dd65f1cee70c",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Qwen3VlDefaultPrecisionTest.xml": "0880727bf9a12a46fd1ee101e21caefb9c105edc2d4aa8c41f69e3001412778f",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VModelTest.xml": "a4f8fc4d836f773bc878c0f3282a2e1a7cfc2d0c1bba51fc3a81194897e08810",
+    "jmlx-models/build/test-results/float32GoldenTest/TEST-se.alipsa.jmlx.models.Phi3VGoldenTest.xml": "3b97bf453a8bff88912f0d7774c23de85229868133cd44d61f41074ce6aa4ac6",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VDefaultPrecisionTest.xml": "d858a7f0eb6b7de4d5325bd204d5f0ac9adba56e8a8cd8480078b5cdb88c18f4",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VRopeReferenceTest.xml": "fbdec6bddd6b20c999242ccff106ee3b82da3d20eb353b8f515247d7d0b4b583",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VGenerationTest.xml": "edcd6f6b9d8c9f63137c366b37c897fc9dd0cda95cbcea37e68176eb99fa6596",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.Phi3VMemoryTest.xml": "64ab0830c0ed55d121545a4064a4e836df978e5850b1dd0e54dbc58e10cc7c7a",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BaselineAdaptersTest.xml": "93217c4afbe05f56327a1a7b7279849af330683503e688a7973a7b07659bb886",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BaselineWorkerProtocolTest.xml": "8d6aa5243b8ee1e248bd23473688ba66379e7ecc731524c1adf83c7a441c7c10",
+    "jmlx-models/build/test-results/test/TEST-se.alipsa.jmlx.models.BaselineWorkerProcessTest.xml": "e1bf74d28a696f0dc7daefb2d428cf97d46ac4f09258fd4f40fbd48b30d4ff98",
+    "jmlx-models/build/test-results/threadProbeTest/TEST-se.alipsa.jmlx.models.WorkerStreamProbeTest.xml": "b8fb7cab446dd01f39c07ad4c050cdc3f75924c3ce5558d7eec89e0a47e6b391"
+  }
+}

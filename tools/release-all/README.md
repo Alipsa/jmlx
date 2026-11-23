@@ -42,6 +42,11 @@ are ignored for status-only recovery. Protect the journal against modification.
    bump. Record the new plugin's historical 8.1 regressions on an unpushed throwaway commit.
 2. Merge the reviewed release-version PR. Anchor an annotated immutable `jmlx-phase8.4-rc.N`
    tag at that SHA and work from a clean detached checkout. Never move the tag.
+   Keep candidate and audit checkouts in durable storage, for example
+   `$HOME/release-candidates/jmlx-phase8.4-rc.N`, never `/tmp`, `/private/tmp` or an OS
+   temporary directory. Preserve their original absolute paths until publication or
+   abandonment: current receipts are not relocatable. RC2 lost its temporary checkout
+   after reboot and cannot currently be revalidated.
    Cut the candidate only after the minimum-host workflow-identity check
    (`verify_minimum_host_workflow`) is on `main` and included in the tagged commit:
    `bundle_smoke.py` runs from the candidate checkout.
@@ -64,6 +69,14 @@ are ignored for status-only recovery. Protect the journal against modification.
    native/pure JDK vendor/full version/home, and this invocation's test evidence. Apple tool
    preflight runs before bundling and records either Xcode or selected CLT package metadata. Its
    printed SHA-256 is an input to every remote/local exact-bundle verification.
+   Back up the complete candidate checkout (including ignored native/build output),
+   plugin bundle receipt and manifest, task-evidence/Gradle-argv JSON, JUnit XML,
+   preliminary/final records, signed ZIP and consumer sidecars in durable storage.
+   A ZIP plus preliminary record alone is insufficient. Verify the backup inventory
+   against every recorded input digest and exercise final-receipt revalidation before
+   ending the window. Keep both jinja verification logs/reports and human sign-off.
+   For each Javadoc comparison record the actual producer toolchain vendor and full
+   runtime version for both archives, rather than inferring it from generated resources.
 7. Use `bundle_smoke.py` for `macos-full`, `macos-pure` and local `linux-pure` reports. It calls
    the independent consumer in read-only bundle mode, records the environment and binds its
    log digest to the candidate. The Linux run uses a full scratch clone of the candidate tag,

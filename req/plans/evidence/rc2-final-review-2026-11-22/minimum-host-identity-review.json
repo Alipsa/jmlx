@@ -1,0 +1,25 @@
+{
+  "recordedAt": "2026-11-22T22:18:35.315261+00:00",
+  "runId": 45076371223,
+  "jobId": 137374458588,
+  "runnerId": 23,
+  "runnerVersionFromActualJobSetup": "2.338.2",
+  "runnerStatus": "offline",
+  "runnerBusy": false,
+  "service": {
+    "exitCode": 113,
+    "stdout": "",
+    "stderr": "Bad request.\nCould not find service \"com.alipsa.jmlx-release-runner\" in domain for system\n"
+  },
+  "smbShared": false,
+  "jobLogSha256": "f545c8527c903f38b850b2e946ba38f2900ef257792d496a1351471978b9a99f",
+  "reportSha256": "41a1936184f7b9f1aeb078402d1f0001603ce6d684ce6d49c7e2b30094f9acb1",
+  "workflowIdentityMatchesReviewedMain": true,
+  "shutdownDiagnosis": "Immediate bootout snapshot was SIGTERMed; later inspection confirms service removal. Original shutdown snapshot retained.",
+  "postWindowAccountProbe": {
+    "path": "/Users/per/project/jmlx/build/releaseAll/window-2026-11-22.es5swG3t/account-probe.json",
+    "sha256": "49ec5ba6dbd1686306b0d041a3bbb5d99a406c4559276f89e548436197bc5cd4",
+    "sourceCommit": "33676837f66993b5a809644dbbdc6e6550417334",
+    "matchesPreWindowMeasurements": true
+  }
+}

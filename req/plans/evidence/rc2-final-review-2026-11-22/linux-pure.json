@@ -1,0 +1,44 @@
+{
+  "schema": "jmlx-bundle-smoke-1",
+  "kind": "linux-pure",
+  "passed": true,
+  "bundleSha256": "0dbb1451f8015843dfd77aeff5ae5e7f1afdbb80bb01f489ee06dfd92f1ba35e",
+  "preliminarySha256": "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af",
+  "candidateSha": "33676837f66993b5a809644dbbdc6e6550417334",
+  "environment": {
+    "system": "Linux",
+    "architecture": "aarch64",
+    "kernel": "6.18.35",
+    "launcherJava": "openjdk version \"21.0.12.1\" 2026-08-18 LTS\nOpenJDK Runtime Environment (build 21.0.12.1+1-LTS)\nOpenJDK 64-Bit Server VM (build 21.0.12.1+1-LTS, mixed mode, sharing)",
+    "osRelease": "PRETTY_NAME=\"Ubuntu 26.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"26.04\"\nVERSION=\"26.04.1 LTS (Resolute Raccoon)\"\nVERSION_CODENAME=resolute\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=resolute\nLOGO=ubuntu-logo\n",
+    "containerImage": "sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944"
+  },
+  "command": [
+    "bash",
+    "/tmp/jmlx-phase8.4-rc.2/tools/release-smoke/run.sh",
+    "candidate",
+    "--profile",
+    "pure-java",
+    "--bundle",
+    "/projects/jmlx/build/releaseAll/candidates/rc.2/transport/jmlx-mega-bundle.zip",
+    "--bundle-record",
+    "/projects/jmlx/build/releaseAll/candidates/rc.2/transport/preliminary-c24fccff-bf4f-4594-b2bc-f6011c19c87f.json",
+    "--bundle-record-sha256",
+    "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af"
+  ],
+  "consumerRuntime": {
+    "java.vendor": "BellSoft",
+    "java.version": "21.0.12.1",
+    "java.runtime.version": "21.0.12.1+1-LTS",
+    "java.vm.name": "OpenJDK 64-Bit Server VM",
+    "java.feature": "21",
+    "java.home": "/root/.sdkman/candidates/java/21.0.12+1.1-librca"
+  },
+  "consumerRuntimeFile": "linux-pure.runtime.xml",
+  "runId": null,
+  "identityAssurance": "Local measurements; workflow run ID and container image are operator attestations, not authenticated provenance",
+  "outputs": {
+    "linux-pure.log": "b4384e537bb6d41b186411ed61dfc5e7ed1d288b395176373e36c432409d4fd7",
+    "linux-pure.runtime.xml": "aa2f8b922ca7df6e31ecbd43ad6aeeccf20b6029de1d1bce70a9b7531ea28365"
+  }
+}

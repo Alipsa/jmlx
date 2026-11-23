@@ -38,3 +38,8 @@ req/native-authored-attributions.json text eol=lf
 
 # Preserve post-merge native distribution review evidence across checkout settings.
 req/plans/evidence/native-distribution-review-2026-11-22/** -text
+
+# Preserve exact RC2 report, runtime, metadata and review evidence bytes.
+req/plans/evidence/rc2-final-review-2026-11-22/** -text
+# Exact Gradle stdout contains a trailing space in its daemon shutdown message.
+req/plans/evidence/rc2-final-review-2026-11-22/*.log whitespace=-blank-at-eol

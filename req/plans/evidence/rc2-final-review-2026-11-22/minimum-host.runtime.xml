@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+<comment>Measured smoke consumer JVM</comment>
+<entry key="java.vendor">Eclipse Adoptium</entry>
+<entry key="java.version">25.0.5.1</entry>
+<entry key="java.runtime.version">25.0.5.1+2-LTS</entry>
+<entry key="java.vm.name">OpenJDK 64-Bit Server VM</entry>
+<entry key="java.feature">25</entry>
+<entry key="java.home">/Users/jmlxrunner/actions-runner/_work/_tool/Java_Temurin-Hotspot_jdk/25.0.5-100000002.0.LTS/aarch64/Contents/Home</entry>
+</properties>

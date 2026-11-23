@@ -1,0 +1,4 @@
+﻿2026-11-22T22:12:27.6776530Z Current runner version: '2.338.2'
+2026-11-22T22:12:27.6779010Z Runner name: 'jmlx-release-minimum-m5-max'
+2026-11-22T22:12:27.6779340Z Runner group name: 'Default'
+2026-11-22T22:12:27.6779720Z Machine name: 'Permac'

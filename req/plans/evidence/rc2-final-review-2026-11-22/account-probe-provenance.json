@@ -1,0 +1,23 @@
+{
+  "schema": 1,
+  "assembledOn": "2026-11-23",
+  "method": "Surviving original sidecars copied byte-for-byte; no timestamps inferred from filesystem metadata.",
+  "probes": {
+    "pre-window": {
+      "windowDirectory": "build/releaseAll/window-2026-11-22.tJMzZeDB",
+      "sourceCommitFile": "pre-window-source-commit.txt",
+      "exactProbeTime": "not recorded"
+    },
+    "connected": {
+      "windowDirectory": "build/releaseAll/window-2026-11-22.HD3nIoaw",
+      "sourceCommitFile": "connected-source-commit.txt",
+      "observation": "connected-account-probe-20261122T221202.609857Z.json"
+    },
+    "post-window": {
+      "windowDirectory": "build/releaseAll/window-2026-11-22.es5swG3t",
+      "sourceCommitFile": "post-window-source-commit.txt",
+      "observation": "minimum-host-identity-review.json"
+    }
+  },
+  "limits": "Sidecars record selected source commits, not authenticated execution provenance; pre-window output contains no exact time."
+}

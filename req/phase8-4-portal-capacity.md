@@ -2,7 +2,8 @@
 
 Reviewed 2026-11-16 at PR #101 merge `102e03ea43e508042ec4d43a61802b448a525267`.
 Revised 2026-11-17 (review rounds 1 and 2).
-Status: research complete; account capacity and signed-candidate measurement pending.
+Status: RC2 historical bundle measurement complete; receipt revalidation blocked by missing
+candidate inputs. Current account capacity remains pending.
 This procedure does not authorize publication or close the native-license gate.
 
 ## Current official sources
@@ -99,4 +100,20 @@ coordinates with nine events. The cited pages do not establish rejected-upload a
 obtain clarification if retries affect available capacity. Retain the snapshot, measurement,
 candidate SHA/digest and accounting decision outside `build/` before running `clean`.
 Close the checklist gate only when the exact signed bundle and current account evidence agree.
-No signed candidate or account-specific capacity verdict exists yet.
+
+## RC2 measurement (2026-11-22)
+
+The [RC2 review](phase8-4-rc2-final-review.md) identifies the historically verified signed ZIP
+and receipt. Missing candidate checkout/producer inputs now block receipt revalidation,
+acceptance and publication. The inventory below remains evidence for the retained RC2 ZIP;
+any replacement bundle requires a new measurement and capacity assessment against its digest.
+Its [retained inventory](plans/evidence/rc2-final-review-2026-11-22/portal-bundle-measurement.json)
+records 106,730,874 compressed bytes, 270 files and 107,448,768 bytes inside the upload ZIP.
+The digest matches the preliminary record, ZIP CRCs pass and filenames are unique. The
+measurement passes the existing conservative upload cap; it is not a capacity verdict.
+
+The three official sources above were rechecked on 2026-11-22. They still direct publishers
+to the authenticated Usage Center for current organization/scope limits and usage. The
+account snapshot, plan/classification confirmation and any adjusted limits or enforcement
+conditions remain pending. No account-specific capacity verdict or publication authorization
+has been recorded. Refresh that snapshot immediately before any authorized publication.

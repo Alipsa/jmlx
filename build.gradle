@@ -1065,11 +1065,52 @@ tasks.named('check') {
     // check covers handwritten source in every module.
     dependsOn tasks.named('verifyMlxApiInventory'), tasks.named('verifyMlxApiCallSites'),
             tasks.named('verifyHfReferenceGoldens'),
+            tasks.named('verifyRc2ReviewEvidence'),
             tasks.named('verifyImageOracleDependencyPins'),
             tasks.named('verifyImageOracleFixtureDigests'),
             tasks.named('verifyDecodeBaselineManifest'),
             tasks.named('verifyQwenVlReferenceProvenance'),
             tasks.named('verifyQwen35ReferenceGoldens')
+}
+
+tasks.register('verifyRc2ReviewEvidence') {
+    group = 'verification'
+    description = 'Verifies the retained RC2 evidence inventory and review document.'
+    def evidenceDir = file('req/plans/evidence/rc2-final-review-2026-11-22')
+    def reviewFile = new File(evidenceDir, 'review.json')
+    inputs.dir(evidenceDir)
+    // Only the retained packet and its review document are frozen; follow-up guides remain editable.
+    def review = new groovy.json.JsonSlurper().parse(reviewFile)
+    inputs.file(review.reviewDocument.path)
+    doLast {
+        def expectedNames = (review.retainedFiles.keySet() + ['review.json']) as Set
+        // Finder metadata is ignored by Git and is not part of the evidence packet.
+        def actualNames = evidenceDir.listFiles().findAll { it.name != '.DS_Store' }
+                .collect { it.name } as Set
+        if (actualNames != expectedNames) {
+            throw new GradleException('RC2 review evidence inventory differs: '
+                    + "missing=${expectedNames - actualNames}, unlisted=${actualNames - expectedNames}")
+        }
+        def verifyPin = { File base, String name, String digest, bytes ->
+            if (!(bytes instanceof Number) || !(bytes.toString() ==~ /0|[1-9][0-9]*/)) {
+                throw new GradleException(
+                        "RC2 review evidence requires a nonnegative integer size: ${name}")
+            }
+            def target = new File(base, name).canonicalFile
+            if (!target.toPath().startsWith(base.canonicalFile.toPath()) || !target.isFile()) {
+                throw new GradleException("RC2 review evidence missing or outside its root: ${name}")
+            }
+            if (!(digest ==~ /[0-9a-f]{64}/) || sha256File(target) != digest
+                    || target.length() != bytes) {
+                throw new GradleException("RC2 review evidence digest/size differs: ${name}")
+            }
+        }
+        review.retainedFiles.each { name, pin ->
+            verifyPin(evidenceDir, name, pin.sha256, pin.bytes)
+        }
+        verifyPin(rootDir, review.reviewDocument.path,
+                review.reviewDocument.sha256, review.reviewDocument.bytes)
+    }
 }
 
 tasks.register('verifyHfReferenceGoldens') {

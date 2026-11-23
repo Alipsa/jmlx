@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "copiedAt": "2026-11-23T11:10:51.761923+00:00",
+  "backupRoot": "/Users/per/release-candidates/jmlx-phase8.4-rc.2-survivors-2026-11-23",
+  "inventoryFile": "backup-inventory.json",
+  "inventorySha256": "a07c088c19ccb132bb2e9b74174455d767234296afed93732c925b8baf3a302b",
+  "sourceCommit": "de662a8fedfe11a989c9c36ee7dabc1386c25bc8",
+  "fileEntries": 3438,
+  "regularFileBytes": 396755077,
+  "copiedTrees": [
+    "build/releaseAll/candidates/rc.2",
+    "build/releaseAll/window-2026-11-22.HD3nIoaw",
+    "build/releaseAll/window-2026-11-22.es5swG3t",
+    "build/releaseAll/window-2026-11-22.tJMzZeDB"
+  ],
+  "verification": "All file sizes/SHA-256 and symlink targets compared between source before copy, source after copy and destination. No candidate receipt paths changed.",
+  "limits": "Durable local copy outside checkout and Gradle clean scope, not an independent-device backup. Does not recover missing candidate checkout, producer JSON, JUnit XML or establish native equivalence. Restore receipt inputs to their original absolute paths before unchanged verification."
+}

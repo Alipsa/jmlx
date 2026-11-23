@@ -1,21 +1,12 @@
 {
   "schema": 1,
-  "checkedAt": "2026-11-23T12:03:35.007427+00:00",
-  "sourceCommit": "05e926abfec80803001e62f0da2e049a32d5f423",
+  "checkedAt": "2026-11-23T12:12:03.619017+00:00",
+  "sourceCommit": "6acbc4d071f253e414f93d571e51f1b85c9c4c4e",
   "sourceCommitNote": "HEAD at check time, not necessarily a clean tree; native and JUnit inputs are ignored outputs. See workingTreeStatus.",
-  "workingTreeStatus": [
-    " M .gitattributes",
-    " M jmlx-core/CHANGELOG.md",
-    " M jmlx-jinja/CHANGELOG.md",
-    " M jmlx-models/CHANGELOG.md",
-    " M jmlx-tokenizer/CHANGELOG.md",
-    " M jmlx-vision/CHANGELOG.md",
-    " M req/phase8-4-rc3-preparation.md",
-    " M req/phase8-4-release-checklist.md",
-    "?? req/plans/evidence/rc3-preparation-2026-11-23/recovery-check.py"
-  ],
-  "probeSha256": "859c4e203bf6d75f0b1282dcd4f1aad6b72ec59fd186b340162d7d9b719a715e",
+  "workingTreeStatus": [],
+  "probeSha256": "d6e003d49629911788a54102c099456d0cc5d300a5438293d2bd7a71660dae84",
   "nativeReportImplementationSha256": "85b4f940f67faf916a9263a3920a69763837176af6685cb8c8db131e4ca4e849",
+  "nativeReportImplementationSource": "probe repository, SHA-256 checked before execution",
   "bootstrapSha256": "ef82a354631b255f0db42abcc3a83bf8cbf130cd7236d79482b51c2c7b54200b",
   "preliminarySha256": "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af",
   "nativeReportArguments": {

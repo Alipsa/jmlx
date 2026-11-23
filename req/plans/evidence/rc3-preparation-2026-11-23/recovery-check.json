@@ -1,10 +1,20 @@
 {
   "schema": 1,
-  "checkedAt": "2026-11-23T12:12:03.619017+00:00",
-  "sourceCommit": "6acbc4d071f253e414f93d571e51f1b85c9c4c4e",
+  "checkedAt": "2026-11-23T12:23:10.008417+00:00",
+  "sourceCommit": "68a9e69b7e85c7587fcf565be2e7575439f047a9",
   "sourceCommitNote": "HEAD at check time, not necessarily a clean tree; native and JUnit inputs are ignored outputs. See workingTreeStatus.",
   "workingTreeStatus": [],
-  "probeSha256": "d6e003d49629911788a54102c099456d0cc5d300a5438293d2bd7a71660dae84",
+  "gitStatusArgv": [
+    "git",
+    "--no-optional-locks",
+    "-C",
+    "/Users/per/project/jmlx",
+    "-c",
+    "core.fsmonitor=false",
+    "status",
+    "--porcelain"
+  ],
+  "probeSha256": "fcd6999e0ff19613c635aeee1fc5a0697dabd9e5cad5ee92aea3d8e90a8a170a",
   "nativeReportImplementationSha256": "85b4f940f67faf916a9263a3920a69763837176af6685cb8c8db131e4ca4e849",
   "nativeReportImplementationSource": "probe repository, SHA-256 checked before execution",
   "bootstrapSha256": "ef82a354631b255f0db42abcc3a83bf8cbf130cd7236d79482b51c2c7b54200b",

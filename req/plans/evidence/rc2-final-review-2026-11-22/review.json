@@ -246,7 +246,7 @@
     }
   },
   "evidenceLimits": [
-    "RC2 original candidate and audit checkouts are missing as of 2026-11-23. The four pinned producer JSON inputs were not retained; current final-receipt revalidation is blocked. Do not recreate them from summaries.",
+    "RC2 original candidate and audit checkouts are missing as of 2026-11-23. Recovery needs four pinned producer JSON files, all 104 digest-pinned JUnit XML reports, staged native/install/lib matching the full recorded native report, and the preliminary record restored at its original path (identical retained copies survive). Signed ZIP and consumer report/sidecar paths must also satisfy the receipt. Main-checkout native equivalence is unestablished. Recovering only the four JSON files is insufficient; do not regenerate original JUnit XML or recreate producer inputs from summaries.",
     "Consumer JSON/log/runtime sidecars and actual job setup identity excerpt are retained here; full job log remains downloadable from the GitHub job, with its hash in the identity review.",
     "Local prerequisite logs and audit report survive under ignored build/releaseAll/candidates/rc.2; the audit checkout does not. Both jinja verification logs and surviving account source-commit sidecars are now retained here.",
     "No ZIP, signing key, Portal credential or runner authentication file is committed.",
@@ -257,8 +257,8 @@
   ],
   "reviewDocument": {
     "path": "req/phase8-4-rc2-final-review.md",
-    "sha256": "eb161bf9334f57e76a81ca2f18c1d2ade435819472487eaad99fd1038dcf1c66",
-    "bytes": 10501
+    "sha256": "f740d223e7f1bb00a26a9a59bde5bc4dc08047ad78a9b8d0163c7f0f34f1c80a",
+    "bytes": 11180
   },
   "followupSurfaceSha256": {
     "req/phase8-4-release-notes.md": "e2bca16946052a2f1d9cb04b5f8465e6f7b395c8414d4f5dcbd09aff584b4792",
@@ -267,6 +267,7 @@
     "req/phase8-4-minimum-host-setup.md": "1b05d49b759fd55df78e9d7093898afa753e59eea49a5a4e7625cb24250fb6b2",
     "tools/release-all/README.md": "344b6689a36b144cbc2e836227a8a090011d23ac582b8b46bdcdd7fd6a5c6fcb"
   },
-  "followupSurfaceSha256Meaning": "Hashes describe the prepared follow-up files at the reviewed packet commit, outside the immutable candidate; acceptance must cite that full commit.",
-  "updatedOn": "2026-11-23"
+  "followupSurfaceSha256Meaning": "Historical hashes of follow-up documents at followupSurfaceCommit, outside the tagged candidate. These living documents are not frozen by root check; owner acceptance must cite the reviewed packet commit and current review document/manifest digests.",
+  "updatedOn": "2026-11-23",
+  "followupSurfaceCommit": "12aa85311b157776cfd58166b1bc6e679147216a"
 }

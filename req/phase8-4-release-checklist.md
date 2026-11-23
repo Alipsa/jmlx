@@ -59,7 +59,8 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   RC2 follow-up: the owner disabled this share before the verification window. Registration,
   queue, saved environment and account/tool measurements were rechecked; the post-window
   probe matches. At 2026-11-22 22:18:35 UTC the share was disabled and runner ID 23 was
-  offline and unloaded. Guest read-write settings remained configured; recheck before any new window.
+  offline and unloaded. Guest read-write settings remained configured; recheck before any
+  new window.
   See the [RC2 review](phase8-4-rc2-final-review.md) for the completed window evidence.
 - [ ] Complete native transitive-license audit, including compiled-in MLX dependencies.
   The [2026-11-16 source audit](phase8-4-native-license-audit.md) expands the packaged
@@ -112,9 +113,15 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   changelog version-cut dates with the final candidate cut date.
   Prepared as 2026-11-22; recheck the date immediately before creating the immutable tag.
   RC2 was cut and verified on that date; no changelog input was changed afterward.
+  A replacement candidate reopens this gate: align and review the version-cut dates again
+  against its actual cut date, then rerun the affected verification.
 - [ ] Restore revalidatable candidate provenance before acceptance or publication.
   RC2 tag/SHA, signed bundle and all consumer runs were historically verified, but the
-  original candidate checkout and four pinned producer inputs are missing.
+  original candidate checkout is missing, including four pinned producer JSON files and all
+  104 digest-pinned JUnit XML reports. Recovery also needs matching staged `native/install/lib`
+  and the preliminary record restored at its original path (an identical copy survives).
+  Matching the main checkout's native staging has not been established. Recovering only the
+  four JSON files is insufficient; see the complete recovery requirements in the RC2 review.
   [RC2 final review](phase8-4-rc2-final-review.md) retains the receipt, exact reports, artifact
   comparison and ZIP inventory. All four consumer reports pass. Owner acceptance of this
   signed candidate and the changed Javadoc/module checksums remains pending.

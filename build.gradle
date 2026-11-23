@@ -1075,22 +1075,31 @@ tasks.named('check') {
 
 tasks.register('verifyRc2ReviewEvidence') {
     group = 'verification'
-    description = 'Verifies the retained RC2 review packet and its referenced document hashes.'
+    description = 'Verifies the retained RC2 evidence inventory and review document.'
     def evidenceDir = file('req/plans/evidence/rc2-final-review-2026-11-22')
     def reviewFile = new File(evidenceDir, 'review.json')
     inputs.dir(evidenceDir)
-    // Parse during configuration so every pinned follow-up document is also a task input.
+    // Only the retained packet and its review document are frozen; follow-up guides remain editable.
     def review = new groovy.json.JsonSlurper().parse(reviewFile)
     inputs.file(review.reviewDocument.path)
-    inputs.files(review.followupSurfaceSha256.keySet())
     doLast {
-        def verifyPin = { File base, String name, String digest, Number bytes ->
+        def expectedNames = (review.retainedFiles.keySet() + ['review.json']) as Set
+        def actualNames = evidenceDir.listFiles().collect { it.name } as Set
+        if (actualNames != expectedNames) {
+            throw new GradleException('RC2 review evidence inventory differs: '
+                    + "missing=${expectedNames - actualNames}, unlisted=${actualNames - expectedNames}")
+        }
+        def verifyPin = { File base, String name, String digest, bytes ->
+            if (!(bytes instanceof Number) || !(bytes.toString() ==~ /0|[1-9][0-9]*/)) {
+                throw new GradleException(
+                        "RC2 review evidence requires a nonnegative integer size: ${name}")
+            }
             def target = new File(base, name).canonicalFile
             if (!target.toPath().startsWith(base.canonicalFile.toPath()) || !target.isFile()) {
                 throw new GradleException("RC2 review evidence missing or outside its root: ${name}")
             }
             if (!(digest ==~ /[0-9a-f]{64}/) || sha256File(target) != digest
-                    || (bytes != null && target.length() != bytes.longValue())) {
+                    || target.length() != bytes) {
                 throw new GradleException("RC2 review evidence digest/size differs: ${name}")
             }
         }
@@ -1099,9 +1108,6 @@ tasks.register('verifyRc2ReviewEvidence') {
         }
         verifyPin(rootDir, review.reviewDocument.path,
                 review.reviewDocument.sha256, review.reviewDocument.bytes)
-        review.followupSurfaceSha256.each { name, digest ->
-            verifyPin(rootDir, name, digest, null)
-        }
     }
 }
 

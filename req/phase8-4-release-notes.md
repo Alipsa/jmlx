@@ -1,8 +1,8 @@
 # Phase 8.4 release notes — draft
 
 Not published. RC2 historical technical verification passed, but missing candidate checkout/
-producer inputs now block receipt revalidation and acceptance; owner signed-candidate/delivery acceptance,
-Portal capacity and publication authorization remain pending. The
+producer inputs now block receipt revalidation and acceptance. Owner signed-candidate/delivery
+acceptance, Portal capacity and publication authorization remain pending. The
 [RC2 review](phase8-4-rc2-final-review.md) records the exact tag, SHA, signed ZIP and receipt.
 Module release tags and deployment identity remain for the authorized publication record.
 

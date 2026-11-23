@@ -1,6 +1,32 @@
 {
-  "status": "pending owner-provided current Usage Center snapshot",
-  "usageCenterSnapshot": null,
+  "status": "partial owner-provided namespace usage retained; account limits and capacity confirmation pending",
+  "usageCenterSnapshot": {
+    "source": "Owner-provided CSV row in the release preparation conversation; no authenticated account query was performed.",
+    "recordedAt": "2026-11-23T21:30:20.552026+00:00",
+    "observedAt": null,
+    "billingMonth": null,
+    "organization": null,
+    "scope": "namespace only",
+    "namespace": "se.alipsa",
+    "reportedUsage": {
+      "releaseSizeDisplay": "5.45 MB",
+      "releaseSizeExactBytes": null,
+      "fileCount": 222,
+      "releaseCount": 8
+    },
+    "rawRecord": {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-namespace-usage.csv",
+      "bytes": 72,
+      "sha256": "a5e074f67cf3584705bf68c947173aaaadcd4c20fede61bdd387c5efe49582ae"
+    },
+    "organizationTotals": null,
+    "monthlyLimits": null,
+    "planAndAccountClassification": null,
+    "adjustedLimitOrExemption": null,
+    "adjustedLimitExpiry": null,
+    "graceOrEnforcementBanner": null,
+    "limits": "The displayed release size may be rounded; its byte-unit convention and exact underlying value were not supplied. The row supplies neither organization totals nor entitlements or enforcement status. Null values mean unknown, not absent or unlimited."
+  },
   "requestedFields": [
     "observation time",
     "organization/namespace scope",
@@ -10,5 +36,15 @@
     "grace/enforcement banner"
   ],
   "measurement": "portal-bundle-measurement.json",
-  "publicationCapacityConfirmed": false
+  "publicationCapacityConfirmed": false,
+  "projectedNamespaceUsage": {
+    "candidateBundleSha256": "139bff18f638136a34a1e61de942322a1d5523a821deca8b282b05b9ca3a500c",
+    "candidatePublishedFileBytes": 107448758,
+    "candidateFiles": 270,
+    "plannedPublishOperations": 1,
+    "fileCount": 492,
+    "releaseCount": 9,
+    "releaseSize": "Displayed current usage of 5.45 MB plus 107,448,758 candidate published-file bytes; no exact total established.",
+    "assumptions": "No intervening namespace releases; this combined deployment adds one namespace release event. Actual Portal accounting and organization-wide headroom still require account confirmation."
+  }
 }

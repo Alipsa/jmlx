@@ -191,7 +191,11 @@ The ZIP measures 106,730,869 bytes, with 270 files totaling 107,448,758 bytes. I
 unique filenames and conservative upload-size check pass. This is not a Portal account
 capacity verdict. The [capacity status][capacity] requests current Usage Center scope,
 plan/classification, monthly byte/file/release-event usage and limits, adjusted-limit expiry
-and grace/enforcement banners. No current account snapshot has been supplied.
+and grace/enforcement banners. The owner supplied namespace usage for `se.alipsa`:
+5.45 MB, 222 files and 8 release events. The row is retained in
+`portal-namespace-usage.csv`, with projections in the capacity status. It supplies no
+organization totals, limits, plan/account classification, snapshot time or enforcement
+status. Current account capacity therefore remains unconfirmed.
 
 Temporary draft Release 455573517 retains only the exact ZIP and preliminary record;
 downloaded asset bytes matched both expected digests. Keep it unpublished. Archive the

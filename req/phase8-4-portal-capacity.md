@@ -3,8 +3,8 @@
 Reviewed 2026-11-16 at PR #101 merge `102e03ea43e508042ec4d43a61802b448a525267`.
 Revised 2026-11-17 (review rounds 1 and 2).
 Status: RC3 signed-bundle measurement and technical receipt revalidation complete.
-Current account capacity remains pending. RC2 measurements remain historical.
-This procedure does not authorize publication or close the native-license gate.
+Namespace usage supplied by the owner is retained; account limits and capacity remain
+pending. RC2 measurements remain historical. This procedure does not authorize publication.
 
 ## Current official sources
 
@@ -106,9 +106,24 @@ Close the checklist gate only when the exact signed bundle and current account e
 The [RC3 review](phase8-4-rc3-final-review.md) records the unchanged signed ZIP and
 revalidated final receipt. Its retained inventory measures 106,730,869 ZIP bytes,
 270 files and 107,448,758 entry bytes. Digest/CRC checks, filename uniqueness and the
-conservative upload-size check pass. The current Usage Center account snapshot is still
-pending; these measurements do not confirm available capacity or authorize publication.
-A replacement bundle must be measured again against its own digest.
+conservative upload-size check pass. The owner supplied the following namespace usage
+on 2026-11-23; the [CSV](plans/evidence/rc3-final-review-2026-11-23/portal-namespace-usage.csv)
+and [structured status](plans/evidence/rc3-final-review-2026-11-23/portal-capacity-status.json)
+retain it separately from the candidate inventory:
+
+| Namespace | Displayed release size | File count | Release count |
+| --- | --- | --- | --- |
+| se.alipsa | 5.45 MB | 222 | 8 |
+
+With no intervening releases, the planned combined deployment would bring this namespace
+to 492 files and an expected 9 release events. Published-file size would add 107,448,758
+bytes to the displayed 5.45 MB. The display may be rounded and its byte-unit convention
+was not supplied, so this is not an exact byte total. The snapshot's observation time and
+billing month were not supplied; the status records only when the row was retained.
+Organization totals, allowed monthly metrics, plan/account classification, adjusted-limit
+or exemption details and any grace/enforcement banners remain unknown. No capacity verdict
+or publication authorization follows from the namespace row. Refresh the account snapshot
+immediately before publishing. A replacement bundle must be measured against its own digest.
 
 ## RC2 measurement (2026-11-22)
 

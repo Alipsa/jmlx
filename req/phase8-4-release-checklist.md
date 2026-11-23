@@ -103,8 +103,10 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   the signed candidate and planned delivery remains open.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
-  organization Usage Center values remain outstanding. The RC3 ZIP inventory is retained
-  in its review; it passes the conservative upload-size check only.
+  the owner supplied namespace usage of 5.45 MB, 222 files and 8 release events for
+  `se.alipsa`, retained in the RC3 packet. Organization totals, monthly limits, plan and
+  any adjusted-limit/grace/enforcement details remain outstanding. The RC3 ZIP inventory
+  passes the conservative upload-size check only; account capacity is unconfirmed.
 - [x] Integrate released upstream plugin 2.6.0 and verify the clean historical 8.1 fixture.
   [Compatibility evidence](phase8-4-plugin-2.6.0-compatibility.md) records the unpushed scratch
   commit, expected published-tuple refusal, eligible-three dry-run and HTTPS upload fixture.
@@ -143,7 +145,7 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 
 The [final review](phase8-4-rc3-final-review.md) pins the technically verified candidate,
 all exact-tag verification reports and the saved signed ZIP. Its publication manifest
-SHA-256 is `a85ccb2c45de0dca55af3e93d98c580308271e3ab6ca54129497c05671d2de33`.
+SHA-256 is `cfbe0a5d51c278d06b4ea79d96644b65bf6fc2aa2e7fc033a294e88942936880`.
 Root `check` verifies its recursive evidence inventory, sizes, digests and review document.
 Jinja human sign-off, signed-candidate/delivery acceptance and both license-finding
 dispositions are recorded in the [owner review](plans/evidence/rc3-final-review-2026-11-23/owner-review.json).

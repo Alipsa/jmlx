@@ -977,6 +977,18 @@
       "bytes": 1235,
       "sha256": "e88f513cf7036b5da945b3ccb86748fe0c38b09a7a3a73447eb93b08aea17332",
       "representation": "Owner human sign-off recorded from the approved review proposal; supersedes the earlier generated pending placeholder. Historical verifier reports remain unchanged."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-namespace-usage.csv",
+      "bytes": 72,
+      "sha256": "a5e074f67cf3584705bf68c947173aaaadcd4c20fede61bdd387c5efe49582ae",
+      "representation": "Owner-provided CSV header and row retained verbatim with a terminal newline; no separate Portal export or authenticated query is asserted."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/portal-capacity-status.json",
+      "bytes": 2280,
+      "sha256": "c1527d8a679147db9d34a026e27319415785cf8119cbf3a8732d3424c87e1c9f",
+      "representation": "Partial namespace usage recorded from the owner conversation; account limits and capacity verdict remain pending. Replaces the earlier generated empty status placeholder."
     }
   ]
 }

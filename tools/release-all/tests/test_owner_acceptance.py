@@ -157,6 +157,11 @@ class OwnerAcceptanceTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "must descend"):
             self.verify()
 
+    def test_missing_packet_commit_reports_fetch_hint(self):
+        self.acceptance["reviewPacket"]["commit"] = "0" * 40
+        with self.assertRaisesRegex(ValueError, "fetch the packet and candidate"):
+            self.verify()
+
     def test_accepted_at_requires_utc_timestamp(self):
         for value in ("x", "2026-11-23", "2026-11-23T12:00:00", "2026-11-23T12:00:00+01:00"):
             self.acceptance["acceptedAt"] = value

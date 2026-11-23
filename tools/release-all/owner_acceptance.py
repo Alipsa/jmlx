@@ -63,9 +63,13 @@ def verify(root, receipt_path, record, acceptance_path, expected):
     if not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
         raise ValueError("review packet requires a full commit SHA")
 
-    if subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor",
-                       record["tag"]["sha"], commit], capture_output=True).returncode != 0:
+    result = subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor",
+                             record["tag"]["sha"], commit], capture_output=True, text=True)
+    if result.returncode == 1:
         raise ValueError("review packet commit must descend from the candidate commit")
+    if result.returncode != 0:
+        raise ValueError("cannot check review packet ancestry; fetch the packet and candidate "
+                         f"commits first (git: {result.stderr.strip()})")
 
     def blob(pin):
         if not isinstance(pin, dict):

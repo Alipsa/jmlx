@@ -72,3 +72,25 @@ Owner signed-candidate/delivery review, jinja human sign-off and current Portal 
 confirmation remain open. Publication requires separate explicit authorization of the
 replacement ZIP digest after these gates pass. RC2 approval or evidence cannot substitute
 for replacement-candidate evidence.
+
+## Pre-tag preparation (2026-11-23)
+
+[PR #119](https://github.com/Alipsa/jmlx/pull/119) merged the owner-acceptance upload gate
+as `cd4271e76ec7f768e468ce8649f0217be362a495`. It requires an externally authorized
+acceptance digest after the replacement review packet is committed; no acceptance has
+been issued.
+
+The pre-tag branch aligns the five changelog dates to 2026-11-23. Two consecutive jinja
+verification passes and the nine-module release dry-run passed at clean source commit
+`b4ee4d75836f3f5fe4445e72a690dae2fd1b7887`. Both reports, logs and supporting evidence
+are retained in the [pre-tag packet](plans/evidence/rc3-pre-tag-2026-11-23/review.json).
+Public copies normalize local paths; the packet records their hashes and the original
+hashes. Originals survive outside Gradle clean scope at
+`~/release-candidates/jmlx-phase8.4-rc.3-pre-tag-2026-11-23/`.
+Jinja human sign-off remains pending.
+
+Review and merge the pre-tag PR before creating RC3. If the actual candidate cut falls on
+a later date, realign the five dates and repeat both passes after that policy input change.
+The tagged candidate still needs its own verification, audit, signed bundle and consumer
+evidence under the [runbook](../tools/release-all/README.md). These pre-tag results do
+not close those gates or authorize publication.

@@ -1,0 +1,152 @@
+{
+  "schema": "jmlx-rc3-pre-tag-verification-1",
+  "sourceCommit": "b4ee4d75836f3f5fe4445e72a690dae2fd1b7887",
+  "workingTreeStatus": "",
+  "scope": "Pre-tag verification only; repeat exact-candidate checks after tagging.",
+  "commands": {
+    "passes": "JAVA_HOME=<HOME>/.sdkman/candidates/java/25.0.5.0+11-librca PATH=<HOME>/.nvm/versions/node/v26.7.0/bin:$PATH ./gradlew :jmlx-jinja:releaseVerification",
+    "dryRun": "JMLX_RELEASE_JAVA21_HOME=/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home JAVA_HOME=<HOME>/.sdkman/candidates/java/25.0.5.0+11-librca PATH=<HOME>/.nvm/versions/node/v26.7.0/bin:$PATH ./releaseAll.sh --dry-run"
+  },
+  "results": {
+    "pass1": 0,
+    "pass2": 0,
+    "dryRun": 0
+  },
+  "toolchains": {
+    "gradle": "BellSoft 25.0.5+11",
+    "java21": "Eclipse Adoptium 21.0.13+9",
+    "node": "v26.7.0"
+  },
+  "humanSignOff": "pending",
+  "durableOriginals": "~/release-candidates/jmlx-phase8.4-rc.3-pre-tag-2026-11-23",
+  "normalization": "Public text copies replace repository root with <REPOSITORY>, home with <HOME>, and macOS per-user temporary root with <TMP>/. Original byte sizes and hashes refer to durable originals; public size/digest pins refer to committed normalized copies.",
+  "environmentPreflights": "Initial attempts failed before verification: wrong default Node version; missing explicit Java 21 home for dry-run. Both logs retained separately.",
+  "retainedFiles": [
+    {
+      "path": "dry-run-preflight-failure.log",
+      "bytes": 84,
+      "sha256": "431183dd7f33168104000bc777f31d7aa9034fe4676305112fa3f29d39b93978",
+      "originalBytes": 84,
+      "originalSha256": "431183dd7f33168104000bc777f31d7aa9034fe4676305112fa3f29d39b93978"
+    },
+    {
+      "path": "dry-run.log",
+      "bytes": 5167,
+      "sha256": "e26f03766c207934c9048b16792c21b83455f3746a6bdb1d25b68ab476e96e5d",
+      "originalBytes": 5189,
+      "originalSha256": "b0104d3fb4a3fcc3a0ee8ce938a94c627510024fef1afefdd541e7ddc1d9eaca"
+    },
+    {
+      "path": "environment-preflight-failure.log",
+      "bytes": 1500,
+      "sha256": "2ac8e523c97f2974fa7a79fc3f95d5640984346af3343f6801edf130d77e97cd",
+      "originalBytes": 1504,
+      "originalSha256": "0aafe0e0f8bc015a033cc29bbd659e196c82be07bd1ab80c4f42c87d9b6b5305"
+    },
+    {
+      "path": "pass-1/release-verification-evidence/archive-reproducibility.json",
+      "bytes": 654,
+      "sha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990",
+      "originalBytes": 654,
+      "originalSha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990"
+    },
+    {
+      "path": "pass-1/release-verification-evidence/corpus-coverage.md",
+      "bytes": 42762,
+      "sha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190",
+      "originalBytes": 42762,
+      "originalSha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190"
+    },
+    {
+      "path": "pass-1/release-verification-evidence/dependency-review.md",
+      "bytes": 231,
+      "sha256": "fd680c24d336df5c73380990290e3f18c9827093320616e2dcccb7fc2cd8391f",
+      "originalBytes": 274,
+      "originalSha256": "d21f9b2bb71370d33245eb5b30523a72841bf1ab9e97feaac0dd6a743af58bdc"
+    },
+    {
+      "path": "pass-1/release-verification-evidence/pom-default.xml",
+      "bytes": 1415,
+      "sha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd",
+      "originalBytes": 1415,
+      "originalSha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd"
+    },
+    {
+      "path": "pass-1/release-verification.json",
+      "bytes": 222,
+      "sha256": "2f85e837a373f5ea3ba37e84f101a727dd8aac7f7a0a89819bc4aadd728c2fde",
+      "originalBytes": 265,
+      "originalSha256": "f43553a88dcb07de7a056c47081c1705e2a9c90502409c677c30a63ec297e4ea"
+    },
+    {
+      "path": "pass-1/release-verification.md",
+      "bytes": 1885,
+      "sha256": "4ea4018f747d6ff9231007c025b45935cf7e41a826304c06a522b7ce837d93cf",
+      "originalBytes": 1932,
+      "originalSha256": "a2e8f7907588720d5ea050f812c604d7d30dc6f135be6e6171290b415904a665"
+    },
+    {
+      "path": "pass-1/verification.log",
+      "bytes": 44092,
+      "sha256": "60e7127da163a15be351e832e60dab938bd2433eefc39e2b4d2152406d067702",
+      "originalBytes": 44194,
+      "originalSha256": "16373b1f2308a503fa785ea824c765515dc040fc30cdd771ed0c480f2c0c8b84"
+    },
+    {
+      "path": "pass-2/release-verification-evidence/archive-reproducibility.json",
+      "bytes": 654,
+      "sha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990",
+      "originalBytes": 654,
+      "originalSha256": "690a8fddb7f8b8e7a1fc9902258c160fff2cf345fb33563f4d2683222ff63990"
+    },
+    {
+      "path": "pass-2/release-verification-evidence/corpus-coverage.md",
+      "bytes": 42762,
+      "sha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190",
+      "originalBytes": 42762,
+      "originalSha256": "161d41f0254baa3751eed7cc89daf38803bb13ddee83f4ddcf3eeb2cdd6c4190"
+    },
+    {
+      "path": "pass-2/release-verification-evidence/dependency-review.md",
+      "bytes": 232,
+      "sha256": "e5a10f9f9e60574907264d4a24067c7349a0dcaaceeee688ff6172b2ebcfa155",
+      "originalBytes": 275,
+      "originalSha256": "11275c819d0ce5ffe21a61b6b50f6e6be9aacc3ba35c48c22addda878e2b1f20"
+    },
+    {
+      "path": "pass-2/release-verification-evidence/pom-default.xml",
+      "bytes": 1415,
+      "sha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd",
+      "originalBytes": 1415,
+      "originalSha256": "87b56f5f364d3071af3117a9f5870769b0d88e3f2553220e088678c87800aefd"
+    },
+    {
+      "path": "pass-2/release-verification.json",
+      "bytes": 221,
+      "sha256": "baa5fa36d484381b2313f10b4823f8f2abc73908e05ecf928876819cc5827158",
+      "originalBytes": 264,
+      "originalSha256": "dce1446cc2394efde49e80b313a0543706b9769e37008a0f195de6ac1d80e275"
+    },
+    {
+      "path": "pass-2/release-verification.md",
+      "bytes": 1884,
+      "sha256": "b4ac525470980cf20df35e4a083226163489a001fd54490a9a0fda5149e01cab",
+      "originalBytes": 1931,
+      "originalSha256": "73da87dcefe2b4ff0959bc8c843717512c628c03d2edca2bbc832783e5dd042e"
+    },
+    {
+      "path": "pass-2/verification.log",
+      "bytes": 44378,
+      "sha256": "5a545b87f77a1ef78e2e13d6f1bc38051968c71d0248fdcefad310c845681c44",
+      "originalBytes": 44480,
+      "originalSha256": "0f7020711532c4fb101399b65b1c5539b23b148253e1c30169737582bff126ba"
+    },
+    {
+      "path": "release-all-report.txt",
+      "bytes": 2774,
+      "sha256": "fb84263db60e05d7b63d2ef5655212de1325640ae7f6c5b803cf81fa65d724c5",
+      "originalBytes": 2774,
+      "originalSha256": "fb84263db60e05d7b63d2ef5655212de1325640ae7f6c5b803cf81fa65d724c5"
+    }
+  ]
+}

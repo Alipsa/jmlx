@@ -132,7 +132,23 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
 - [ ] Merge development-bump PR only after Central verification.
   In that PR, update AGENTS.md's version paragraph and remove the Phase 8.4 release-window note.
 
-## Pre-candidate verification (2026-11-22)
+## RC3 pre-tag verification (2026-11-23)
+
+Two consecutive `./gradlew :jmlx-jinja:releaseVerification` passes and the nine-module
+`./releaseAll.sh --dry-run` passed at clean commit
+`b4ee4d75836f3f5fe4445e72a690dae2fd1b7887`. The
+[pre-tag packet](plans/evidence/rc3-pre-tag-2026-11-23/review.json) retains both complete
+reports, logs and supporting evidence, with sizes and SHA-256 pins. Public copies normalize
+local paths; original bytes are preserved outside Gradle clean scope at the packet's
+`durableOriginals` location. Both passes used BellSoft 25.0.5+11, Temurin 21.0.13+9 and
+Node v26.7.0. The changelog contract input is
+`5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`;
+the jinja release checklist input remains
+`377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`.
+Human sign-off remains open. These are pre-tag results; repeat exact-candidate checks and
+the final audit for RC3. Realign dates and repeat both passes if the actual cut date changes.
+
+## Historical pre-candidate verification (2026-11-22)
 
 PR #116 aligned the five changelog version-cut dates to 2026-11-22. The earlier PR #105
 jinja verification below is historical: its changelog input no longer matches. Two consecutive
@@ -147,7 +163,7 @@ The report records these contract input SHA-256 values:
 The RC3 pre-tag date alignment supersedes the changelog digest above with
 `5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`.
 PR #116 verification is stale for this contract input and remains historical. Repeat both
-verification passes after the replacement's final policy input changes. The same digest
+verification passes after the replacement's final policy input changes. That digest also
 briefly existed in PR #118's initial commit before that PR reverted its date edit.
 
 The isolated online/offline matrix, reproducible archives and independent consumer resolution

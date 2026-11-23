@@ -6,6 +6,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import owner_acceptance
+
 from release_inputs import (check_bundle, native_report, read_json, read_runtime, sha256,
                             verify_smoke_environment, verify_minimum_host_workflow)
 from verify_native_tests import verify_events
@@ -82,17 +84,14 @@ def verify(root, receipt_path):
     return receipt, record
 
 
-def plugin_digests(root, receipt_path):
-    _, record = verify(root, receipt_path)
-    return record["bundleSha256"], record["pluginReceipt"]["manifestHash"]
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--verify", type=Path)
     parser.add_argument("--plugin-digests", action="store_true",
                         help="with --verify, print reviewed ZIP and manifest hashes separated by a tab")
+    parser.add_argument("--acceptance", type=Path)
+    parser.add_argument("--acceptance-sha256")
     parser.add_argument("--preliminary", type=Path)
     parser.add_argument("--bundle", type=Path)
     parser.add_argument("--report", action="append", default=[])
@@ -101,7 +100,10 @@ if __name__ == "__main__":
     try:
         if args.verify:
             if args.plugin_digests:
-                print("\t".join(plugin_digests(args.root.resolve(), args.verify)))
+                _, record = verify(args.root.resolve(), args.verify)
+                owner_acceptance.verify(args.root.resolve(), args.verify, record,
+                                        args.acceptance, args.acceptance_sha256)
+                print("\t".join((record["bundleSha256"], record["pluginReceipt"]["manifestHash"])))
             else:
                 verify(args.root.resolve(), args.verify)
         else:

@@ -9,18 +9,24 @@ RELEASE_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 cd "$RELEASE_ROOT"
 source "$RELEASE_ROOT/tools/release-all/preflight.sh"
 usage() {
-  echo 'usage: ./releaseAll.sh [--dry-run|--bundle-only|--publish-verified receipt|--resume deployment-id]' >&2
+  echo 'usage: ./releaseAll.sh [--dry-run|--bundle-only|--publish-verified receipt --acceptance record --acceptance-sha256 digest|--resume deployment-id]' >&2
   exit 2
 }
 mode=release
 resume=
 verified_receipt=
+acceptance_record=
+acceptance_sha=
 case "${1:-}" in
   '') [[ $# == 0 ]] || usage ;;
   --dry-run) mode=plan; [[ $# == 1 ]] || usage ;;
   --bundle-only) mode=bundle; [[ $# == 1 ]] || usage ;;
   --resume) mode=resume; [[ $# == 2 && -n "$2" ]] || usage; resume=$2 ;;
-  --publish-verified) mode=verified; [[ $# == 2 && -n "$2" ]] || usage; verified_receipt=$2 ;;
+  --publish-verified)
+    mode=verified
+    [[ $# == 6 && -n "$2" && "$3" == --acceptance && -n "$4" &&
+       "$5" == --acceptance-sha256 && "$6" =~ ^[0-9a-f]{64}$ ]] || usage
+    verified_receipt=$2; acceptance_record=$4; acceptance_sha=$6 ;;
   *) usage ;;
 esac
 release_tools_preflight "$mode"
@@ -43,13 +49,16 @@ fi
 if [[ "$mode" == verified ]]; then
   [[ -z "$(git status --porcelain)" ]] || { echo 'Verified publication requires a clean tree' >&2; exit 1; }
   verified_hashes=$(python3 "$RELEASE_ROOT/tools/release-all/final_receipt.py" \
-    --root "$RELEASE_ROOT" --verify "$verified_receipt" --plugin-digests)
+    --root "$RELEASE_ROOT" --verify "$verified_receipt" --plugin-digests \
+    --acceptance "$acceptance_record" --acceptance-sha256 "$acceptance_sha")
   IFS=$'\t' read -r verified_bundle_sha verified_manifest_sha <<< "$verified_hashes"
   [[ "$verified_bundle_sha" =~ ^[0-9a-f]{64}$ && "$verified_manifest_sha" =~ ^[0-9a-f]{64}$ &&
      "$verified_hashes" == "$verified_bundle_sha"$'\t'"$verified_manifest_sha" ]] || {
     echo 'Receipt verifier returned malformed digests' >&2; exit 1;
   }
   "${gradle[@]}" -PreleaseAllUseExistingBundle=true "-PreleaseAllVerifiedReceipt=$verified_receipt" \
+    "-PreleaseAllOwnerAcceptance=$acceptance_record" \
+    "-PreleaseAllOwnerAcceptanceSha256=$acceptance_sha" \
     "-PreleaseAllExpectedBundleSha256=$verified_bundle_sha" \
     "-PreleaseAllExpectedManifestSha256=$verified_manifest_sha" releaseAll
   exit

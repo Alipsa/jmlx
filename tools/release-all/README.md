@@ -112,17 +112,23 @@ itself writes feature/version/runtime build/vendor/home; its file and digest are
 independently of the Java launcher on PATH. The minimum-host report also records the manual
 workflow's main ref and SHA; review these against the actual GitHub run and reviewed workflow
 commit. Job guards and recorded identity do not restrict other workflows from using its labels.
-Only a **final** receipt can be submitted:
+Only a **final** receipt with separately digest-pinned owner acceptance can be submitted.
+Follow the [acceptance contract](owner-acceptance.md) to retain the reviewed packet and
+actual decision, including jinja human sign-off. Fetch the packet commit into the
+candidate repository without changing its tagged checkout:
 
 ```sh
-./releaseAll.sh --publish-verified build/releaseAll/verified.json
+./releaseAll.sh --publish-verified build/releaseAll/verified.json \
+  --acceptance <durable-owner-acceptance.json> \
+  --acceptance-sha256 <owner-authorized-acceptance-SHA-256>
 ./releaseAll.sh --resume <deployment-id>  # status-only recovery, no rebuild/re-upload
 ```
 
 The receipt's bundle path must resolve to `build/releaseAll/jmlx-mega-bundle.zip`, whose digest
 is independently compared with the preliminary record. The final receipt, native directory,
 tag/SHA, plugin plan/receipt, JUnit/event evidence and report
-logs are rechecked before upload. The plugin uploads the saved ZIP without `bundleAll`.
+logs and owner acceptance are rechecked before upload. The plugin uploads the saved ZIP
+without `bundleAll`.
 AUTOMATIC publication makes it public without a Portal inspection interval; authorization must
 name the reviewed ZIP digest. If anything changes, prepare and verify a new candidate.
 

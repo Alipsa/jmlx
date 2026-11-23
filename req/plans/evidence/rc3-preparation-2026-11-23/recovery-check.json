@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "checkedAt": "2026-11-23T11:54:25.931246+00:00",
+  "sourceCommit": "7df269d7d82b2526cdd61d733eba087f6f8ce183",
+  "preliminarySha256": "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af",
+  "nativeReportMatchesRc2": true,
+  "nativeReport": {
+    "pins": {
+      "mlxMetalVersion": "0.32.4",
+      "mlxcCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a"
+    },
+    "supportedMinimum": [
+      27,
+      2,
+      0
+    ],
+    "deploymentTarget": [
+      26,
+      2,
+      0
+    ],
+    "files": {
+      "libmlxc.dylib": {
+        "sha256": "15a08b85d40333093a38043d0545f9ff6d12ab532e58e7c1af067a23c93a238d",
+        "size": 2364080,
+        "minos": [
+          26,
+          2,
+          0
+        ],
+        "sdk": [
+          27,
+          2,
+          0
+        ]
+      },
+      "libmlx.dylib": {
+        "sha256": "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6",
+        "size": 21720704,
+        "minos": [
+          26,
+          2,
+          0
+        ],
+        "sdk": [
+          26,
+          5,
+          0
+        ],
+        "upstreamPathAllowlist": [
+          "/Users/runner/work/mlx/mlx/build/temp.macosx-11.0-arm64-cpython-310/mlx.core/mlx/backend/metal/kernels//mlx.metallib"
+        ]
+      },
+      "libjaccl.dylib": {
+        "sha256": "7890e84a96e3121c8c1c2f351e41e46ba4d92e7b7bc6275fc2b38c2773891032",
+        "size": 2131168,
+        "minos": [
+          26,
+          2,
+          0
+        ],
+        "sdk": [
+          26,
+          5,
+          0
+        ]
+      },
+      "mlx.metallib": {
+        "sha256": "c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893",
+        "size": 214156448
+      },
+      "native-pin.properties": {
+        "sha256": "9fbdc2f67202c57a6e86adbae8f3ab318c89cbbc222df34c197aedf14f5739b7",
+        "size": 75
+      }
+    }
+  },
+  "junit": {
+    "required": 104,
+    "matchingInMainCheckout": 0
+  },
+  "backupRecovery": {
+    "timeMachineDestinations": "none configured (tmutil destinationinfo)",
+    "mountedVolumes": [
+      "Macintosh HD",
+      "Recovery"
+    ],
+    "limit": "No local Time Machine recovery source found; external/offline backups were not searched."
+  },
+  "conclusion": "Native staging is reusable byte-for-byte, but the original producer JSON and JUnit reports remain missing. This does not restore RC2 revalidation."
+}

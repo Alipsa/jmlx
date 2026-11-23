@@ -6,6 +6,7 @@ original-input recovery or a fully verified replacement candidate. Owner signed-
 delivery review, jinja human sign-off and current Portal capacity confirmation remain open.
 The tagged candidate is
 `jmlx-phase8.4-rc.2` at `33676837f66993b5a809644dbbdc6e6550417334`.
+Replacement preparation: [RC3 preparation](phase8-4-rc3-preparation.md).
 No publication authorized or performed.
 Plan: [phase8-4-plan.md](plans/phase8-4-plan.md).
 Local verification: [implementation report](phase8-4-implementation-report.md).
@@ -109,19 +110,19 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e`;
   [merge-commit CI run 44815990385](https://github.com/Alipsa/jmlx/actions/runs/44815990385)
   passed Java and native checks, both release-smoke profiles and required-native-suite verification.
-- [x] Before tagging, review and align the jinja, tokenizer, vision, core and models
+- [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
   changelog version-cut dates with the final candidate cut date.
-  Prepared as 2026-11-22; recheck the date immediately before creating the immutable tag.
-  RC2 was cut and verified on that date; no changelog input was changed afterward.
-  A replacement candidate reopens this gate: align and review the version-cut dates again
-  against its actual cut date, then rerun the affected verification.
+  RC2 used 2026-11-22. Replacement preparation sets these dates to 2026-11-23; this
+  gate is reopened. Review and recheck against the actual cut date immediately before
+  creating the replacement tag, then rerun the affected verification.
 - [ ] Restore revalidatable candidate provenance before acceptance or publication.
   RC2 tag/SHA, signed bundle and all consumer runs were historically verified, but the
   original candidate checkout is missing, including four pinned producer JSON files and all
   104 digest-pinned JUnit XML reports. Recovery also needs matching staged `native/install/lib`
   and the preliminary record restored at its original path (an identical copy survives).
-  Matching the main checkout's native staging has not been established. Recovering only the
-  four JSON files is insufficient; see the complete recovery requirements in the RC2 review.
+  The [replacement recovery check](phase8-4-rc3-preparation.md) establishes that the main
+  checkout's native report matches RC2, but none of its 104 JUnit reports matches.
+  Recovering only the four JSON files is insufficient; see the RC2 review.
   [RC2 final review](phase8-4-rc2-final-review.md) retains the receipt, exact reports, artifact
   comparison and ZIP inventory. All four consumer reports pass. Owner acceptance of this
   signed candidate and the changed Javadoc/module checksums remains pending.

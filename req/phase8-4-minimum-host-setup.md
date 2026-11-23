@@ -123,11 +123,15 @@ The account's `com.apple.sharepoint.group.1` membership comes through nested `ev
 it is the Public-folder share group, not an account-specific grant. A later read-only
 `sharing -l` check found the owner's Public-folder SMB share enabled with guest access
 and read-write permissions. Its state at the earlier account probe time was not established.
-This exposure remains an open sharing-review item: resolve it or explicitly assess it before
-the window, then recheck sharing and private-home isolation. No sharing settings were changed.
+This was an open sharing-review item at that inspection. Before the RC2 window the owner
+disabled the share. Retained observations through 2026-11-22 22:18:35 UTC show it disabled;
+guest read-write settings remained configured. Recheck sharing and private-home isolation
+before any new window; the dated observations do not establish current state.
 
-The queued-job review, sharing review and immediate pre-window revalidation remain required.
-This probe does not close the readiness gate or establish signed-candidate Metal execution.
+The RC2 window subsequently completed queue/sharing review, account revalidation and
+signed-candidate Metal execution; see the [RC2 review](phase8-4-rc2-final-review.md). These
+checks must repeat for a new window. RC2 receipt revalidation is now blocked by missing
+producer inputs, independently of the historical host result.
 
 ## Window-time account probe
 
@@ -137,7 +141,9 @@ for the next measurement. These commands stage it outside the owner's private ho
 fresh, runner-owned `0700` directory. Python isolated mode excludes the script directory,
 user site packages and Python environment overrides from import resolution. Run from `/`
 with the absolute staged path; retain the new output separately from the historical evidence.
-This procedure has not yet been run and does not change the historical invocation.
+This hardened procedure was run for the RC2 window. Surviving source-commit sidecars and
+the timestamped connected observation are retained in the RC2 evidence directory, with
+an explicit provenance map. It does not change the earlier historical invocation.
 
 From the repository root, in an administrator's Terminal:
 
@@ -219,7 +225,10 @@ sudo launchctl bootout system/com.alipsa.jmlx-release-runner
 `KeepAlive` prevent automatic startup; they do not keep the definition unloaded.
 These administrative commands manage launchd; the runner process itself runs as UID 503.
 Recheck account isolation and the candidate workflow before each window. Exact-bundle Metal
-execution, measured Java 21/25 consumer runtimes and acceptance reports remain outstanding.
+execution and measured Java 21/25 consumer runtimes passed for RC2. Owner acceptance
+remains open, and missing producer inputs currently prevent receipt revalidation. The
+minimum-host job used the same physical Mac as the local runs, under a dedicated account;
+it provides no independent hardware coverage.
 
 ## Provisioning reference
 
@@ -286,8 +295,9 @@ still occur on job assignment: also retain the actual run's **Set up job** log a
 its `Current runner version` line with the pre-dispatch version. If it differs, re-measure
 the installed listener and digest and review the updated version before accepting the report.
 The earlier binary digest must not be attributed to the updated runner; if the job-time binary
-cannot be identified, repeat verification on an identified version. No actual candidate run
-exists yet, so no job-time version comparison has been performed.
+cannot be identified, repeat verification on an identified version. RC2 run 45076371223
+subsequently recorded runner 2.338.2 in its actual job setup log, matching the retained
+window measurements; see the RC2 identity review.
 Review version changes alongside the saved environment and tool paths. Persistent registration
 and manual workspace cleanup remain the chosen setup; ephemeral registration alone would not wipe files.
 

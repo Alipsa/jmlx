@@ -1,7 +1,7 @@
 {
   "schema": 1,
   "preparedOn": "2026-11-22",
-  "status": "prepared for owner review; no approval or publication authorization recorded",
+  "status": "blocked: original candidate checkout and pinned producer inputs missing; historical verification only; no acceptance or publication authorization",
   "candidate": {
     "tag": "jmlx-phase8.4-rc.2",
     "tagObject": "400b90e1a0b062a57b70a1007e68a4f6313f3976",
@@ -9,7 +9,8 @@
     "originBranch": "main",
     "reviewedPr": 116,
     "headCi": "https://github.com/Alipsa/jmlx/actions/runs/45072595248",
-    "publicationAuthorized": false
+    "publicationAuthorized": false,
+    "revalidation": "blocked pending recovery of original inputs or fully verified replacement candidate"
   },
   "bundle": {
     "path": "/Users/per/project/jmlx/build/releaseAll/candidates/rc.2/transport/jmlx-mega-bundle.zip",
@@ -44,7 +45,10 @@
     "serviceUnloaded": true,
     "githubRunnerStatus": "offline",
     "githubRunnerBusy": false,
-    "smbShareDisabled": true
+    "smbShareDisabled": true,
+    "stateObservedAt": "2026-11-22T22:18:35.315261+00:00",
+    "independentPhysicalHost": false,
+    "accountProbeProvenance": "account-probe-provenance.json"
   },
   "capacity": {
     "bundleBytes": 106730874,
@@ -87,7 +91,9 @@
     "signedCandidateAndDocumentedDifferences": "pending",
     "plannedDeliveryTerms": "pending",
     "licenseFindingDisposition": "pending; neither finding is closed by technical verification",
-    "centralPublicationAuthorization": "not granted"
+    "centralPublicationAuthorization": "not granted",
+    "jinjaHumanSignOff": "pending; retained report checkbox is unchecked",
+    "approvedNativeJavadocProducerJdk": "unestablished; recover producer vendor/full runtime and actual toolchain before acceptance"
   },
   "retainedFiles": {
     "connected-account-probe.json": {
@@ -209,24 +215,58 @@
     "verified.json": {
       "sha256": "5253382f3921c79f06b19746d479edf619e565a83d39b7678159549c0be84f55",
       "bytes": 1335
+    },
+    "post-window-source-commit.txt": {
+      "sha256": "fe31a086844cc22a9f258e0810829faa7c8eccdad3ae69f77a35258593068619",
+      "bytes": 41
+    },
+    "jinja-verification-2.log": {
+      "sha256": "66ef0bd839740bd66f315758a880723a0cf67da3755ca968ba4f161bc424aad0",
+      "bytes": 44106
+    },
+    "pre-window-source-commit.txt": {
+      "sha256": "fe31a086844cc22a9f258e0810829faa7c8eccdad3ae69f77a35258593068619",
+      "bytes": 41
+    },
+    "jinja-verification-1.log": {
+      "sha256": "dd5d5f4cb36ab4d59301fe2f8afa75c117c77fd3032940699020625090c9399a",
+      "bytes": 44642
+    },
+    "account-probe-provenance.json": {
+      "sha256": "b66d135f935119fbb74acf8e2cdd44f2a01dfac659e3f65e6620cf6872561df8",
+      "bytes": 962
+    },
+    "connected-account-probe-20261122T221202.609857Z.json": {
+      "sha256": "feaa073e73c2925051f6f4d120ff0027b4d053a458ce4695e91f3615704eded6",
+      "bytes": 251
+    },
+    "connected-source-commit.txt": {
+      "sha256": "fe31a086844cc22a9f258e0810829faa7c8eccdad3ae69f77a35258593068619",
+      "bytes": 41
     }
   },
   "evidenceLimits": [
-    "Receipt and preliminary records are retained byte-for-byte with original local paths. Revalidation requires the preserved candidate checkout, task/JUnit evidence and signed ZIP; copying records does not make them portable.",
+    "RC2 original candidate and audit checkouts are missing as of 2026-11-23. The four pinned producer JSON inputs were not retained; current final-receipt revalidation is blocked. Do not recreate them from summaries.",
     "Consumer JSON/log/runtime sidecars and actual job setup identity excerpt are retained here; full job log remains downloadable from the GitHub job, with its hash in the identity review.",
-    "Local prerequisite logs and complete audit scratch build remain under ignored build/releaseAll/candidates/rc.2; their retained conclusions are not substitutes for candidate execution.",
+    "Local prerequisite logs and audit report survive under ignored build/releaseAll/candidates/rc.2; the audit checkout does not. Both jinja verification logs and surviving account source-commit sidecars are now retained here.",
     "No ZIP, signing key, Portal credential or runner authentication file is committed.",
-    "This follow-up records the immutable RC2 result; its documentation commit is outside the tagged candidate."
+    "This follow-up records the immutable RC2 result; its documentation commit is outside the tagged candidate.",
+    "Local paths, host identity and the audit PATH remain in historical raw records to preserve byte pins; future public summaries should normalize incidental personal details.",
+    "SMB/runner state is a dated observation, not a current-state assertion; guest read-write settings were still configured.",
+    "Final owner acceptance is not enforced by the technical receipt verifier; a digest-pinned acceptance gate remains a separate release-workflow implementation item."
   ],
   "reviewDocument": {
     "path": "req/phase8-4-rc2-final-review.md",
-    "sha256": "20ce6412b4545eb5227144893e6690bc7ad2884ecc1a972f1428fde9bb88a28d",
-    "bytes": 7487
+    "sha256": "eb161bf9334f57e76a81ca2f18c1d2ade435819472487eaad99fd1038dcf1c66",
+    "bytes": 10501
   },
   "followupSurfaceSha256": {
-    "req/phase8-4-release-notes.md": "50dc7471d0250c54ce9f1eb31f8c120b2c92ebb848cb8d31523bc2573cf9e6c7",
-    "req/phase8-4-release-checklist.md": "46d79c6adff04cf7f95ce08c8cece52b32c3546cca0241971589cb6425932a77",
-    "req/phase8-4-portal-capacity.md": "86178b9a68c67426d5ee4528b937353fdc66771aca61e7bee6c2349360e1997a"
+    "req/phase8-4-release-notes.md": "e2bca16946052a2f1d9cb04b5f8465e6f7b395c8414d4f5dcbd09aff584b4792",
+    "req/phase8-4-release-checklist.md": "023a93da73f2199aeda549539ec3dc56832598730b7005f12117125bbfde1c39",
+    "req/phase8-4-portal-capacity.md": "86178b9a68c67426d5ee4528b937353fdc66771aca61e7bee6c2349360e1997a",
+    "req/phase8-4-minimum-host-setup.md": "1b05d49b759fd55df78e9d7093898afa753e59eea49a5a4e7625cb24250fb6b2",
+    "tools/release-all/README.md": "344b6689a36b144cbc2e836227a8a090011d23ac582b8b46bdcdd7fd6a5c6fcb"
   },
-  "followupSurfaceSha256Meaning": "Hashes describe the prepared follow-up files at the reviewed packet commit, outside the immutable candidate; acceptance must cite that full commit."
+  "followupSurfaceSha256Meaning": "Hashes describe the prepared follow-up files at the reviewed packet commit, outside the immutable candidate; acceptance must cite that full commit.",
+  "updatedOn": "2026-11-23"
 }

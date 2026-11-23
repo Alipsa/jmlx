@@ -1,10 +1,12 @@
 # Phase 8.4 RC2 final candidate review
 
-Prepared 2026-11-22 for Per Nyfelt. Technical verification passed; owner acceptance of this
-signed candidate, planned delivery terms and current Portal capacity remain pending.
+Prepared 2026-11-22 for Per Nyfelt; updated 2026-11-23. Historical technical verification
+passed. RC2 is now blocked from acceptance
+and publication because its candidate checkout and required producer evidence are missing.
+Owner acceptance, planned delivery terms and current Portal capacity also remain pending.
 No Central publication is authorized. Earlier owner decisions and evidence remain unchanged.
 
-## Immutable candidate and retained evidence
+## Tagged candidate and retained evidence
 
 PR #116 merged as `33676837f66993b5a809644dbbdc6e6550417334` after
 [CI run 45072595248](https://github.com/Alipsa/jmlx/actions/runs/45072595248) passed.
@@ -23,8 +25,19 @@ documentation follow-up; it changes neither the candidate nor its artifacts. RC1
 The [review manifest][review] pins the retained evidence. It includes exact consumer
 JSON/log/runtime sidecars, preliminary and final receipts, native metadata, the signed-native
 comparison, account probes, sharing snapshots and Portal ZIP inventory. Original local paths
-remain in the receipts. Revalidating them requires the preserved candidate checkout, native
-files, task/JUnit evidence and ZIP; the committed copies alone are not a portable release.
+remain in the receipts. Revalidation requires the original candidate checkout, native
+files, task/JUnit evidence
+and ZIP; the committed copies alone are not a portable release.
+
+On 2026-11-23, inspection confirmed that `/private/tmp/jmlx-phase8.4-rc.2` and its audit
+checkout no longer exist. The retained ZIP survives, but the pinned plugin bundle receipt,
+manifest, task-evidence JSON and Gradle argv JSON were not retained with it. The main
+checkout's bundle receipt has different bytes. The saved final receipt cannot currently
+be revalidated. Do not accept or publish RC2 in this state. Recover the original inputs
+from backup and pass the unchanged verifier, or cut and fully verify a new candidate in a
+durable checkout. A relocatable verifier would require separate review; it is not supplied
+here. Rebuilding missing inputs cannot restore this receipt's provenance.
+
 The ZIP and complete prerequisite logs remain under ignored `build/releaseAll/candidates/rc.2/`.
 The temporary draft Release contains only the verified ZIP and preliminary record; it stays draft.
 
@@ -32,7 +45,10 @@ The temporary draft Release contains only the verified ZIP and preliminary recor
 
 Root checks, separate buildSrc checks, all 109 release regressions and smoke selftests passed.
 Two consecutive jinja `releaseVerification` runs passed at the candidate SHA with pinned Node
-v26.7.0, preserving the evidence directory. The historical-toolchain pure-Java audit reproduced
+v26.7.0. Both original logs are now retained as `jinja-verification-1.log` and
+`jinja-verification-2.log` beside the report. The report's human sign-off remains unchecked;
+owner review of NOTICE, changelog, POM, Javadoc, dependencies and corpus evidence is pending.
+The historical-toolchain pure-Java audit reproduced
 all 15 reviewed comparison records against hash-verified retained Central artifacts. The
 nine-module dry run selected the approved tuple. Bundle preparation passed signing preflight
 and reran required tests and native payload/license tasks with caching disabled.
@@ -42,19 +58,28 @@ and reran required tests and native payload/license tasks with caching disabled.
 | macOS full | BellSoft 25.0.5+11-LTS | Passed |
 | macOS pure Java | Temurin 21.0.13+9-LTS | Passed |
 | Linux ARM64 pure Java | BellSoft 21.0.12.1+1-LTS | Passed |
-| Dedicated physical minimum host | Temurin 25.0.5.1+2-LTS | Passed |
+| Physical minimum host, dedicated account | Temurin 25.0.5.1+2-LTS | Passed |
 
 [Minimum-host run 45076371223](https://github.com/Alipsa/jmlx/actions/runs/45076371223)
 used reviewed `main` at the candidate SHA, runner ID 23 and job ID 137374458588.
 Its report records physical Apple M5 Max, ARM64 macOS 27.2.1 (26B131), no virtualization
-and successful exact-ZIP consumer/kernel execution. The actual job setup log reports runner
+and successful exact-ZIP consumer/kernel execution. This is the same physical Mac as
+the local macOS consumer runs, using a separate account; it is not independent host evidence.
+The actual job setup log reports runner
 2.338.2, matching the listener measurements before connection, after connection and after
 the window. The full job log hash and retained setup excerpt support that comparison.
 
-The pre-window, connected and post-window account measurements match. Private-home access
+The pre-window, connected and post-window account measurement bytes match. Retained
+`account-probe-provenance.json` maps each copy to its surviving window directory and
+`source-commit.txt`. The connected observation also retains its original timestamped
+filename. Pre-window output has no exact probe timestamp; do not infer one from file times.
+Private-home access
 checks pass; their parent-directory and owner-managed-toolchain limits still apply. The owner
-disabled the Public-folder SMB share before verification; it remains disabled. The worker is
-offline and idle, and launchd no longer has the service loaded. The initial shutdown check ran
+disabled the Public-folder SMB share before verification. At the last retained observation
+(2026-11-22 22:18:35 UTC), the share was disabled, the worker was offline and idle, and
+launchd had no loaded service. Guest read-write settings were still configured: re-enabling
+the share would restore that exposure. These observations do not establish current state.
+The initial shutdown check ran
 before termination completed and saw `SIGTERMed`; later inspection confirmed removal. The
 original observation is retained locally. A helper revision waits for removal instead of
 treating that immediate snapshot as a completed stop. No candidate rerun was required.
@@ -70,7 +95,14 @@ The native Javadoc JAR differs in entry content only in three generated JavaScri
 `script-files/script.js`, `script-files/search-page.js` and `script-files/search.js`.
 The [retained diff][javadoc-diff] shows text/HTML assignment changes. No entry was added or
 removed, and every other entry's content matches the approved archive. This is an archive
-comparison, not a browser-behavior or security claim. Its candidate SHA-256 is
+comparison, not a browser-behavior or security claim. The preliminary record identifies
+the RC2 release JDK as BellSoft `25.0.5+11-LTS`. The approved PR #115 Javadoc producer
+JDK vendor/full runtime version was not retained in the reviewed packet and remains
+unestablished; its post-merge log reused the Javadoc task. A JDK patch difference is a
+hypothesis, not an established cause. Before acceptance, recover the approved producer
+version and compare both actual Javadoc toolchains, or review a replacement candidate
+with explicit producer records. The Java 21 pure-Java audit is unrelated to this native JAR.
+The candidate native Javadoc SHA-256 is
 `d832a704c6e97b89d12676e0ff7694fdf0da43f9c8788de637dfec96d784fcdf`.
 
 The actual native module metadata differs from its approved literal only in the Javadoc
@@ -101,10 +133,22 @@ limits, scope, plan and any enforcement or exemption conditions. The official do
 was rechecked on 2026-11-22; the authenticated account snapshot is pending. One combined
 publish operation is planned; projected file/byte usage must include other monthly activity.
 
-After owner review and capacity confirmation, publication still requires separate explicit
+After provenance recovery or replacement-candidate verification, owner review and capacity
+confirmation, publication still requires separate explicit
 authorization naming the ZIP digest above. Revalidate the saved receipt and unchanged ZIP
-immediately before using `--publish-verified`; do not rebuild or use a newly generated plan
+immediately before using `--publish-verified`. RC2 cannot pass this step with the currently
+retained inputs. Do not rebuild or use a newly generated plan
 to substitute different bytes. Fresh-cache Central checks remain after publication.
+
+The existing uploader verifies technical receipts; it does not enforce RC2 owner acceptance.
+Digest-specific human publication authorization remains mandatory. A digest-pinned final
+acceptance gate is a separate implementation item before a replacement release workflow
+is approved; the earlier `owner-acceptance.json` does not accept RC2 differences or jinja
+human sign-off.
+
+Original evidence retains local paths, host identity and the audit PATH. These are historical
+raw records, not credentials. They are left byte-identical to preserve their pins; future
+public summaries should normalize incidental local details and retain raw records privately.
 
 Record any owner acceptance separately against the full reviewed commit and SHA-256 of this
 Markdown file and the review manifest. Keep the approved snapshot unchanged afterward.

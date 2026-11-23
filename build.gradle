@@ -1065,11 +1065,44 @@ tasks.named('check') {
     // check covers handwritten source in every module.
     dependsOn tasks.named('verifyMlxApiInventory'), tasks.named('verifyMlxApiCallSites'),
             tasks.named('verifyHfReferenceGoldens'),
+            tasks.named('verifyRc2ReviewEvidence'),
             tasks.named('verifyImageOracleDependencyPins'),
             tasks.named('verifyImageOracleFixtureDigests'),
             tasks.named('verifyDecodeBaselineManifest'),
             tasks.named('verifyQwenVlReferenceProvenance'),
             tasks.named('verifyQwen35ReferenceGoldens')
+}
+
+tasks.register('verifyRc2ReviewEvidence') {
+    group = 'verification'
+    description = 'Verifies the retained RC2 review packet and its referenced document hashes.'
+    def evidenceDir = file('req/plans/evidence/rc2-final-review-2026-11-22')
+    def reviewFile = new File(evidenceDir, 'review.json')
+    inputs.dir(evidenceDir)
+    // Parse during configuration so every pinned follow-up document is also a task input.
+    def review = new groovy.json.JsonSlurper().parse(reviewFile)
+    inputs.file(review.reviewDocument.path)
+    inputs.files(review.followupSurfaceSha256.keySet())
+    doLast {
+        def verifyPin = { File base, String name, String digest, Number bytes ->
+            def target = new File(base, name).canonicalFile
+            if (!target.toPath().startsWith(base.canonicalFile.toPath()) || !target.isFile()) {
+                throw new GradleException("RC2 review evidence missing or outside its root: ${name}")
+            }
+            if (!(digest ==~ /[0-9a-f]{64}/) || sha256File(target) != digest
+                    || (bytes != null && target.length() != bytes.longValue())) {
+                throw new GradleException("RC2 review evidence digest/size differs: ${name}")
+            }
+        }
+        review.retainedFiles.each { name, pin ->
+            verifyPin(evidenceDir, name, pin.sha256, pin.bytes)
+        }
+        verifyPin(rootDir, review.reviewDocument.path,
+                review.reviewDocument.sha256, review.reviewDocument.bytes)
+        review.followupSurfaceSha256.each { name, digest ->
+            verifyPin(rootDir, name, digest, null)
+        }
+    }
 }
 
 tasks.register('verifyHfReferenceGoldens') {

@@ -1,0 +1,146 @@
+{
+  "schema": 1,
+  "checkedAt": "2026-11-23T12:23:10.008417+00:00",
+  "sourceCommit": "68a9e69b7e85c7587fcf565be2e7575439f047a9",
+  "sourceCommitNote": "HEAD at check time, not necessarily a clean tree; native and JUnit inputs are ignored outputs. See workingTreeStatus.",
+  "workingTreeStatus": [],
+  "gitStatusArgv": [
+    "git",
+    "--no-optional-locks",
+    "-C",
+    "/Users/per/project/jmlx",
+    "-c",
+    "core.fsmonitor=false",
+    "status",
+    "--porcelain"
+  ],
+  "probeSha256": "fcd6999e0ff19613c635aeee1fc5a0697dabd9e5cad5ee92aea3d8e90a8a170a",
+  "nativeReportImplementationSha256": "85b4f940f67faf916a9263a3920a69763837176af6685cb8c8db131e4ca4e849",
+  "nativeReportImplementationSource": "probe repository, SHA-256 checked before execution",
+  "bootstrapSha256": "ef82a354631b255f0db42abcc3a83bf8cbf130cd7236d79482b51c2c7b54200b",
+  "preliminarySha256": "3a530d8386834abb20de23b96d4ec0a46e6cf62207952b193c2fc9d6e29689af",
+  "nativeReportArguments": {
+    "directory": "/Users/per/project/jmlx/native/install/lib",
+    "bootstrap": "/Users/per/project/jmlx/scripts/bootstrap-native.sh",
+    "forbidden": [
+      "/Users/per",
+      "/Users/per/project/jmlx"
+    ]
+  },
+  "nativeReportMatchesRc2": true,
+  "nativeReport": {
+    "pins": {
+      "mlxMetalVersion": "0.32.4",
+      "mlxcCommit": "a26f2d584a14ec619ae8db9a09be03becd47598a"
+    },
+    "supportedMinimum": [
+      27,
+      2,
+      0
+    ],
+    "deploymentTarget": [
+      26,
+      2,
+      0
+    ],
+    "files": {
+      "libmlxc.dylib": {
+        "sha256": "15a08b85d40333093a38043d0545f9ff6d12ab532e58e7c1af067a23c93a238d",
+        "size": 2364080,
+        "minos": [
+          26,
+          2,
+          0
+        ],
+        "sdk": [
+          27,
+          2,
+          0
+        ]
+      },
+      "libmlx.dylib": {
+        "sha256": "d8c9393d584e781393c3effccfccd8ba85ad0c70264edaf9f897dca9875375c6",
+        "size": 21720704,
+        "minos": [
+          26,
+          2,
+          0
+        ],
+        "sdk": [
+          26,
+          5,
+          0
+        ],
+        "upstreamPathAllowlist": [
+          "/Users/runner/work/mlx/mlx/build/temp.macosx-11.0-arm64-cpython-310/mlx.core/mlx/backend/metal/kernels//mlx.metallib"
+        ]
+      },
+      "libjaccl.dylib": {
+        "sha256": "7890e84a96e3121c8c1c2f351e41e46ba4d92e7b7bc6275fc2b38c2773891032",
+        "size": 2131168,
+        "minos": [
+          26,
+          2,
+          0
+        ],
+        "sdk": [
+          26,
+          5,
+          0
+        ]
+      },
+      "mlx.metallib": {
+        "sha256": "c6d7a3facb83568f6e4cb2cf4a8c736ee29302571a48343cb9a3a4d1cd3e3893",
+        "size": 214156448
+      },
+      "native-pin.properties": {
+        "sha256": "9fbdc2f67202c57a6e86adbae8f3ab318c89cbbc222df34c197aedf14f5739b7",
+        "size": 75
+      }
+    }
+  },
+  "junit": {
+    "required": 104,
+    "presentInMainCheckout": 104,
+    "matchingInMainCheckout": 0,
+    "method": "sha256 of <root>/<relative path> from preliminary.json junit map"
+  },
+  "backupRecovery": {
+    "timeMachineDestinations": {
+      "argv": [
+        "tmutil",
+        "destinationinfo"
+      ],
+      "returncode": 0,
+      "stdout": "tmutil: No destinations configured.\n",
+      "stderr": ""
+    },
+    "localSnapshots": {
+      "argv": [
+        "tmutil",
+        "listlocalsnapshots",
+        "/"
+      ],
+      "returncode": 0,
+      "stdout": "Snapshots for disk /:\n",
+      "stderr": ""
+    },
+    "apfsSnapshots": {
+      "argv": [
+        "diskutil",
+        "apfs",
+        "listSnapshots",
+        "/"
+      ],
+      "returncode": 0,
+      "stdout": "Snapshot for disk3s1s1 (1 found)\n|\n+-- 808236D9-F176-4EEE-B085-33EEA9DF251A\n    Name:        com.apple.os.update-5EAEB3CC027918533FF72C50AB959F1FB19B7F17D4D1B9C09329E5C04E193F54\n    XID:         2892750\n    Purgeable:   No\n    NOTE:        This snapshot limits the minimum size of APFS Container disk3\n",
+      "stderr": ""
+    },
+    "mountedVolumes": [
+      "Macintosh HD",
+      "Recovery"
+    ],
+    "limit": "Local observations only; nonzero command results do not establish absence. External/offline backups were not searched. An OS update snapshot alone does not establish recovery of candidate data."
+  },
+  "conclusion": "This probe reports native equivalence and JUnit matches only. It does not recover missing producer inputs or restore RC2 revalidation."
+}

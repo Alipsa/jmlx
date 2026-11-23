@@ -6,6 +6,7 @@ original-input recovery or a fully verified replacement candidate. Owner signed-
 delivery review, jinja human sign-off and current Portal capacity confirmation remain open.
 The tagged candidate is
 `jmlx-phase8.4-rc.2` at `33676837f66993b5a809644dbbdc6e6550417334`.
+Replacement preparation: [RC3 preparation](phase8-4-rc3-preparation.md).
 No publication authorized or performed.
 Plan: [phase8-4-plan.md](plans/phase8-4-plan.md).
 Local verification: [implementation report](phase8-4-implementation-report.md).
@@ -109,19 +110,20 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   `784124ac44cfe17f8bf7f4d8c814fc30b96ff05e`;
   [merge-commit CI run 44815990385](https://github.com/Alipsa/jmlx/actions/runs/44815990385)
   passed Java and native checks, both release-smoke profiles and required-native-suite verification.
-- [x] Before tagging, review and align the jinja, tokenizer, vision, core and models
+- [ ] Before tagging, review and align the jinja, tokenizer, vision, core and models
   changelog version-cut dates with the final candidate cut date.
-  Prepared as 2026-11-22; recheck the date immediately before creating the immutable tag.
-  RC2 was cut and verified on that date; no changelog input was changed afterward.
-  A replacement candidate reopens this gate: align and review the version-cut dates again
-  against its actual cut date, then rerun the affected verification.
+  RC2 used 2026-11-22; those dates are retained during preparation. This gate is
+  reopened. Align and review the actual cut date in the final pre-tag PR, then rerun
+  the affected verification after that change.
 - [ ] Restore revalidatable candidate provenance before acceptance or publication.
   RC2 tag/SHA, signed bundle and all consumer runs were historically verified, but the
   original candidate checkout is missing, including four pinned producer JSON files and all
   104 digest-pinned JUnit XML reports. Recovery also needs matching staged `native/install/lib`
   and the preliminary record restored at its original path (an identical copy survives).
-  Matching the main checkout's native staging has not been established. Recovering only the
-  four JSON files is insufficient; see the complete recovery requirements in the RC2 review.
+  The [replacement recovery check](plans/evidence/rc3-preparation-2026-11-23/recovery-check.json)
+  establishes that the main checkout's native report matches RC2, but none of its 104
+  JUnit reports matches.
+  Recovering only the four JSON files is insufficient; see the RC2 review.
   [RC2 final review](phase8-4-rc2-final-review.md) retains the receipt, exact reports, artifact
   comparison and ZIP inventory. All four consumer reports pass. Owner acceptance of this
   signed candidate and the changed Javadoc/module checksums remains pending.
@@ -142,8 +144,13 @@ The report records these contract input SHA-256 values:
 - `req/release-checklist.md` (jinja):
   `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`
 
-The verified commit precedes this documentation update; it is not the current HEAD.
-This update changes no jinja verification contract inputs.
+At this PR's head the changelog digest is again
+`9bc0162e0158403e06dd6b9068edec5ec655e77189b23c95092d8c5bcbf539e0`.
+The `5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26` digest existed
+only in PR #118's initial commit, before its date edit was reverted. PR #116 verification
+remains historical because it did not run at the replacement candidate commit. Final pre-tag
+date alignment will change this contract input; repeat both verification passes for the
+replacement after its final changes.
 
 The isolated online/offline matrix, reproducible archives and independent consumer resolution
 passed with BellSoft JDK 25.0.5, Temurin 21.0.13+9 and pinned Node v26.7.0. The published and

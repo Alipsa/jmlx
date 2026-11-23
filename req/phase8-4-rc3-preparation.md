@@ -85,9 +85,16 @@ verification passes and the nine-module release dry-run passed at clean source c
 `b4ee4d75836f3f5fe4445e72a690dae2fd1b7887`. Both reports, logs and supporting evidence
 are retained in the [pre-tag packet](plans/evidence/rc3-pre-tag-2026-11-23/review.json).
 Public copies normalize local paths; the packet records their hashes and the original
-hashes. Originals survive outside Gradle clean scope at
+hashes. Root `check` runs `verifyRc3PreTagEvidence` to enforce the recursive inventory and
+all retained size/digest pins. The reports identify the inner Gradle daemon as BellSoft
+25.0.5 and Node as v26.7.0. Inner candidate logs identify the Temurin installation path,
+whose 21.0.13+9 version was observed later, rather than captured during the passes.
+The successful verifier JVM identity was not recorded; the failed environment preflight
+used the BellSoft `21.0.12+1.1-librca` launcher. The packet distinguishes this evidence
+from the timestamped later toolchain observation. Originals survive outside Gradle clean scope at
 `~/release-candidates/jmlx-phase8.4-rc.3-pre-tag-2026-11-23/`.
-Jinja human sign-off remains pending.
+These pre-tag passes precede the shared evidence-guard change to root `build.gradle`;
+root `:check` separately validates the new guard. Jinja human sign-off remains pending.
 
 Review and merge the pre-tag PR before creating RC3. If the actual candidate cut falls on
 a later date, realign the five dates and repeat both passes after that policy input change.

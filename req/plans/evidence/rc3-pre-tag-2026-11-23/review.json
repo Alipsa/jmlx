@@ -13,9 +13,26 @@
     "dryRun": 0
   },
   "toolchains": {
-    "gradle": "BellSoft 25.0.5+11",
-    "java21": "Eclipse Adoptium 21.0.13+9",
-    "node": "v26.7.0"
+    "innerGradleDaemon": {
+      "recordedVersion": "BellSoft 25.0.5",
+      "buildNumberNote": "25.0.5+11 observed later at the JAVA_HOME installation; successful reports omit build number."
+    },
+    "innerCandidateJava21": {
+      "recordedPath": "/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home",
+      "versionAtPassTime": "not recorded",
+      "laterObservation": "Eclipse Adoptium 21.0.13+9"
+    },
+    "verifierJvm": {
+      "successfulPasses": "not recorded",
+      "failedEnvironmentPreflightLauncher": "<HOME>/.sdkman/candidates/java/21.0.12+1.1-librca/bin/java",
+      "inference": "Successful passes likely used the same launcher; this is not established by their logs."
+    },
+    "node": "v26.7.0",
+    "laterObservation": {
+      "checkedAt": "2026-11-23T14:06:22.221913+00:00",
+      "path": "toolchain-observation.txt",
+      "scope": "Current installation versions, not contemporaneous pass evidence."
+    }
   },
   "humanSignOff": "pending",
   "durableOriginals": "~/release-candidates/jmlx-phase8.4-rc.3-pre-tag-2026-11-23",
@@ -147,6 +164,12 @@
       "sha256": "fb84263db60e05d7b63d2ef5655212de1325640ae7f6c5b803cf81fa65d724c5",
       "originalBytes": 2774,
       "originalSha256": "fb84263db60e05d7b63d2ef5655212de1325640ae7f6c5b803cf81fa65d724c5"
+    },
+    {
+      "path": "toolchain-observation.txt",
+      "bytes": 900,
+      "sha256": "a66abbb86d2b35f9acf1a0d7c0f0e5535b6924fae3787bd9c68bcea6a01d0830"
     }
-  ]
+  ],
+  "pinEnforcement": "Root check depends on verifyRc3PreTagEvidence: recursive inventory and every retained size/SHA-256 pin; Finder .DS_Store files excluded."
 }

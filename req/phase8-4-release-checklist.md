@@ -140,13 +140,20 @@ Two consecutive `./gradlew :jmlx-jinja:releaseVerification` passes and the nine-
 [pre-tag packet](plans/evidence/rc3-pre-tag-2026-11-23/review.json) retains both complete
 reports, logs and supporting evidence, with sizes and SHA-256 pins. Public copies normalize
 local paths; original bytes are preserved outside Gradle clean scope at the packet's
-`durableOriginals` location. Both passes used BellSoft 25.0.5+11, Temurin 21.0.13+9 and
-Node v26.7.0. The changelog contract input is
+`durableOriginals` location. Root `check` enforces the recursive inventory and every retained
+file's size and SHA-256 through `verifyRc3PreTagEvidence`.
+The reports record the inner Gradle daemon as BellSoft 25.0.5 and Node v26.7.0; the inner
+candidate build logs resolve `/Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home`.
+A later version observation of that installation reports Temurin 21.0.13+9; it does not prove
+the version at pass time. The successful passes did not record the verifier JVM identity;
+the failed environment preflight used the BellSoft `21.0.12+1.1-librca` launcher.
+See the packet's toolchain notes and timestamped version observation. The changelog input is
 `5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`;
 the jinja release checklist input remains
 `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`.
-Human sign-off remains open. These are pre-tag results; repeat exact-candidate checks and
-the final audit for RC3. Realign dates and repeat both passes if the actual cut date changes.
+These passes precede this PR's shared evidence-guard change to root `build.gradle`; root
+`:check` separately validates the new guard. Human sign-off remains open. Repeat
+exact-candidate checks and the final audit for RC3. Realign dates and repeat both passes if the actual cut date changes.
 
 ## Historical pre-candidate verification (2026-11-22)
 
@@ -160,10 +167,8 @@ The report records these contract input SHA-256 values:
 - `req/release-checklist.md` (jinja):
   `377ee052ffa4b7fe3e0271b9665552016140975b998025775c51bd79adf8ecde`
 
-The RC3 pre-tag date alignment supersedes the changelog digest above with
-`5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`.
-PR #116 verification is stale for this contract input and remains historical. Repeat both
-verification passes after the replacement's final policy input changes. That digest also
+This changelog input was superseded by RC3 pre-tag date alignment; see the section above.
+PR #116 verification is historical and stale for that input. The RC3 changelog digest also
 briefly existed in PR #118's initial commit before that PR reverted its date edit.
 
 The isolated online/offline matrix, reproducible archives and independent consumer resolution
@@ -175,10 +180,8 @@ snapshot of the final Markdown/JSON reports are retained under ignored
 `build/releaseAll/pre-candidate-2026-11-22/`. The logs are
 `pr116-repeat-verification-1.log`, `pr116-repeat-verification-2.log` and
 `pr116-followup-dry-run.log`. These local files are not committed evidence.
-These checks precede the immutable candidate; repeat verification after any contract input
-changes, including the jinja release checklist.
-RC2 subsequently completed its tagged verification; its current revalidation blocker is
-recorded above. A replacement candidate requires fresh verification and signed-bundle evidence.
+These checks preceded RC2, which subsequently completed its tagged verification. Its current
+revalidation blocker and the replacement candidate gates are recorded above.
 
 ## Historical pre-candidate verification (2026-11-20)
 

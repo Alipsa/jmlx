@@ -49,7 +49,7 @@ req/plans/evidence/rc3-preparation-2026-11-23/** -text
 
 # Preserve RC3 pre-tag verification evidence bytes.
 req/plans/evidence/rc3-pre-tag-2026-11-23/** -text
-req/plans/evidence/rc3-pre-tag-2026-11-23/**/*.log whitespace=-blank-at-eol
-req/plans/evidence/rc3-pre-tag-2026-11-23/*.log whitespace=-blank-at-eol
+req/plans/evidence/rc3-pre-tag-2026-11-23/**/*.log whitespace=-blank-at-eof
+req/plans/evidence/rc3-pre-tag-2026-11-23/*.log whitespace=-blank-at-eof
 # Generated corpus reports retain their original trailing blank line.
-req/plans/evidence/rc3-pre-tag-2026-11-23/**/corpus-coverage.md whitespace=-blank-at-eol
+req/plans/evidence/rc3-pre-tag-2026-11-23/**/corpus-coverage.md whitespace=-blank-at-eof

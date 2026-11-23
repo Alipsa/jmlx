@@ -944,6 +944,39 @@
       "bytes": 5028,
       "sha256": "01be3169aafea0f20797075637bee8de21b39189c168cf9c5903916dc64439b3",
       "representation": "Comparison recipe authored for this review; later revision adds the non-empty legal-text check. The retained signed-native-comparison.json was produced by the earlier revision identified in its producer record; no separate original of this current recipe."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/owner-review-preparation.json",
+      "bytes": 7616,
+      "sha256": "9636b9eba83999824bc50bbd5366aac51a2319cf9cf330d858640fdfeb94b69f",
+      "originalBytes": 7847,
+      "originalSha256": "be70d88f9f327011f70525febacf891cf06ecfe052712a08387796c8dd473759",
+      "originalPath": "<REPOSITORY>/build/releaseAll/rc3-owner-review-preparation.json",
+      "representation": "Historical pre-approval technical preparation; normalized local roots and comparison-output path. Pending proposal statuses describe preparation time, not the later owner decision."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/owner-review-native-comparison.json",
+      "bytes": 4448,
+      "sha256": "bc22c1822241ab5bf3b43c2da024d8fd83ddb671742266ff17e7292a1085a759",
+      "representation": "Exact current comparator output prepared for owner review; earlier retained comparison is unchanged.",
+      "producer": {
+        "commit": "9879d1aaa7f11733a1a77d0712e1d96b1880cd2b",
+        "path": "req/plans/evidence/rc3-final-review-2026-11-23/compare-native.py",
+        "bytes": 5028,
+        "sha256": "01be3169aafea0f20797075637bee8de21b39189c168cf9c5903916dc64439b3"
+      }
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/owner-review.json",
+      "bytes": 4554,
+      "sha256": "54959c9dd8aae093e68d2c738d4eebe66ed52e4f2b38ae0bca944d9d13a8e852",
+      "representation": "Owner approval recorded from the current conversation; approvedProposal and response preserve the decision. No separate signed original or independently timestamped approval is asserted."
+    },
+    {
+      "path": "req/plans/evidence/rc3-final-review-2026-11-23/jinja-human-signoff.json",
+      "bytes": 1235,
+      "sha256": "e88f513cf7036b5da945b3ccb86748fe0c38b09a7a3a73447eb93b08aea17332",
+      "representation": "Owner human sign-off recorded from the approved review proposal; supersedes the earlier generated pending placeholder. Historical verifier reports remain unchanged."
     }
   ]
 }

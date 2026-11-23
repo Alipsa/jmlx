@@ -1,10 +1,12 @@
 # Phase 8.4 RC3 signed-candidate review
 
-Prepared 2026-11-23. RC3 technical verification passed. This packet is ready for review of
-the retained technical evidence; jinja human sign-off, current Portal capacity,
-license-finding disposition, signed-candidate/delivery acceptance and publication
-authorization remain pending. This packet is not eligible for publication acceptance. No
-owner acceptance is asserted. RC2 remains historical and blocked by its lost inputs.
+Prepared 2026-11-23; updated with the owner's RC3 review approval on the same date.
+RC3 technical verification passed. The owner approved jinja human sign-off, the signed
+candidate and its documented evidence limits, both license-finding dispositions under the
+previously recorded interpretations, and delivery terms. The [owner review][owner-review]
+records the exact approved proposal and the owner's response. Current Portal capacity and
+final publication authorization remain pending; this packet is not eligible for publication
+acceptance. RC2 remains historical and blocked by its lost inputs.
 
 ## Candidate identity and preservation
 
@@ -64,9 +66,14 @@ Both exact-tag jinja `releaseVerification` passes and the nine-module dry-run pa
 Both complete reports/logs, dependency review, corpus report, POM and archive comparison
 are retained separately. Their changelog input is
 `5984b78b9933c167b9362b5465877a7f60a3b6a68a3a624bec0695d8b9af3a26`.
-Both reports leave the human sign-off unchecked. The separate
-[jinja sign-off record][jinja-signoff] explicitly remains pending for NOTICE, changelog,
-POM, Javadoc, dependency report and corpus evidence.
+Both historical reports leave the human sign-off unchecked. The separate
+[jinja sign-off record][jinja-signoff] now records the owner's 2026-11-23 approval of
+NOTICE, changelog, POM, Javadoc, dependency report and corpus evidence, with the fixture
+policy also reviewed. The retained preparation links the reviewed inputs and confirms all
+three signed jinja JARs match both clean builds in each pass, and the signed POM matches
+both retained POMs. The final receipt revalidated; the current native comparator reproduced
+the retained results exactly apart from its timestamp. Its new output is retained separately
+as `owner-review-native-comparison.json`; the earlier comparison remains unchanged.
 
 Retained logging-only init scripts recorded the invoking and inner Gradle daemons as
 BellSoft `25.0.5+11-LTS`. The verifier's selected launcher probe recorded Temurin
@@ -172,8 +179,13 @@ original grants, attribution, modification indications, approved scope paragraph
 legal texts/notices retained. No new recipient restriction or technical measure is proposed.
 The owner's [recorded interpretation](phase8-4-owner-license-decision.md), adapter-license
 counterargument and conditional PR #115 conclusion remain the basis for owner review.
-Technical checks do not close `NATIVE-LICENSE-1` or `NATIVE-LICENSE-2`. Their disposition,
-signed-candidate acceptance and actual delivery terms remain pending.
+On 2026-11-23 the owner explicitly approved the RC3 signed candidate, its documented
+evidence limits and these delivery terms, and accepted its validation as satisfying
+`NATIVE-LICENSE-1` and `NATIVE-LICENSE-2` under the previously recorded interpretations.
+The findings are resolved by that owner decision for this exact candidate and delivery
+scope. The adapter-license counterargument and provenance limits remain recorded; no
+new grant or acceptance of unspecified future artifacts is established. This decision
+is separate from publication authorization, which remains pending.
 
 The ZIP measures 106,730,869 bytes, with 270 files totaling 107,448,758 bytes. Its CRCs,
 unique filenames and conservative upload-size check pass. This is not a Portal account
@@ -186,18 +198,18 @@ downloaded asset bytes matched both expected digests. Keep it unpublished. Archi
 evidence and remove the draft/assets within 30 days of publication or abandonment,
 preserving the immutable tag.
 
-This PR may be merged as a technical evidence record, but acceptance must not name this
-incomplete packet commit. Before acceptance, a superseding reviewed packet commit must
-retain the actual jinja human sign-off, disposition of both license findings, current
-Portal capacity snapshot and owner delivery/signed-candidate decisions. That update must
+The jinja sign-off, both license-finding dispositions and owner delivery/signed-candidate
+decisions are now retained. Acceptance must not name this still-incomplete packet commit.
+Before acceptance, a superseding reviewed packet commit must retain the current Portal
+capacity snapshot and the separately required publication decision. That update must
 revise this review document, regenerate its pin and the publication manifest, and update
 the checklist's manifest digest. Review and merge the superseding packet before issuing
 acceptance. Actual acceptance must name its full commit and new manifest digest, this
 ZIP and final receipt, and all explicit owner decisions under the
 [acceptance contract](../tools/release-all/owner-acceptance.md).
 Fetch the packet commit into the detached candidate repository without changing its
-checkout. No acceptance record or publication authorization is created here. Fresh-cache
-Central verification and module tags remain post-publication work.
+checkout. No final publication-acceptance record or upload authorization is created here.
+Fresh-cache Central verification and module tags remain post-publication work.
 
 [packet]: plans/evidence/rc3-final-review-2026-11-23/publication-review.json
 [provenance]: plans/evidence/rc3-final-review-2026-11-23/evidence-provenance.json
@@ -206,3 +218,4 @@ Central verification and module tags remain post-publication work.
 [capacity]: plans/evidence/rc3-final-review-2026-11-23/portal-capacity-status.json
 [drivers]: plans/evidence/rc3-final-review-2026-11-23/driver-history.json
 [repair]: plans/evidence/rc3-final-review-2026-11-23/preservation-repair.json
+[owner-review]: plans/evidence/rc3-final-review-2026-11-23/owner-review.json

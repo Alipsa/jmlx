@@ -1,7 +1,9 @@
 # Phase 8.4 owner license decision record
 
-Prepared 2026-11-21; updated 2026-11-22. Owner interpretations, final metadata and local
-downstream terms accepted; signed-candidate validation remains open.
+Prepared 2026-11-21; updated 2026-11-23. The owner accepted RC3 signed-candidate
+validation and delivery terms under the previously recorded interpretations. Both findings
+are resolved for that exact candidate and scope. Portal capacity and publication
+authorization remain pending. Earlier dated sections below retain their historical status.
 
 | Field | Record |
 | --- | --- |
@@ -11,9 +13,9 @@ downstream terms accepted; signed-candidate validation remains open.
 | Confirmation date | 2026-11-21; owner statements in the preparation conversation |
 | Applicable law | Not determined; pending assessment of relevant rights and grants |
 | Assessment | Owner judgment based on the evidence; reviewer is not a lawyer |
-| Juffa disposition | Scope, final metadata and local terms accepted; validation pending |
-| Cephes disposition | Interpretation and retained implementation accepted; validation pending |
-| Release gate | Open; neither finding has been resolved |
+| Juffa disposition | Resolved for the exact RC3 candidate and approved delivery scope; counterargument retained |
+| Cephes disposition | Resolved for the exact RC3 candidate and approved delivery scope |
+| Release gate | License conditions accepted for RC3; Portal capacity and publication authorization remain open |
 
 The owner makes jmlx's acceptance and release decisions. This workflow does not require an
 external lawyer's approval; independent advice is optional. This record distinguishes an
@@ -25,6 +27,30 @@ The tables in this record are the authoritative decision template. The proposal 
 required coverage; every pending field here must be completed or explicitly marked not
 applicable with a reason. Owner statements above come from the preparation conversation,
 not independently verified repository evidence.
+
+## RC3 signed-candidate owner decision (2026-11-23)
+
+Per Nyfelt approved the concrete proposal presented after RC3 receipt revalidation and
+native/jinja archive comparisons, replying "approved" to this statement:
+
+> I approve the jinja review, accept the exact RC3 signed candidate and documented evidence limits, accept its validation as satisfying both native-license findings under my previously recorded interpretations, and approve the proposed delivery terms.
+
+The [retained owner record](plans/evidence/rc3-final-review-2026-11-23/owner-review.json)
+binds that response to the previously reviewed packet commit, exact candidate tag, signed
+ZIP and final receipt. The [RC3 review](phase8-4-rc3-final-review.md) retains the evidence,
+including exact equality with all five previously approved native publications and notices,
+four passing exact-ZIP consumers and physical minimum-host execution. The owner accepts
+those results as satisfying the recorded conditions for `NATIVE-LICENSE-1` and
+`NATIVE-LICENSE-2` for this exact candidate and delivery scope. The owner also approves
+jinja sign-off and delivery as one combined Central deployment preserving the reviewed
+grants, notices, attribution and modification indications without additional recipient
+restrictions or technological measures.
+
+The previously recorded Juffa adapter-license counterargument, Cephes provenance limits,
+applicable-law uncertainty and unestablished cached native Javadoc producer remain part of
+the decision. This establishes no new grant or acceptance of unspecified future artifacts
+or changed delivery terms. The temporary transport Release must stay unpublished. Current
+Portal account capacity and final publication authorization remain pending.
 
 ## Evidence being assessed
 

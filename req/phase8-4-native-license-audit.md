@@ -3,7 +3,15 @@
 Review date: 2026-11-16. Source baseline: PR #99 merge
 `a97eb5b0c735cdc047a13c5539295cce64130eef`.
 
-**The license release gate remains open.** This review found missing permissive notices and
+Current disposition (2026-11-23): the [owner decision](phase8-4-owner-license-decision.md#rc3-signed-candidate-owner-decision-2026-11-23)
+accepts RC3 validation as satisfying both findings under the previously recorded owner
+interpretations, for the exact signed candidate and approved delivery scope. The
+counterargument and provenance limits remain recorded. Portal capacity and final
+publication authorization remain pending. The audit and machine-readable findings below
+retain their historical observations; they have not been rewritten as new legal evidence.
+
+**Historical status at this audit's review date: the license release gate remained open.**
+This review found missing permissive notices and
 adds them to the native main, sources and Javadoc JARs. Two provenance findings below require
 resolution before release. Passing source/hash/packaging checks establishes consistency of
 the reviewed material, not permission for the unresolved material.

@@ -1,8 +1,9 @@
 # Phase 8.4 release notes — draft
 
-Not published. RC3 technical verification and final-receipt revalidation passed. Owner
-signed-candidate/delivery acceptance, jinja human sign-off, license-finding disposition,
-Portal capacity and publication authorization remain pending. The
+Not published. RC3 technical verification and final-receipt revalidation passed. The owner
+approved the signed candidate, delivery terms, jinja review and both license-finding
+dispositions on 2026-11-23. Portal capacity and final publication authorization remain
+pending. The
 [RC3 review](phase8-4-rc3-final-review.md) records the exact tag, SHA, signed ZIP and receipt.
 Module release tags and deployment identity remain for the authorized publication record.
 
@@ -50,6 +51,8 @@ The native distribution retains MLX's MIT grant for Apple/MLX contributions and 
 See the [owner decision](phase8-4-owner-license-decision.md) and
 [approved notice](https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES).
 Final local metadata was accepted in PR #115. All five signed RC3 native publications
-match those approved byte pins, including Javadoc and module metadata. Owner acceptance
-of the signed candidate, delivery terms and license-finding disposition remains pending
-in the [RC3 review](phase8-4-rc3-final-review.md).
+match those approved byte pins, including Javadoc and module metadata. The owner's
+2026-11-23 approval accepts the signed candidate and delivery terms and resolves both
+findings for this exact scope under the previously recorded interpretations. The
+[RC3 review](phase8-4-rc3-final-review.md) retains that decision and its evidence limits.
+Current Portal account capacity and final publication authorization remain pending.

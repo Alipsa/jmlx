@@ -85,7 +85,8 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   notices and artifact validation. The
   [Cephes local verification](plans/evidence/cephes-notice-validation-2026-11-21/validation.json)
   records the revised title and checks all three native JARs; implementation review was
-  accepted on 2026-11-22, while final candidate validation remains outstanding. The owner
+  accepted on 2026-11-22. RC3 technical validation now passes; final owner disposition
+  remains pending. The owner
   also accepted the Juffa existing-grants interpretation on 2026-11-21, subject to scope,
   final wording, downstream terms and artifact validation. Both findings stay open.
   On 2026-11-22 the owner approved the scope/wording packet. PR #114 merged as
@@ -94,7 +95,7 @@ BellSoft 21.0.12.1; the matching-toolchain audit reproduces every JAR exactly. T
   [final metadata/downstream review](phase8-4-native-distribution-review.md)
   supplies exact local artifact/metadata hashes and the owner conclusion accepted on
   2026-11-22 in PR #115. The separate acceptance record pins the approved review commit and
-  document/metadata hashes. RC2 artifact and consumer validation passed; owner acceptance of
+  document/metadata hashes. RC3 artifact and consumer validation passed; owner acceptance of
   the signed candidate and planned delivery remains open.
 - [ ] Verify current official Portal size limits/accounting against actual signed bundle.
   [Capacity procedure and current sources](phase8-4-portal-capacity.md), reviewed 2026-11-16;
@@ -219,21 +220,21 @@ also passed at that commit. Smoke selftests and all 85 Gradle-backed release reg
 were rerun and passed at clean `de37ee4551b8dd74be3f0b360173ccfe89fddaf9`, replacing their
 earlier runs whose working-tree state was not recorded. Logs and retained jinja reports are under
 ignored `build/releaseAll/pre-candidate-2026-11-20/`; the new runs use `*-pr105-*` names. These are
-preparation checks, not evidence for an immutable tagged candidate or signed bundle. The
-final tag still requires its own audit, verification, signed-bundle task evidence, consumer
-reports and minimum-host execution.
+preparation checks, not evidence for an immutable tagged candidate or signed bundle.
+The RC3 exact-candidate review above retains the later audit, verification, signed-bundle
+task evidence, consumer reports and minimum-host execution at its tag.
 
 ## Supported minimum decision (2026-11-16)
 
 The owner approved macOS 27.2 as the native support floor, including every 27.2.x patch
 release and later versions. The available physical Apple Silicon host runs macOS 27.2.1
-(build 26B131). The release job must still record chip/GPU identity, virtualization status,
-full OS version and successful Metal execution of the exact signed candidate. No candidate
-has been frozen or tested yet. The dedicated non-privileged `jmlxrunner` account has been
-created without signing, release or SSH credentials. The
+(build 26B131). At that decision no candidate had been frozen or tested. The RC3 review
+now retains chip/GPU identity, virtualization status, full OS version and successful
+Metal execution of its exact signed ZIP. The dedicated non-privileged `jmlxrunner`
+account was created without signing, release or SSH credentials. The
 [runner setup and evidence](phase8-4-minimum-host-setup.md) records account isolation checks,
 runner ID 23 and a successful connection under that account. Its label is
-`jmlx-release-minimum`; it is stopped until a reviewed candidate is ready. The existing
+`jmlx-release-minimum`; it was stopped after the RC3 verification window. The existing
 `ghrunner` PR/Tier-B runner remains separate. Connectivity does not establish candidate
 Metal execution or consumer acceptance.
 

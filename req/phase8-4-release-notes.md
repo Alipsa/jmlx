@@ -49,5 +49,7 @@ The native distribution retains MLX's MIT grant for Apple/MLX contributions and 
 
 See the [owner decision](phase8-4-owner-license-decision.md) and
 [approved notice](https://github.com/Alipsa/jmlx/blob/551eebeeb66a80ef3af467a6c1b4995c2a7f7034/jmlx-native-macos-arm64/THIRD-PARTY-NOTICES).
-Final local metadata was accepted in PR #115. The signed RC2 comparison and documented
-Javadoc/module checksum differences await owner acceptance in the final review.
+Final local metadata was accepted in PR #115. All five signed RC3 native publications
+match those approved byte pins, including Javadoc and module metadata. Owner acceptance
+of the signed candidate, delivery terms and license-finding disposition remains pending
+in the [RC3 review](phase8-4-rc3-final-review.md).

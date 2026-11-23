@@ -1,0 +1,660 @@
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:compileJava UP-TO-DATE
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes UP-TO-DATE
+> Task :jmlx-jinja:compileTestJava UP-TO-DATE
+> Task :jmlx-jinja:processTestResources UP-TO-DATE
+> Task :jmlx-jinja:testClasses UP-TO-DATE
+
+> Task :jmlx-jinja:releaseVerification
+Preparing worktree (detached HEAD b4ee4d7)
+HEAD is now at b4ee4d7 Align RC3 pre-tag changelog dates and record merged acceptance gate
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+
+> Task :jmlx-jinja:verifyJava21Toolchain
+Resolved Java 21 toolchain: /Library/Java/JavaVirtualMachines/Temurin-21.jdk/Contents/Home
+
+BUILD SUCCESSFUL in 388ms
+3 actionable tasks: 1 executed, 2 up-to-date
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:compileJava
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes
+> Task :jmlx-jinja:compileTestJava
+> Task :jmlx-jinja:processTestResources
+> Task :jmlx-jinja:testClasses
+
+> Task :jmlx-jinja:verifyReproducibleArchives
+Preparing worktree (detached HEAD b4ee4d7)
+HEAD is now at b4ee4d7 Align RC3 pre-tag changelog dates and record merged acceptance gate
+Updating files:  91% (2292/2496)Starting a Gradle Daemon, 1 busy and 1 stopped Daemons could not be reused, use --status for details
+Updating files:  92% (2297/2496)Updating files:  93% (2322/2496)Updating files:  94% (2347/2496)Updating files:  95% (2372/2496)Updating files:  96% (2397/2496)Updating files:  97% (2422/2496)Updating files:  98% (2447/2496)Updating files:  99% (2472/2496)Updating files: 100% (2496/2496)
+Updating files: 100% (2496/2496), done.
+> Task :buildSrc:compileJava
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes
+> Task :buildSrc:jar
+> Task :jmlx-jinja:clean
+> Task :jmlx-jinja:compileJava
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes
+> Task :jmlx-jinja:jar
+> Task :jmlx-jinja:sourcesJar
+> Task :jmlx-jinja:javadoc
+> Task :jmlx-jinja:javadocJar
+
+BUILD SUCCESSFUL in 6s
+8 actionable tasks: 8 executed
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:clean
+> Task :jmlx-jinja:compileJava
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes
+> Task :jmlx-jinja:jar
+> Task :jmlx-jinja:sourcesJar
+> Task :jmlx-jinja:javadoc
+> Task :jmlx-jinja:javadocJar
+
+BUILD SUCCESSFUL in 1s
+8 actionable tasks: 6 executed, 2 up-to-date
+archive evidence: <TMP>/jmlx-jinja-release-worktree-3136990443885371870/candidate/jmlx-jinja/build/reports/archive-reproducibility.json
+jmlx-jinja-0.6.2.jar 8048f73b7480d8bab56d8def5ef73fd9501e5d91329f644f701c00d8d5d083c1
+jmlx-jinja-0.6.2-sources.jar ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5
+jmlx-jinja-0.6.2-javadoc.jar c9602ee3f5971d5ffa802ded99c10c5d4750b3829ad6df623d610047f380e8e8
+
+BUILD SUCCESSFUL in 12s
+6 actionable tasks: 4 executed, 2 up-to-date
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:clean
+> Task :jmlx-jinja:compileJava
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes
+> Task :jmlx-jinja:compileTestJava
+> Task :jmlx-jinja:processTestResources
+> Task :jmlx-jinja:testClasses
+> Task :jmlx-jinja:jar
+> Task :jmlx-jinja:compileTokenizerConfigExample
+> Task :jmlx-jinja:spotlessJava
+> Task :jmlx-jinja:spotlessJavaCheck
+> Task :jmlx-jinja:spotlessCheck
+> Task :jmlx-jinja:checkstyleMain
+> Task :jmlx-jinja:test
+> Task :jmlx-jinja:upstreamVerify
+> Task :jmlx-jinja:verifyModuleDescriptor
+> Task :jmlx-jinja:generatePomFileForMavenPublication
+> Task :jmlx-jinja:verifyPublicationMetadata
+> Task :jmlx-jinja:verifyReleaseScriptsMatch
+> Task :jmlx-jinja:checkstyleTest
+> Task :jmlx-jinja:verifyTokenizerConfigExample
+> Task :jmlx-jinja:check
+
+BUILD SUCCESSFUL in 4s
+19 actionable tasks: 17 executed, 2 up-to-date
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:dependencyUpdates
+
+BUILD SUCCESSFUL in 547ms
+3 actionable tasks: 1 executed, 2 up-to-date
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:compileJava UP-TO-DATE
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes UP-TO-DATE
+> Task :jmlx-jinja:compileTestJava UP-TO-DATE
+> Task :jmlx-jinja:processTestResources UP-TO-DATE
+> Task :jmlx-jinja:testClasses UP-TO-DATE
+
+Preparing worktree (detached HEAD b4ee4d7)
+> Task :jmlx-jinja:verifyReproducibleArchives
+HEAD is now at b4ee4d7 Align RC3 pre-tag changelog dates and record merged acceptance gate
+> Task :buildSrc:compileJava
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes
+> Task :buildSrc:jar
+> Task :jmlx-jinja:clean
+> Task :jmlx-jinja:compileJava
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes
+> Task :jmlx-jinja:jar
+> Task :jmlx-jinja:sourcesJar
+> Task :jmlx-jinja:javadoc
+> Task :jmlx-jinja:javadocJar
+
+BUILD SUCCESSFUL in 3s
+8 actionable tasks: 8 executed
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:clean
+> Task :jmlx-jinja:compileJava
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes
+> Task :jmlx-jinja:jar
+> Task :jmlx-jinja:sourcesJar
+> Task :jmlx-jinja:javadoc
+> Task :jmlx-jinja:javadocJar
+
+BUILD SUCCESSFUL in 1s
+8 actionable tasks: 6 executed, 2 up-to-date
+archive evidence: <TMP>/jmlx-jinja-release-worktree-3136990443885371870/candidate/jmlx-jinja/build/reports/archive-reproducibility.json
+jmlx-jinja-0.6.2.jar 8048f73b7480d8bab56d8def5ef73fd9501e5d91329f644f701c00d8d5d083c1
+jmlx-jinja-0.6.2-sources.jar ec9d5f4c5d4956b7819e8be65ef5be1c8bd4e51ae55db7e8cb91441fad6e67f5
+jmlx-jinja-0.6.2-javadoc.jar c9602ee3f5971d5ffa802ded99c10c5d4750b3829ad6df623d610047f380e8e8
+
+BUILD SUCCESSFUL in 6s
+6 actionable tasks: 1 executed, 5 up-to-date
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:clean
+> Task :jmlx-jinja:compileJava
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes
+> Task :jmlx-jinja:compileTestJava
+> Task :jmlx-jinja:processTestResources
+> Task :jmlx-jinja:testClasses
+> Task :jmlx-jinja:jar
+> Task :jmlx-jinja:compileTokenizerConfigExample
+> Task :jmlx-jinja:spotlessJava
+> Task :jmlx-jinja:spotlessJavaCheck
+> Task :jmlx-jinja:spotlessCheck
+> Task :jmlx-jinja:test
+> Task :jmlx-jinja:upstreamVerify
+> Task :jmlx-jinja:verifyModuleDescriptor
+> Task :jmlx-jinja:generatePomFileForMavenPublication
+> Task :jmlx-jinja:verifyPublicationMetadata
+> Task :jmlx-jinja:verifyReleaseScriptsMatch
+> Task :jmlx-jinja:checkstyleMain
+> Task :jmlx-jinja:verifyTokenizerConfigExample
+> Task :jmlx-jinja:checkstyleTest
+> Task :jmlx-jinja:check
+
+BUILD SUCCESSFUL in 4s
+19 actionable tasks: 17 executed, 2 up-to-date
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:upstreamVerify UP-TO-DATE
+
+> Task :jmlx-jinja:nodeOracleVersion
+Node oracle version v26.7.0
+
+> Task :jmlx-jinja:nodeCorpusVerify
+PASS templates.no-template sha256=c0535e4be2b79ffd93291305436bf889314e4a3faec05ecffcbb7df31ad9e51a
+PASS templates.text-nodes sha256=de97d5b464f1e602e4bb9faaed6b567a8e6d116ccf1ab075e93dbfcd74b5c586
+PASS templates.boolean-literals sha256=a6f3f9a1f4dfe5f858e0965b436204573463ff9f02b7f13323aa443e2f49df6b
+PASS templates.logical-and sha256=964f6878b9b64d9fb66336fbc1aedfeac0273eda605a5edc99b686b3340a3358
+PASS templates.logical-or sha256=d22cb48ce87ef8cbc254d1fa9719712ba3843d4cd31b442ee77d45872a8e9a03
+PASS templates.logical-not sha256=d0ed673fb6af647b0a9da7863b7699b68286c3c3796b41976baf4fa3b3dc3ef9
+PASS templates.logical-not-not sha256=c0b3b644a08b30d0dcd67fe353ded4d67bb8308394cb5d89ad94bfd3cb0e8ed7
+PASS templates.logical-and-or sha256=14e06db98cf6acecc07ff389b8408c76547971fe2fed353a42ab43aad3a2dbe0
+PASS templates.logical-and-not sha256=71e1f45357932038d9abd8a42d02c4647d9da494a11c4bff7c7a6009b60bcf8f
+PASS templates.logical-or-not sha256=61fb209b962e124990773e2c200d1d76e84be98eca61dd2224e4b7a7dd67d0e3
+PASS templates.logical-combined sha256=d0ed673fb6af647b0a9da7863b7699b68286c3c3796b41976baf4fa3b3dc3ef9
+PASS templates.if-only sha256=38164fbd17603d73f696b8b4d72664d735bb6a7c88577687fd2ae33fd6964153
+PASS templates.if-else-only sha256=768921a22b8e190c2cfafeb0688f0d58a5f76ee4c7fb369758a208c7ba5e9acb
+PASS templates.if-elif-else sha256=dd76f7dce43dfe80c6e39030abfb4da8e497a37f10a39eef8c3aabfdd1525945
+PASS templates.nested-statements sha256=fc5101a7f55d71e234242163fd1bdfaa4fdea7437bf161f7e1cf7c49e57580a2
+PASS templates.for-loop sha256=b5d4045c3f466fa91fe2cc6abe79232a1a57cdf104f7a26e716e0a1e2789df78
+PASS templates.for-loop-unpacking sha256=9a6bd3f538767c5bdb5fc27f67813a4bc52f4a89c37f32db1848f4737caaf5af
+PASS templates.for-loop-default sha256=df7e70e5021544f4834bbee64a9e3789febc4be81470df629cad6ddb03320a5c
+PASS templates.for-loop-select sha256=86e50149658661312a9e0b35558d84f6c6d3da797f552a9657fe0558ca40cdef
+PASS templates.for-loop-select-2 sha256=961b6dd3ede3cb8ecbaacbd68de040cd78eb2ed5889130cceb4c49268ea4d506
+PASS templates.for-loop-break sha256=6b51d431df5d7f141cbececcf79edf3dd861c3b4069f0b11661a3eefacbba918
+PASS templates.for-loop-continue sha256=6affdae3b3c1aa6aa7689e9b6a7b3225a636aa1ac0025f490cca1285ceaf1487
+PASS templates.for-loop-range-negative-step sha256=f69c9603e78869ff68f7b4e27c40719083e68d2193cc0d87b862cc826dd6eb6d
+PASS templates.for-loop-objects sha256=74ed88cefdc63bcc431f459c60e517cca0fd2b92cfbbff05543f19f87948741b
+PASS templates.variables sha256=a591a6d40bf420404a011733cfb7b190d62c65bf0bcda32b57b277d9ad9f146e
+PASS templates.variables-2 sha256=9294ab38039f60d2ec53822fb46b52c663af7ea478f4d17bf43da44ede5e166c
+PASS templates.variables-block sha256=f1c3354690459af1df336a763aa8635384a1f749a0d43ef5c2c3f8320b9116fe
+PASS templates.variables-unpacking sha256=69fedd5d8e8fc1e402d4f2fcc8ef1ba195e4abd11d18a57958ae3f4914a02582
+PASS templates.binop-expr sha256=f9eae097e05d7e8a1b2262541ff2e8727454600357869e7b51998fec91142dda
+PASS templates.binop-expr-1 sha256=4002a0db27cd5f1c9ad61d22d660fbd47ab99afef3817bb44d4b6f8d57d222a3
+PASS templates.strings sha256=862d85bb80f59b837ad07a3ba58c0d5fe129f736149075646448a4ec50f12022
+PASS templates.strings-1 sha256=e34e0984f8902ae981fa8a20544673737ce44dd8747f02c1fc932eb919833862
+PASS templates.strings-2 sha256=cf1f811b5743628c3328acc27f915ceae01d8117407e924937dcec8dcaa77690
+PASS templates.strings-3 sha256=1112d957c0a4e43f6cb3372201bbd76386bba97303d809124cf93f7efb55bc91
+PASS templates.strings-4 sha256=ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+PASS templates.properties sha256=b74b7e3fcb623d805dacf98db27530f845760c47e3b0faa702b84e9ff3902c37
+PASS templates.properties-1 sha256=421a8bef4bdec555e085884672b178f6a69b9ea78a04a24efa0a06a1795796fa
+PASS templates.string-methods sha256=02932e7149f3fe17f147c6998255d95bf00e92541d2db8713dec8cb5dea5a034
+PASS templates.string-methods-2 sha256=f03888793e8b383b1536f9e58dabc2ecbe35a2a86ddfa362e4199436421374e5
+PASS templates.rstrip sha256=9f6d2f7e35aba11c321ad8ed17c1b096570566fac33ef97e1526cf9c6b6988af
+PASS templates.lstrip sha256=b4ba54d717d3eb0554c6b4a4534a547bb04ab9e3e84d279d80e586640ef63d74
+PASS templates.split sha256=f83b35b3f85b872f65ca94133a6cb35a11ae19b267c282cdb3219d91594a2459
+PASS templates.split-2 sha256=64d97d7937e4d49fcc0d89db1b363446df0efbc1c6acb2cd5756ef4952803f63
+PASS templates.split-3 sha256=54c823346a03f47ec2ae12f735e2c7596bd12435f946c2d3c453eddbb683cf66
+PASS templates.split-4 sha256=14355f8f9033a8d2023810dbcef691bf34923d525557a9a62a725f63c8b0cd72
+PASS templates.split-5 sha256=e69014b492a1df0f0bc39459c030718675d84538ddf76764f05f2a6e240e57b9
+PASS templates.replace sha256=b2b4bb60043d46665fd8e9c532cc0b5739d7fce8f7364a0b5d57c0db70623e46
+PASS templates.string-slicing sha256=62093b6d1b057cc6349e20bd628592bf279a45ec0606a1677876f0596d858c7c
+PASS templates.array-slicing sha256=62093b6d1b057cc6349e20bd628592bf279a45ec0606a1677876f0596d858c7c
+PASS templates.membership sha256=8ac6d045ccdd3c36e3ecfaf0fa53173c0864739bba692c712856ed87d2cf0e01
+PASS templates.membership-negation-1 sha256=4651c5b1c2244ccd820ca245849ffdd79529bc72f05d43bc8ea49f5fd29ccb79
+PASS templates.membership-negation-2 sha256=4651c5b1c2244ccd820ca245849ffdd79529bc72f05d43bc8ea49f5fd29ccb79
+PASS templates.membership-undefined sha256=bb00699cbfc6b68ad45e54f0a70bfbacc55af2d277dffb10a766a08f77c7c9f3
+PASS templates.escaped-chars sha256=df280fda54b82bdf099e68f5f4cdfdbdbb4a4f521c9c32b572a2edcda9da55b0
+PASS templates.substring-inclusion sha256=d2de67f28e5c89a751a8e48d62ef3503465640aec3cd3023dbdf092ce6eff1e4
+PASS templates.filter-operator sha256=bb551a7a1524e2effeb1c44e13d497a3aecb51cfa92245d70f799af519127f9c
+PASS templates.filter-operator-2 sha256=4ba2e741cacb192630c7a81b1c5c7b34d9b2367e1cebdf8e157394af96663366
+PASS templates.filter-operator-3 sha256=207c00462f265a3669f553ab363dd6e28b101f532832b778710a3c1a08a9f497
+PASS templates.filter-operator-4 sha256=d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+PASS templates.filter-operator-5 sha256=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+PASS templates.filter-operator-6 sha256=b863b18073e38fd848048ba8d93d8893d03ab847ca8cdcb6c08610147902a593
+PASS templates.filter-operator-7 sha256=f0e99fe8b158058ca280390da62da7ab86618d64795d24b58435a88a469cc4a6
+PASS templates.filter-operator-8 sha256=0c3cd95bde24c6bade1e659c52cb970de8b11766a310286e817b0a2ba03891ba
+PASS templates.filter-operator-9 sha256=a36b1f2c3f84522dd1005145646617d7054c0851e97c72a039c0bdfac9fa07f3
+PASS templates.filter-operator-10 sha256=775406d5403706f4f9906f97d875885865b893aa9dbec6559606ccecd6281dd7
+PASS templates.filter-operator-11 sha256=4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+PASS templates.filter-operator-12 sha256=d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+PASS templates.filter-operator-13 sha256=1f37694747ac36215f29135fcfcf06f9993e6552480ec508886a042a816d655f
+PASS templates.filter-operator-14 sha256=95e23c9e5fd202921551cab8ec5faf36190958497221d53eb387d673b244ae38
+PASS templates.filter-operator-15 sha256=59d9a7f26844b8e1425c0fe6a7b6fe1667f2f5fe2fa9b666d1b0f67385c12a39
+PASS templates.filter-operator-16 sha256=d98c5407264af5bfbca17df46ca768ad6d533d04b6b55730898781b1c1ee572b
+PASS templates.filter-operator-17 sha256=4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+PASS templates.filter-operator-18 sha256=c81ef880af0fcfef49e1b45c3690a1666c47d9e064b7eaead2af09bb78884dcd
+PASS templates.filter-operator-19 sha256=908c2979c4faa754db8434224d568ac1aaa9f1cbcb319f18e22407b7f0c41263
+PASS templates.tojson-separators-1 sha256=c9859303c159435a57aee7562b2f8cf8fbf6677ad006deae17f8049920a90890
+PASS templates.tojson-separators-2 sha256=a615eeaee21de5179de080de8c3052c8da901138406ba71c38c032845f7d54f4
+PASS templates.tojson-separators-3 sha256=82dc98b9f85cbf8e31b7220ab7dbc5e50f26d49a3902668674d1236957f125d5
+PASS templates.tojson-ensure-ascii sha256=13fd8abf76dc2615f90b230370aa970217cfbdfbca1c274c1b2f196f6a87f631
+PASS templates.tojson-ensure-ascii-false sha256=9576f8620543e226f920c7bbc4bdc6054a6ee792f8621f252a2363aff109fdc2
+PASS templates.tojson-sort-keys sha256=d97e5b9864df8961178c35e532187fb22b7a286b01af9e416459f5e4d49ec62d
+PASS templates.tojson-combined sha256=e6a3385fb77c287a712e7f406a451727f0625041823ecf23bea7ef39b2e39805
+PASS templates.tojson-indent-with-separators sha256=3d7e3090834ae75ffb838a5d2a2085b9cbb9bfe4b1cb502f52256f9a003b99d9
+PASS templates.filter-operator-dictsort-1 sha256=e457f785ca2c9b2c63d7ce7625ac5a83744f9285f91e287596b485c3cfac04c6
+PASS templates.filter-operator-dictsort-2 sha256=e457f785ca2c9b2c63d7ce7625ac5a83744f9285f91e287596b485c3cfac04c6
+PASS templates.filter-operator-dictsort-3 sha256=cbc3904dde955a1c0768fd77a472278586dcc6fef0a25ad0fe552dcf609cde56
+PASS templates.filter-operator-dictsort-4 sha256=89e1bbf2b83d841779e845499d9e8168d9b149325b2bb2e82c6db05792005149
+PASS templates.filter-operator-dictsort-5 sha256=961b4162ff191a854ee1ef273a22a99cd9faf15ba6be5ce1491993fa8390ef51
+PASS templates.filter-operator-dictsort-6 sha256=6ad0620106b96a22baac59ac38dd6dc681937779b4275645b24f2120cac176a8
+PASS templates.sort-basic-numbers sha256=a36b1f2c3f84522dd1005145646617d7054c0851e97c72a039c0bdfac9fa07f3
+PASS templates.sort-basic-strings sha256=a8cdaa8fdf7bbfbe2fdb7a997c09c35b29b5cf571b3f461b91c96f1bdcbbe8e7
+PASS templates.sort-reverse sha256=d520590c6bcf63a93c14cddce3975f7c48bcaa9c4b68dde1907e69b141829687
+PASS templates.sort-case-sensitive sha256=a8cdaa8fdf7bbfbe2fdb7a997c09c35b29b5cf571b3f461b91c96f1bdcbbe8e7
+PASS templates.sort-case-insensitive sha256=a8cdaa8fdf7bbfbe2fdb7a997c09c35b29b5cf571b3f461b91c96f1bdcbbe8e7
+PASS templates.sort-attribute-simple sha256=c4110b739902d6e7fdb91b0de3eb35af26a09a4edb38f1368e62725cf223b6f0
+PASS templates.sort-attribute-reverse sha256=f728b4d35323ca4f5c93a624417e22cbd9bc44859aaf135c60530a77549cadaf
+PASS templates.sort-attribute-dot-notation sha256=a36b1f2c3f84522dd1005145646617d7054c0851e97c72a039c0bdfac9fa07f3
+PASS templates.sort-chained sha256=45adc8f3094d95ad33ba3005e3d82e9f5deb833f30208887ce2dabbb89533e32
+PASS templates.sort-stable sha256=95a67ba2edfbb46af34f3dd68c407ebcff0206a65cb1aed95e89905c4c68532d
+PASS templates.sort-positional-reverse sha256=d520590c6bcf63a93c14cddce3975f7c48bcaa9c4b68dde1907e69b141829687
+PASS templates.sort-positional-reverse-case sha256=a8cdaa8fdf7bbfbe2fdb7a997c09c35b29b5cf571b3f461b91c96f1bdcbbe8e7
+PASS templates.sort-positional-all sha256=c4110b739902d6e7fdb91b0de3eb35af26a09a4edb38f1368e62725cf223b6f0
+PASS templates.sort-positional-mixed sha256=f728b4d35323ca4f5c93a624417e22cbd9bc44859aaf135c60530a77549cadaf
+PASS templates.sort-null-values sha256=6d9695b0f6f0de8c737c15a199b1658001af6e4ef0d756109efffbd0c69ad4c9
+PASS templates.sort-undefined-values sha256=549e97fceb497e44564b2eee7b1d10dc4d44ea1b07c55e515c14d7e1e8b2baa8
+PASS templates.sort-mixed-bool-num sha256=03ac302da7070271696e8762782f480b67cd495561ad30e2de4655403080a850
+PASS templates.filter-statements sha256=e4ba216b53e675d3ce45a8584de79ecc013718ef83ebd53f29d47d97af594386
+PASS templates.boolean-numerical sha256=819ce3d3df7f3d7d63a593854f2b11a6823070c3c8b92b739ad001bdf782f654
+PASS templates.boolean-strings sha256=cbc999311fee9372711bf44283c9eea4089d52137b2ddc77ce62f63b8e738949
+PASS templates.boolean-mixed sha256=44923cbba3e0296356fcc53b232f132750928afb85c37f0e859f5c254526159c
+PASS templates.boolean-mixed-2 sha256=f7ec84bdcfd6d89ff4701603ca1510a63af0f3305fd7b4f99f3817e53afa8db9
+PASS templates.boolean-mixed-if sha256=24349c8054862cb8cbd4d857d096943e21434041ea744799074e2e28e753c14c
+PASS templates.is-operator sha256=7ca8f43d53d1af1797de45bcced64edb813856970cce68696b7ceba32a0d314e
+PASS templates.is-operator-2 sha256=93d1b8f86baf4ab3fe5e39d163528e9032d376bdfa1c91d371aa5d692bb0152c
+PASS templates.is-operator-3 sha256=993aa12215d1217562dedadb3fbbb70914a4d37eaa8a1847622e4c84592f8816
+PASS templates.is-operator-5 sha256=839a71006590f56a69f56761a61c347cefd0925c46d53e912330c43903fc2e5c
+PASS templates.is-operator-6 sha256=60c12ca574781c9bcbd2a2d362a03929a4d56fab3af5f3a0dc33ac6a7331b8bb
+PASS templates.short-circuit sha256=fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa
+PASS templates.short-circuit-1 sha256=b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b
+PASS templates.namespace sha256=fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9
+PASS templates.namespace-1 sha256=fcbcf165908dd18a9e49f7ff27810176db8e9f63b4352213741664245224f8aa
+PASS templates.namespace-2 sha256=4f146ba2ea356855cf470defc3f050e14fcfb943451a6c4017edeb164f7be675
+PASS templates.object-operators sha256=839a71006590f56a69f56761a61c347cefd0925c46d53e912330c43903fc2e5c
+PASS templates.object-operators-1 sha256=44e36003c09ddf1fd6d2f26b9c8a315d126fefb9959433b744b53cac7ae3abac
+PASS templates.object-operators-2 sha256=7d31a1c6491c0945e5da8b591de2afba427cd1c2263fca421376a33705019752
+PASS templates.scope sha256=3af86f37800894840552f0cbce550ce7001ab9be52b220c45a74ee1b1683ac64
+PASS templates.scope-1 sha256=917f4035f056c5a529775fc39d688d187f9c4bac9867bf1dab0529d2e092f9c3
+PASS templates.undefined-variables sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS templates.undefined-access sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS templates.null-variable sha256=d74ff0ee8da3b9806b18c877dbf29bbde50b5bd8e4dad7a3a725000feb82e8f1
+PASS templates.ternary-operator sha256=639652c48ab1c366119071452c94430fae5f483f946e69cd5ac993f8151a8888
+PASS templates.ternary-operator-1 sha256=4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+PASS templates.ternary-set sha256=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+PASS templates.ternary-consecutive sha256=4e07408562bedb8b60ce05c1decfe3ad16b72230967de01f640b7e4729b49fce
+PASS templates.ternary-shortcut sha256=fcde2b2edba56bf408601fb721fe9b5c338d10ee429ea04fae5511b68fbf8fb9
+PASS templates.array-literals sha256=ef2d127de37b942baad06145e54b0c619a1f22327b2ebbcfbec78f5564afe39d
+PASS templates.tuple-literals sha256=d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+PASS templates.object-literals sha256=cd42404d52ad55ccfa9aca4adc828aa5800ad9d385a0671fbcbf724118320619
+PASS templates.object-literals-1 sha256=cd42404d52ad55ccfa9aca4adc828aa5800ad9d385a0671fbcbf724118320619
+PASS templates.array-operators sha256=e7f6c011776e8db7cd330b54174fd76f7d0216b612387a5ffcfb81e6f0919683
+PASS templates.macros sha256=c597257daf8cc7cfa97df60f3525da54c942ab62f76ee7c44082a4d9f00521a4
+PASS templates.macros-1 sha256=3e02cf22b63a4f04789c97d627f55a8c2c707bc00213c93e9cf653362db1b594
+PASS templates.macros-2 sha256=32705243bb4e01b27fb9dbf56b7589c80e8ad3cf670504126d970d3a870407bd
+PASS templates.macros-3 sha256=39958d5adfcbb53ce335df5110050cac0043a91b570125b425a484728c3b3b25
+PASS templates.macros-4 sha256=ca0cec2a0612606c1f92ed6fc91b16a3c3217748610b882163e7433108481a46
+PASS templates.context-keywords sha256=3e23e8160039594a33894f6564e1b1348bbd7a0088d42c4acb73eeaed59c009d
+PASS templates.context-keywords-1 sha256=8281cbce860ee22cbedc80da4fc2d5a7183eff7fbfc1d477cbac5e153e4be6fe
+PASS templates.unpacking sha256=c73b39c45586c524f9de04c7a9b9d78539ee81a22b1975a0fe28f775fca789e3
+PASS templates.whitespace-control-1 sha256=c1cf8a1abdca89e6f2fd26746ec8fae1bf4e8f9e1eb478ce6c38036b2647581b
+PASS templates.whitespace-control-2 sha256=a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3
+PASS templates.whitespace-control-3 sha256=559aead08264d5795d3909718cdd05abd49572e84fe55590eef31a88a08fdffd
+PASS templates.whitespace-control-4 sha256=f8ef5f9c7214669b5cd993209a3e312a5552f98d77e53f48ee463d742738346a
+PASS templates.whitespace-control-5 sha256=4b68ab3847feda7d6c62c1fbcbeebfa35eab7351ed5e78f4ddadea5df64b8015
+PASS templates.whitespace-control-6 sha256=4b68ab3847feda7d6c62c1fbcbeebfa35eab7351ed5e78f4ddadea5df64b8015
+PASS templates.whitespace-control-7 sha256=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+PASS templates.whitespace-control-8 sha256=cc3bb398d17b424da6305ede1daee3a30316f083b63894bdcdbf3d4d21b30c4a
+PASS interpreter.whitespace-control-1 sha256=9143ac268c3829d9e8ec73cea49e1a5fb87382e42e95adcce71a72bad7277d43
+PASS interpreter.whitespace-control-2 sha256=50b103cdf42ca4431cfdd5bbcdb16ac7cdfa7abef4fd0603ae5a5ad508673921
+PASS interpreter.whitespace-control-3 sha256=a489fe4d529721e98a15e6f06e1afed6ed0517fbd2ad66e088451fbeb448573a
+PASS interpreter.whitespace-control-4 sha256=cfd7597668c9e7c3c6b9cf195e5ec250ac225984de396369a427c6aad79428fe
+PASS interpreter.whitespace-control-5 sha256=a018cdd86eccde1c7ac23ab61ab187671c0d5bbfdf1bf69a8f764afa2438607e
+PASS interpreter.whitespace-control-6 sha256=a018cdd86eccde1c7ac23ab61ab187671c0d5bbfdf1bf69a8f764afa2438607e
+PASS interpreter.whitespace-control-7 sha256=3975561c4686f1e3137619146251b7fd88b4125be0e906c0cafce64bd50e16b9
+PASS interpreter.whitespace-control-8 sha256=3975561c4686f1e3137619146251b7fd88b4125be0e906c0cafce64bd50e16b9
+PASS interpreter.whitespace-control-9 sha256=90cdaf13f564e4d2e76706f84226a554a2bbdb2542c2e48764d16bffd17bb38a
+PASS interpreter.whitespace-control-10 sha256=113474ae117272dd2cdc2ea0aaeb9352802d96aedae9a481ac2393a6d41cdf57
+PASS interpreter.whitespace-control-11 sha256=0b067cfdf83bb094427296e3d04ee7ed0f7eb6bf7d792b8ddbffa4ad3364e5f5
+PASS interpreter.whitespace-control-12 sha256=15e2b0d3c33891ebb0f1ef609ec419420c20e320ce94c65fbc8c3312448eb225
+PASS interpreter.whitespace-control-13 sha256=e60afa3aac7430d68bb7898d81c6cbebef96f6e9529adbf69750fe43c59cb628
+PASS interpreter.whitespace-control-14 sha256=01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b
+PASS interpreter.whitespace-control-15 sha256=399141be1d30ac2656d89eedcf0d8dcedaa72d6c29bf959cae243dc7b1442cf6
+PASS interpreter.whitespace-control-16 sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS templates.error-missing-closing-curly-brace error=SYNTAX message=exact
+PASS templates.error-unclosed-string-literal error=SYNTAX message=exact
+PASS templates.error-unexpected-character error=SYNTAX message=exact
+PASS templates.error-invalid-quote-character error=SYNTAX message=exact
+PASS templates.error-unclosed-statement error=SYNTAX
+PASS templates.error-unclosed-expression error=SYNTAX
+PASS templates.error-unmatched-control-structure error=SYNTAX message=exact
+PASS templates.error-missing-variable-in-for-loop error=SYNTAX message=exact
+PASS templates.error-unclosed-parentheses-in-expression error=SYNTAX message=exact
+PASS templates.error-invalid-variable-name error=SYNTAX message=exact
+PASS templates.error-invalid-control-structure-usage error=SYNTAX message=exact
+PASS templates.error-undefined-function-call error=TYPE message=exact
+PASS templates.error-incorrect-function-call error=TYPE message=exact
+PASS templates.error-looping-over-non-iterable error=TYPE message=exact
+PASS templates.error-invalid-variable-assignment error=SYNTAX message=exact
+PASS self.if-set-persists sha256=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+PASS self.loop-prev-next sha256=a27d98b6e676c806678ab0b3796b14075633454741efe9f15935fea5098f6647
+PASS self.object-key-type error=TYPE
+PASS self.context-global-collision error=VALUE
+PASS self.tuple-unpack-loop-item error=TYPE
+PASS self.filters-basic sha256=b02980bb50806f3ba4190937c00c691e51589853c0f65515a158935614b955af
+PASS self.tests-basic sha256=49b91644ab6b506cb4e358ee0ce17cd558f39661b69aefee5f15477e0e047f0c
+PASS self.filter-edge-cases sha256=401e1e6499158d1cbaa9f3ff6cdced3c82ed6f0630108fc90e2aaeae3c531344
+PASS self.ternary-expressions sha256=ef69c7dfae8a9eea014cbac2b415f3037369ecd1202de47b35dd9026262aecec
+PASS self.sequence-slicing sha256=178aecff5cfa0dda26ebd399ca7e6297797d34c5a3174e3209ea573e14ac2948
+PASS self.loose-nil-equality sha256=7f31ff407eaad074b1003cbb411119977a99ab35d1911b1ead251ee774ae9812
+PASS self.spread-call-arguments sha256=412a4789b02cad19bacb029f5c8ec8e9b115375d82b97df1d6b15997a8e70e01
+PASS self.spread-invalid-receiver error=TYPE
+PASS self.macro-default-arguments sha256=dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f
+PASS self.call-block-caller sha256=eb971b93d3d4cbf4e61c360d52d06e3d9fb101fb3eabd74b74971cecce22f560
+PASS self.filter-block sha256=cd6f6854353f68f47c9c93217c5084bc66ea1af918ae1518a2d715a1885e1fcb
+PASS self.mapping-test sha256=ba3c3749975e3b3424050cc8cb7c8aa1c14d0e21fcba53a4e43e79daea7914e3
+PASS self.tojson-ensure-ascii sha256=4f53cb068da06e096daed6994ccafa3d44826a205f412d5f8b33ef61a384ac45
+PASS self.tojson-negative-indent error=VALUE
+PASS self.tojson-sort-undefined-key sha256=4e152be66e9cbe747c77309966f545840a8e80bfec780b150871404eff31c036
+PASS self.tojson-negative-indent-scalars sha256=abf96d30588143044bc45b457d821ae119448f23fb160c4252cbfe0ef9f5d292
+PASS self.tojson-nan-indent sha256=0ec94a9fd103d119b807d6c3b3b6c8333985593e1c674bb3939598fb5520cb63
+PASS self.tojson-undefined-slots-and-separators sha256=4a3e2dc497b6f92473729c8bee5be56b398e4e6fa69619a55e04a14d8c3c8c50
+PASS self.strftime-month-names sha256=6b1a84ac924b58914d99fe90a211bfb07c94252c1b46275106f362fffb6fc9d2
+PASS self.strftime-default-instant-zone sha256=7ab7d9706a15088d0b4b568310a020dc045206eb6a998aec91cff629a87cae58
+PASS self.strftime-unknown-directive sha256=eafd9a86f990902cde13eed1edc078664683e7845adb9bbebc488c967324bfa9
+PASS self.strftime-terminal-percent sha256=8b4f41396b65065a622fd66f3711d45de38a54e4e2d67840b9fae42a68351eea
+PASS self.strftime-non-ascii-literal sha256=dbcef621b3450a8fe17d56ecba2fa0b685456bccc87f5e51b9b431c6fe9162c7
+PASS self.strftime-date-boundary sha256=8797caebfc62c51aab59542059dda8b85d57ca589bc34c9c7a25ef4469eb8a2f
+PASS self.strftime-zero-padding-utc sha256=0724127377344d57df6249c1918369f6f191bd71e8e397a30e57de7ba0043eb1
+PASS self.strftime-literal-vector sha256=c63297276d8a2cb89d6a461ad8f3be5a94c00d42010dd7d9d231094339adfc48
+PASS self.safe-and-boolean-tests sha256=9fb6b32027d573ffc8413b4f9d6c6eb704806c43f81e5182cf4fa4d97014d701
+PASS self.items-filter sha256=21cba725dbc26761a7e61ec43498881cdc443cdc717ee26a4becca87468c3081
+PASS self.startswith-endswith sha256=a0bea79a9d1862bd06f3a5fec7058a169f9eb1904d3b0c1e2520336c8f73297b
+PASS self.startswith-arity error=ARITY
+PASS self.endswith-type error=TYPE
+PASS self.startswith-tuple-element-type error=TYPE
+PASS self.runtime-edge-undefined-object-key sha256=6c7cd8f91b032aa4bc5b92eab087b4eb71d04f25d8a993f93e124f1e5b0c1494
+PASS self.runtime-edge-ecma-whitespace-split sha256=994a0560210a6cbe802429abde609db5a2487fb0eb9c8975118269634eb265c8
+PASS self.runtime-edge-indent-raw-truthiness sha256=7b3a130e5812d6eddaa6930900f2a7a017a1e56e1a682fdf9ed559dd108463c2
+PASS self.runtime-edge-title-ascii-boundary sha256=1150d1218ac289e214cc8a379a0b9669ec2749e71ac4c030c7e881d6bd22dfa2
+PASS self.runtime-edge-replace-code-point sha256=1a817e5fe63527e770ec9b1e4ef20fc751b33d843566d516c4f76fd65e27f39e
+PASS self.runtime-sequence-filter-basics sha256=227292a843fe04493a873444bf5dd8d2fe754f492545d767ee3bb06bbe395671
+PASS self.runtime-object-builtin-filters sha256=3a2f53f078c39fae88fdd05b0f7b269c2e60d9604316bf3436b8f87a289ba456
+PASS self.runtime-filter-options sha256=6a53ee3aad0e3fd2695c7ea1b8ef3d9ca2beee608de0f6f2bbb7299ebb90323e
+PASS self.runtime-string-negative-maxsplit sha256=e732c1a87c11e596f8dc9f170db5b17ac2957bcb526c9d7280c09fa7cfc437a5
+PASS wp7.call-safe-string error=TYPE
+PASS wp7.call-safe-skips-arguments error=TYPE
+PASS wp7.call-items-ignores-arguments sha256=21cba725dbc26761a7e61ec43498881cdc443cdc717ee26a4becca87468c3081
+PASS wp7.call-items-evaluates-spread error=TYPE
+PASS wp7.call-first-empty-arguments error=TYPE
+PASS wp7.call-first-argument error=TYPE
+PASS wp7.call-tuple-first error=TYPE
+PASS wp7.call-tuple-join sha256=42eb161c43f718f21f065e03a92c894f64ce206ec44fcd48803bff987863846a
+PASS wp7.bare-numeric-unknown error=TYPE
+PASS wp7.bare-float-unknown error=TYPE
+PASS wp7.bare-boolean-unknown error=TYPE
+PASS wp7.bare-null-unknown error=TYPE
+PASS wp7.bare-undefined-unknown error=TYPE
+PASS wp7.bare-function-unknown error=TYPE
+PASS wp7.bare-tuple-unknown error=TYPE
+PASS wp7.bare-object-unknown error=TYPE
+PASS wp7.call-object-unknown error=TYPE
+PASS wp7.call-float-abs error=TYPE
+PASS wp7.call-number-coercion sha256=6ed638c2de3b0c0ba36631e75d9c2858323f1216d8a6780d2efb5040041cfdc1
+PASS wp7.bare-selectattr error=TYPE
+PASS wp7.bare-rejectattr error=TYPE
+PASS wp7.bare-map error=TYPE
+PASS wp7.bare-replace error=TYPE
+PASS wp7.bare-default error=TYPE
+PASS wp7.call-map-no-attribute error=TYPE
+PASS wp7.call-map-positional-attribute error=TYPE
+PASS wp7.call-selectattr-empty-array sha256=4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945
+PASS wp7.call-selectattr-nonobject-array error=TYPE
+PASS wp7.call-selectattr-string error=TYPE
+PASS wp7.filter-block-safe-call error=TYPE
+PASS wp7.int-surplus-spread sha256=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+PASS wp7.float-surplus-spread sha256=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+PASS wp7.join-surplus-spread sha256=412a4789b02cad19bacb029f5c8ec8e9b115375d82b97df1d6b15997a8e70e01
+PASS wp7.default-surplus-spread sha256=ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb
+PASS wp7.int-unknown-keywords sha256=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+PASS wp7.eager-int error=EXPLICIT_RAISE
+PASS wp7.eager-tojson error=EXPLICIT_RAISE
+PASS wp7.join-receiver-before-arguments error=TYPE
+PASS wp7.selectattr-computed-argument error=TYPE
+PASS wp7.selectattr-spread-argument error=TYPE
+PASS wp7.selectattr-keyword-argument error=TYPE
+PASS wp7.selectattr-four-literals sha256=b41c2caad604cad6aaeccd84f0aa87d69cb50ed85796839f912a41b7f244c1c2
+PASS wp7.replace-filter-one-positional error=TYPE
+PASS wp7.replace-member-keyword-bag error=TYPE
+PASS wp7.replace-filter-count sha256=122f511b2bef868ef39698204feafcc35df40c7e2f43ae4f378c6930a56efe1d
+PASS wp7.get-keyword-bag error=TYPE
+PASS wp7.split-maxsplit-keyword error=TYPE
+PASS wp7.split-sep-keyword error=TYPE
+PASS wp7.positional-after-keyword error=SYNTAX
+PASS wp7.filter-block-int-surplus sha256=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+PASS wp7.filter-block-replace-one error=TYPE
+PASS wp7.filter-block-eager error=EXPLICIT_RAISE
+PASS wp7.get-filter-missing-no-keywords sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS wp7.get-filter-present-no-keywords sha256=6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b
+PASS wp7.eager-float error=EXPLICIT_RAISE
+PASS wp7.eager-sort error=EXPLICIT_RAISE
+PASS wp7.eager-join error=EXPLICIT_RAISE
+PASS wp7.eager-indent error=EXPLICIT_RAISE
+PASS wp7.eager-map error=EXPLICIT_RAISE
+PASS wp7.eager-default error=EXPLICIT_RAISE
+PASS wp7.eager-replace error=EXPLICIT_RAISE
+PASS wp7.get-member-keyword-only error=TYPE
+PASS wp7.positional-after-keyword-macro error=SYNTAX
+PASS wp7.macro-continue-crosses-call-boundary sha256=535fa30d7e25dd8a49f1536779734ec8286108d115da5045d77f3b4185d8f790
+PASS wp7.macro-break-crosses-call-boundary sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS wp7.call-block-continue-crosses-caller-boundary sha256=535fa30d7e25dd8a49f1536779734ec8286108d115da5045d77f3b4185d8f790
+PASS wp7.call-block-break-crosses-caller-boundary sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS wp7.macro-break-preserves-prior-iterations sha256=c04d86ca1b234dae2539f44a3ea605b8ed59fb65ec5ded09937ebacbfa100264
+PASS wp7.macro-break-loop-else sha256=a9f51566bd6705f7ea6ad54bb9deb449f795582d6529a0e22207b8981233ec58
+PASS wp7.macro-continue-loop-else sha256=a9f51566bd6705f7ea6ad54bb9deb449f795582d6529a0e22207b8981233ec58
+PASS wp7.macro-break-stops-at-inner-loop sha256=9fd3dd454e912a3ea9aa6b18c09383208c771baada571523baa1c372ac7c387b
+PASS wp7.macro-continue-stops-at-inner-loop sha256=aa2fd1770935d6005fac08aa72d35f5ef271a3d06756800c93591979f8300f0d
+PASS wp7.call-block-break-stops-at-inner-loop sha256=9fd3dd454e912a3ea9aa6b18c09383208c771baada571523baa1c372ac7c387b
+PASS wp7.call-block-continue-stops-at-inner-loop sha256=aa2fd1770935d6005fac08aa72d35f5ef271a3d06756800c93591979f8300f0d
+PASS wp7.macro-break-crosses-filter-block sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS wp7.macro-break-crosses-set-capture sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS wp7.call-block-callee-break-crosses-call-boundary sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS wp7.macro-break-in-for-predicate sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS wp7.macro-break-in-for-else sha256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+PASS wp7.macro-default-control-balances-depth sha256=d4735e3a265e16eee03f59718b9b5d03019c07d8b6c51f90da3a666eec13ab35
+PASS wp7.replace-filter-zero-positional error=TYPE
+PASS wp7.replace-filter-keyword-only error=TYPE
+PASS wp7.replace-filter-four-positional sha256=2b3e634b71b287b6cd9b2be78832b7096b6ee4abd65b5452d2e5e7e39acd4cfd
+PASS wp7.macro-bare-break error=SYNTAX
+PASS wp7.macro-bare-continue error=SYNTAX
+PASS wp7.call-block-bare-break error=SYNTAX
+PASS wp7.call-block-bare-continue error=SYNTAX
+PASS wp7.empty-first-last error=TYPE
+PASS wp7.dictsort-undefined-key-with-peer error=TYPE
+PASS wp7.lower-undefined-backed-string error=TYPE
+PASS wp7.strftime-missing-format error=TYPE
+PASS wp7.strftime-keyword-format error=TYPE
+PASS wp7.strftime-namespace-format error=TYPE
+PASS wp7.runtime-filter-and-member-surface sha256=35c0a95dd9b21f44fdcffcc2c62cc2e70ea7e4c9d66d47b95b1bcd8887b2648d
+PASS wp7.runtime-test-aliases-require-arguments error=TYPE
+PASS wp7.runtime-test-eq-alias-requires-arguments error=TYPE
+PASS wp7.runtime-inventory-core sha256=1896876abfa42eefeef1000030f9e73181b4b122490de43d96542936c1215fe5
+PASS wp7.empty-first-last-defer-undefined sha256=5e77dfd44422e2976ff670add26a0c36703b86c873a58b495ec6014b73d4dbb5
+PASS wp7.sort-case-sensitive-undefined sha256=c4375c9cb4f0682b90ba8107c502dc53969264f3e08f1da8614e3393cc1b77b3
+PASS wp7.undefined-backed-string-tests sha256=ca2e49564e07c30752b818cac84845d8b204982baeff2b58f095f91bdd9eb892
+PASS wp7.upper-undefined-backed-string error=TYPE
+PASS wp7.runtime-global-aliases sha256=70f12603013f78b4305641413d71809835880c313e9b44e08277a07c3ffa3a9c
+PASS wp7.empty-first-macro-argument error=ARITY
+PASS wp7.empty-first-deferred-dereference error=TYPE
+PASS wp7.empty-first-container-dereference error=TYPE
+PASS wp7.empty-first-macro-default sha256=6d6e2c72d981f361142f1fc1f88ff739c689d26f805a8fcf8dfa7d36c7f8956a
+PASS wp7.empty-first-filter-default-arguments sha256=ecba4ebdeaed1ab7532607ae955aa8b65805cf1d1ac77283c6adcae3b9955627
+PASS wp7.empty-first-default-truthiness error=TYPE
+PASS wp7.empty-first-test-dereference error=TYPE
+PASS wp7.empty-first-tojson-dereference error=TYPE
+PASS wp7.empty-first-join-dereference error=TYPE
+PASS wp7.empty-first-or-dereference error=TYPE
+PASS wp7.empty-first-and-dereference error=TYPE
+PASS wp7.empty-first-unary-dereference error=TYPE
+PASS wp7.empty-first-equality-dereference error=TYPE
+PASS wp7.empty-first-member-dereference error=TYPE
+PASS wp7.empty-first-loop-predicate error=TYPE
+PASS wp7.empty-first-safe-store sha256=1bcad7867f7021ded5b84f1cd934f5be3f2fb89d5bab8d5fc4444e20608578df
+PASS wp7.empty-first-container-filter-read error=TYPE
+PASS wp7.empty-first-container-unique-read error=TYPE
+PASS wp7.empty-first-attribute-read sha256=a1cb73e28d55807ab63d4187c8e706bc4134ccd2b06164ba540d5d9e75734ae2
+PASS wp7.empty-first-absorbing-arguments sha256=0b124a96bb733080a86dec5de164a0a263e55030653fbf16d4c9ef61032242d0
+PASS wp7.empty-first-callable-argument error=TYPE
+PASS wp7.undefined-backed-string-tostring-add error=TYPE
+PASS wp7.undefined-backed-string-tostring-concat error=TYPE
+PASS wp7.empty-first-instanceof-tests sha256=500cd43bb36b4128ef2e01a274f09672e3ee80c94f10804853019ccb364aa4ac
+PASS wp7.empty-first-all-absorbing-arguments sha256=d8d730ad0e072bdd94afd88624a4950b0b28486583eb9f1985f8a01e98545b5a
+PASS wp7.empty-first-replace-positional-count error=TYPE
+PASS wp7.deferred-object-member-builtin-fallback sha256=2d155ecf69908420b7225e37ce7adc655faa565830b1f220a2bed1206d259d43
+PASS wp7.namespace-object-surface sha256=dbfa4e5b0118b93b62ef12e0706f20ee10ed64c5e97ecf64fcfaca9962c7aab1
+PASS wp7.tuple-array-surface sha256=37054f76c581f7c60153e12d55c975f5be9a89909627af4d224dcac4e6d28fc3
+PASS wp7.deferred-namespace-member-builtin-fallback sha256=5a87b225f80063ff4cbb0542e5b373e7313a34ffc39eb1a95f2888d8e3bef202
+PASS wp7.namespace-map-unknown-filter error=TYPE
+PASS wp7.namespace-selectattr-unknown-filter error=TYPE
+PASS wp7.namespace-rejectattr-unknown-filter error=TYPE
+PASS wp7.namespace-replace-unknown-filter error=TYPE
+PASS wp7.member-builtin-identity sha256=b6320a64082c264ec75e553b0262f7723f7d4bcf4427a2b7e833fa692b5e3517
+PASS wp7.undefined-backed-string-coercions sha256=eb765b0e739524e315d44ee9dfc2009b182ef4c057e892fb5b82daff3a0d3367
+PASS wp7.undefined-backed-string-join-call error=TYPE
+PASS wp7.undefined-backed-string-join-call-positional-separator error=TYPE
+PASS wp7.undefined-backed-string-join-call-keyword-separator error=TYPE
+PASS wp7.undefined-backed-string-membership error=TYPE
+PASS wp7.undefined-backed-string-index error=TYPE
+PASS wp7.undefined-backed-string-slice error=TYPE
+PASS wp7.undefined-backed-string-replace error=TYPE
+PASS wp7.range-function-rendering-through-filters sha256=1f28eaab96c8aab12879d989160d41fb6ea8bc36ed3c05f03e11d2673d954ce8
+PASS wp7.range-function-bare-rendering sha256=9f7d177ac88809c3231af52f010986a7915b3f8b84876f69b31adfb39fca96e6
+PASS wp7.raise-exception-function-bare-rendering sha256=9f7d177ac88809c3231af52f010986a7915b3f8b84876f69b31adfb39fca96e6
+PASS wp7.strftime-now-function-bare-rendering sha256=9f7d177ac88809c3231af52f010986a7915b3f8b84876f69b31adfb39fca96e6
+PASS wp7.raise-exception-function-message error=EXPLICIT_RAISE message=exact
+PASS wp7.raise-exception-nested-function-message error=EXPLICIT_RAISE message=exact
+PASS wp7.parser-missing-statement-name error=SYNTAX
+SUMMARY executed=384 skipped=0
+
+> Task :jmlx-jinja:corpusCoverage
+> Task :jmlx-jinja:astSnapshotVerify
+> Task :jmlx-jinja:formatGoldenVerify
+> Task :jmlx-jinja:compileJava UP-TO-DATE
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes UP-TO-DATE
+> Task :jmlx-jinja:compileTestJava UP-TO-DATE
+> Task :jmlx-jinja:processTestResources UP-TO-DATE
+> Task :jmlx-jinja:testClasses UP-TO-DATE
+> Task :jmlx-jinja:fuzzParserVerify
+
+BUILD SUCCESSFUL in 6s
+12 actionable tasks: 6 executed, 6 up-to-date
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-jinja:dependencyReview
+
+BUILD SUCCESSFUL in 497ms
+4 actionable tasks: 1 executed, 3 up-to-date
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-jinja:clearModuleMetadata
+> Task :jmlx-jinja:compileJava UP-TO-DATE
+> Task :jmlx-jinja:processResources NO-SOURCE
+> Task :jmlx-jinja:classes UP-TO-DATE
+> Task :jmlx-jinja:jar UP-TO-DATE
+> Task :jmlx-jinja:javadoc
+> Task :jmlx-jinja:javadocJar
+> Task :jmlx-jinja:sourcesJar
+> Task :jmlx-jinja:generateMetadataFileForMavenPublication
+> Task :jmlx-jinja:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-jinja:signMavenPublication SKIPPED
+> Task :jmlx-jinja:publishMavenPublicationToReleaseVerificationRepository
+
+BUILD SUCCESSFUL in 1s
+11 actionable tasks: 6 executed, 5 up-to-date
+> Task :compileJava
+> Task :processResources NO-SOURCE
+> Task :classes
+
+> Task :consumerVerify
+verified
+> Task :copyResolvedRuntime
+
+BUILD SUCCESSFUL in 1s
+3 actionable tasks: 3 executed
+Consider enabling configuration cache to speed up this build: https://docs.gradle.org/9.9.0/userguide/configuration_cache_enabling.html
+
+BUILD SUCCESSFUL in 42s
+6 actionable tasks: 1 executed, 5 up-to-date

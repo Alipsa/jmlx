@@ -1,0 +1,93 @@
+Starting a Gradle Daemon, 1 busy and 1 incompatible Daemons could not be reused, use --status for details
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :jmlx-ffi:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-jinja:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-spring-ai:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-vision:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-langchain4j:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-tokenizer:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-core:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-models:generatePomFileForMavenPublication UP-TO-DATE
+> Task :jmlx-native-macos-arm64:generatePomFileForMavenPublication
+
+> Task :releaseAllPlan
+Release plan at b4ee4d75836f3f5fe4445e72a690dae2fd1b7887
+SELECT se.alipsa:jmlx-core:0.5.0
+  depends se.alipsa:jmlx-ffi:0.5.0 (:jmlx-core:compileClasspath)
+  depends se.alipsa:jmlx-ffi:0.5.0 (:jmlx-core:implementation)
+  depends se.alipsa:jmlx-ffi:0.5.0 (:jmlx-core:runtimeClasspath)
+  depends se.alipsa:jmlx-ffi:0.5.0 (pom.dependencies)
+SELECT se.alipsa:jmlx-ffi:0.5.0
+SELECT se.alipsa:jmlx-jinja:0.6.2
+SELECT se.alipsa:jmlx-langchain4j:0.1.0
+  depends se.alipsa:jmlx-models:0.1.0 (:jmlx-langchain4j:api)
+  depends se.alipsa:jmlx-models:0.1.0 (:jmlx-langchain4j:compileClasspath)
+  depends se.alipsa:jmlx-models:0.1.0 (:jmlx-langchain4j:implementation)
+  depends se.alipsa:jmlx-models:0.1.0 (:jmlx-langchain4j:runtimeClasspath)
+  depends se.alipsa:jmlx-models:0.1.0 (pom.dependencies)
+SELECT se.alipsa:jmlx-models:0.1.0
+  depends se.alipsa:jmlx-core:0.5.0 (:jmlx-models:api)
+  depends se.alipsa:jmlx-tokenizer:0.1.2 (:jmlx-models:api)
+  depends se.alipsa:jmlx-vision:0.1.2 (:jmlx-models:api)
+  depends se.alipsa:jmlx-core:0.5.0 (:jmlx-models:compileClasspath)
+  depends se.alipsa:jmlx-tokenizer:0.1.2 (:jmlx-models:compileClasspath)
+  depends se.alipsa:jmlx-vision:0.1.2 (:jmlx-models:compileClasspath)
+  depends se.alipsa:jmlx-core:0.5.0 (:jmlx-models:implementation)
+  depends se.alipsa:jmlx-tokenizer:0.1.2 (:jmlx-models:implementation)
+  depends se.alipsa:jmlx-vision:0.1.2 (:jmlx-models:implementation)
+  depends se.alipsa:jmlx-core:0.5.0 (:jmlx-models:runtimeClasspath)
+  depends se.alipsa:jmlx-tokenizer:0.1.2 (:jmlx-models:runtimeClasspath)
+  depends se.alipsa:jmlx-vision:0.1.2 (:jmlx-models:runtimeClasspath)
+  depends se.alipsa:jmlx-core:0.5.0 (pom.dependencies)
+  depends se.alipsa:jmlx-tokenizer:0.1.2 (pom.dependencies)
+  depends se.alipsa:jmlx-vision:0.1.2 (pom.dependencies)
+SELECT se.alipsa:jmlx-native-macos-arm64:0.1.0
+SELECT se.alipsa:jmlx-spring-ai:0.1.0
+  depends se.alipsa:jmlx-models:0.1.0 (:jmlx-spring-ai:api)
+  depends se.alipsa:jmlx-models:0.1.0 (:jmlx-spring-ai:compileClasspath)
+  depends se.alipsa:jmlx-models:0.1.0 (:jmlx-spring-ai:implementation)
+  depends se.alipsa:jmlx-models:0.1.0 (:jmlx-spring-ai:runtimeClasspath)
+  depends se.alipsa:jmlx-models:0.1.0 (pom.dependencies)
+SELECT se.alipsa:jmlx-tokenizer:0.1.2
+  depends se.alipsa:jmlx-jinja:0.6.2 (:jmlx-tokenizer:api)
+  depends se.alipsa:jmlx-jinja:0.6.2 (:jmlx-tokenizer:compileClasspath)
+  depends se.alipsa:jmlx-jinja:0.6.2 (:jmlx-tokenizer:implementation)
+  depends se.alipsa:jmlx-jinja:0.6.2 (:jmlx-tokenizer:runtimeClasspath)
+  depends se.alipsa:jmlx-jinja:0.6.2 (pom.dependencies)
+SELECT se.alipsa:jmlx-vision:0.1.2
+Verification scope: :jmlx-core, :jmlx-ffi, :jmlx-jinja, :jmlx-langchain4j, :jmlx-models, :jmlx-native-macos-arm64, :jmlx-spring-ai, :jmlx-tokenizer, :jmlx-vision
+
+
+[Incubating] Problems report is available at: file://<REPOSITORY>/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.9.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 10s
+12 actionable tasks: 2 executed, 10 up-to-date
+> Task :buildSrc:compileJava UP-TO-DATE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:processResources NO-SOURCE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :releaseAllGuard
+> Task :releaseAllSigningCheck
+
+[Incubating] Problems report is available at: file://<REPOSITORY>/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.9.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 738ms
+4 actionable tasks: 2 executed, 2 up-to-date
+Dry run completed; signing configuration will be checked during preparation.
